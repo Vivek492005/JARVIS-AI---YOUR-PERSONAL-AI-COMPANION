@@ -1,0 +1,20 @@
+{
+    "language": "en-IN",
+    "voice_rate": 160,
+    "voice_volume": 1.0,
+    "wake_word": "jarvis",
+    "require_wake_word": false,
+    "energy_threshold": 300,
+    "pause_threshold": 0.8,
+    "assistant_name": "JARVIS",
+    "tts_engine": "rumik",
+    "rumik_model": "muga",
+    "neural_voice": "en-US-AvaNeural",
+    "phrase_time_limit": 6.0,
+    "enable_ai_agent": true,
+    "ai_provider": "huggingface",
+    "hf_model": "Qwen/Qwen2.5-72B-Instruct",
+    "deepseek_model": "deepseek-chat",
+    "ai_temperature": 0.3,
+    "fallback_to_local": true
+}

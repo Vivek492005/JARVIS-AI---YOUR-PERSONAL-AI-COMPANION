@@ -1,0 +1,15 @@
+{
+  "app_name": "ACCESS-OS",
+  "version": "1.0.0",
+  "enable_gesture_control": true,
+  "gesture_sensitivity": 0.8,
+  "enable_mouse_control": true,
+  "enable_voice_control": true,
+  "wake_word": "access",
+  "voice_sensitivity": 0.7,
+  "show_camera_feed": true,
+  "show_gesture_feedback": true,
+  "show_voice_feedback": true,
+  "high_contrast_mode": false,
+  "text_to_speech": true
+}

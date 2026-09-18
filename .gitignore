@@ -1,0 +1,27 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Sensitive environment configuration (API keys)
+.env
+.env.local
+
+# Logs and runtime artifacts
+*.log
+notes.txt
+screenshots/
+jarvis_voice.log
+jarvis.log
+access_os.log
+
+# Temporary / OS files
+.DS_Store
+Thumbs.db
