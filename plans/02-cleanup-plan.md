@@ -1,7 +1,14 @@
 # JARVIS — Cleanup Plan
 
-**Status:** Plan (not yet implemented) · **Priority:** P1 — do before packaging (Plan 03 depends on it)
+**Status:** Phases A, B, D implemented 2026-10-30 (commit f7a8f25, local clone only — NOT in Vivek's repo yet); Phase C pending · **Priority:** P1 — do before packaging (Plan 03 depends on it)
 **Verified:** every claim below was checked with `grep` against the cloned repo on 2026-10-30.
+
+**Implementation log (2026-10-30):**
+- Phase A: 3 dead files deleted via `git rm` (zero references re-verified at implementation time).
+- Phase B: `requirements.txt` rewritten to proven imports only; 13 unused packages moved to new `requirements-optional.txt` with re-add reasons; **added 3 packages the code imports but requirements missed** (`fuzzywuzzy`, `psutil`, `pyperclip`) — fresh installs would have crashed without them.
+- Phase D: `Launch_Saarthi.bat` → `Launch_JARVIS.bat` (`git mv`); hardcoded `e:\Btech Essentials\JARVIS` replaced with `cd /d "%~dp0"`; README references + naming note updated.
+- Phase C (engine unification) deliberately left for a focused session with the full test suite.
+- command_policy.py spot checks: 6/6 pass after cleanup (module untouched).
 
 ---
 
