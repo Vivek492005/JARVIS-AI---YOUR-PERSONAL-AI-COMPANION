@@ -49,7 +49,7 @@ copy env.example .env
 # → open .env in any text editor and paste in your keys (see API Key Configuration below)
 
 # 4. Launch
-Launch_Saarthi.bat
+Launch_JARVIS.bat
 ```
 
 That's it — the floating companion widget should appear on your screen and start listening. 🎙
@@ -123,7 +123,7 @@ JARVIS-AI---YOUR-PERSONAL-AI-COMPANION/
 ├── main.py                     # Primary GUI application entry point
 ├── gui.py                      # Tkinter + Pillow floating AI companion widget
 ├── install.bat                 # One-click dependency & environment setup
-├── Launch_Saarthi.bat          # 1-click desktop background launcher
+├── Launch_JARVIS.bat          # 1-click desktop background launcher
 │
 ├── access_os/                  # Core Accessibility & Intelligence Package
 │   ├── __init__.py             # Module exports
@@ -152,7 +152,7 @@ JARVIS-AI---YOUR-PERSONAL-AI-COMPANION/
 
 > **Note**: `.env`, `notes.txt`, `jarvis.log`, `screenshots/`, `.venv/`, and `__pycache__/` are generated at runtime and intentionally excluded from version control via `.gitignore` — you won't see them in a fresh clone.
 
-> ⚠️ **File naming note**: The launcher script is currently named `Launch_Saarthi.bat` (a leftover from an earlier project name). It works exactly the same — just double-click it. For full naming consistency you can rename it to `Launch_JARVIS.bat` in your local copy; just remember to update this README's command if you do.
+> **Note**: The desktop launcher is `Launch_JARVIS.bat` — it uses its own folder (`%~dp0`), so it works from any location with no hardcoded paths.
 
 ---
 
@@ -231,7 +231,7 @@ If both Hugging Face and DeepSeek are ever unreachable, JARVIS silently falls ba
 ## 🚀 Running JARVIS
 
 ### Option A: Desktop 1-Click Launch (Recommended)
-Double-click **`Launch_Saarthi.bat`**.
+Double-click **`Launch_JARVIS.bat`**.
 This starts the floating AI companion without leaving a lingering command prompt open.
 
 ### Option B: From Command Line

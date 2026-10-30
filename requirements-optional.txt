@@ -1,0 +1,29 @@
+# Packages REMOVED from requirements.txt on 2026-10-30.
+# Each was declared but is imported NOWHERE in the codebase (verified with grep).
+# Re-add only if you implement the feature noted beside it.
+#
+# Install with: pip install -r requirements-optional.txt   (only what you need)
+
+# --- Heavy ML stack (~2 GB install, nothing imports it) ---
+# torch>=2.0.0            # re-add if a local model is ever loaded (none is today)
+# torchvision>=0.15.0     # see above
+# torchaudio>=2.0.0       # see above
+# transformers>=4.30.0    # see above
+
+# --- Offline STT ---
+# openai-whisper>=20230314  # STT actually uses Google via SpeechRecognition; re-add if offline STT is implemented
+
+# --- Web server (none exists in the codebase) ---
+# flask>=2.3.0
+# flask-socketio>=5.3.4
+
+# --- Data / input libs never imported ---
+# pandas>=2.0.0           # never imported anywhere
+# keyboard>=0.13.5        # never imported; pyautogui covers keyboard/mouse
+# pynput>=1.7.6           # never imported; pyautogui covers keyboard/mouse
+# pywinauto>=0.6.8        # never imported
+# pygetwindow>=0.0.9      # never imported
+# pywin32>=306            # no win32* imports anywhere; ctypes is used instead
+# python-dateutil>=2.8.2  # never imported
+# pyaudio>=0.2.13         # only named inside a test's print() string, never imported;
+#                         # not needed for Google STT via SpeechRecognition

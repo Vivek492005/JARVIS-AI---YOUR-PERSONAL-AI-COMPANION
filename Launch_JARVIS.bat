@@ -2,8 +2,8 @@
 :: JARVIS AI Companion - Desktop Launcher
 :: Double-click this file to start JARVIS without any terminal window
 
-:: Navigate to the project folder
-cd /d "e:\Btech Essentials\JARVIS"
+:: Navigate to this bat file's own directory (works from anywhere, no hardcoded path)
+cd /d "%~dp0"
 
 :: Start the companion in background without keeping terminal open
 if exist ".venv\Scripts\pythonw.exe" (
