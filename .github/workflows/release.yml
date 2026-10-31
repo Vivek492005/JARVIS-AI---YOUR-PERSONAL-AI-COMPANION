@@ -1,0 +1,85 @@
+# JARVIS release pipeline — tag push -> Windows installer on GitHub Releases.
+#
+# Flow:  git tag v1.0.0 && git push origin v1.0.0
+#        -> ~25-40 min -> installer attached to the GitHub Release.
+#
+# Quality gate: the pure-python test files must pass before anything builds.
+# (Mic/camera/GUI tests can't run headless, so they stay out of CI.)
+
+name: Release installer
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # needed for gh release create/upload
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Quality gate — pure-python tests
+        run: >
+          python -m pytest tests/test_command_policy.py
+          tests/test_agent_safety.py tests/test_actions_unified.py
+          tests/test_ai_agent.py -q
+
+      - name: Build with PyInstaller
+        run: |
+          pip install pyinstaller
+          pyinstaller packaging/jarvis.spec
+
+      - name: Smoke-test the bundle
+        run: |
+          cd dist/JARVIS
+          ./JARVIS.exe --self-test
+        timeout-minutes: 5
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart("v")
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=$ver" packaging\jarvis.iss
+
+      - name: Create GitHub Release with installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $notes = @'
+          ## JARVIS ${{ github.ref_name }} — Windows installer
+
+          **First install?** Download `JARVIS-Setup-${{ github.ref_name }}.exe`,
+          run it, paste your API keys when asked (all have free tiers), and talk.
+
+          > **SmartScreen note (v1 is unsigned):** Windows will show an
+          > "Unknown publisher" warning — click *More info* → *Run anyway*.
+          > This is expected for a first release without a paid code-signing
+          > certificate.
+
+          ### What's inside
+          - LLM tool-calling brain (Qwen 2.5 72B → DeepSeek → offline fallback)
+          - Confirm-before-destroy safety gate + local audit log
+          - Voice chain: Rumik → Edge neural → offline; Hinglish supported
+          - Floating companion widget + text prompt bar
+          '@
+          gh release create "${{ github.ref_name }}" `
+            --title "JARVIS ${{ github.ref_name }}" `
+            --notes $notes `
+            dist-installer/*.exe

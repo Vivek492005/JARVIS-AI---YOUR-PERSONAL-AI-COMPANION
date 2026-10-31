@@ -10,6 +10,7 @@ import logging
 import threading
 
 from access_os.voice_interface import VoiceInterface, VoiceCommand
+from access_os.first_run import ensure_api_keys
 from gui import JARVISGUI
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -112,10 +113,44 @@ class JARVISAssistant:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+def _self_test() -> int:
+    """Smoke test for the packaged build (CI runs `JARVIS.exe --self-test`).
+
+    No GUI, no network, no microphone: just proves the security gate and the
+    unified action executors are intact inside the bundle.
+    """
+    from access_os.command_policy import check_tool_call
+    from access_os.actions import run_action
+
+    assert check_tool_call(
+        "run_powershell_command", {"command": "Remove-Item x"})[0] == "deny"
+    assert check_tool_call(
+        "run_powershell_command", {"command": "Get-Date"})[0] == "allow"
+    assert check_tool_call(
+        "keyboard_mouse_action",
+        {"action": "press_hotkey", "value": "alt+f4"})[0] == "deny"
+
+    verdict, result = run_action(
+        "manage_notes", {"action": "save", "content": "self-test"})
+    assert verdict == "allow", result
+    assert os.path.exists("notes.txt")
+    os.remove("notes.txt")
+
+    print("JARVIS self-test OK")
+    return 0
+
+
 def main():
+    if "--self-test" in sys.argv:
+        sys.exit(_self_test())
+
     # Change working directory to project root so relative paths work
     project_root = os.path.dirname(os.path.abspath(__file__))
     os.chdir(project_root)
+
+    # First-run API key dialog for non-technical users (silent no-op if keys
+    # are already configured). Never blocks startup.
+    ensure_api_keys()
 
     assistant = JARVISAssistant()
     assistant.start()
