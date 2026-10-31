@@ -279,12 +279,34 @@ Prefer to type? Use the input bar on the companion card:
 
 A quick mental model of the request lifecycle, for anyone reading the code or contributing:
 
+```
+User text / voice
+       │
+VoiceCommandProcessor.process()          ← routing only (no OS touches here)
+  0. pending confirmation? → resolve via the agent's state machine
+  1. regex fast-path (deterministic, no API round-trip: "volume up", …)
+  2. fuzzy match (typo-tolerant)
+  3. LLM AIAgent fallback (tool-calling brain)
+  4. Google search last resort
+       │
+Every parameterized action funnels into access_os/actions.py
+(single home for all 8 tools — no duplicated OS code anymore)
+       │
+command_policy.check_tool_call()         ← allow / confirm / deny gate
+  DENY    → blocked, reason returned (logged)
+  CONFIRM → user asked first ("say yes"), 60s timeout (logged)
+  ALLOW   → execute (logged)
+       │
+jarvis_audit.log                         ← every verdict, local only
+```
+
 1. **Capture** — `voice_interface.py` listens via microphone (speech-to-text) or reads text typed into the prompt bar.
-2. **Understand** — the captured input, plus recent rolling conversational context, is sent to `ai_agent.py`, which calls the LLM brain (Qwen 2.5 72B via Hugging Face, falling back to DeepSeek).
-3. **Decide** — the LLM doesn't just reply in text; it decides *which tool to call* (open an app, download media, control the system, etc.) and formats the arguments as structured JSON — this is the "autonomous tool-calling" mechanism.
-4. **Execute** — the tool dispatcher in `ai_agent.py` runs the corresponding function in `access_os/` against your actual OS (via `pyautogui`, `subprocess`, `yt-dlp`, etc.), inside white-listed, sandboxed calls.
-5. **Respond** — the result is summarized into a short natural-language reply, sent to `voice_interface.py`, and spoken back through the TTS failover chain (Rumik → Edge-TTS → Pyttsx3).
-6. **Reflect** — the GUI (`gui.py`) updates its live status badge throughout (`● Listening...` → `⚡ Thinking...` → `● Ready`) so you always know what state JARVIS is in.
+2. **Route** — `VoiceCommandProcessor.process()` tries instant commands first (regex → fuzzy), so "volume up" never waits for an API call. Anything it can't handle falls through to the LLM `AIAgent`, then to web search. A pending destructive-action confirmation always takes precedence.
+3. **Decide** — the LLM doesn't just reply in text; it decides *which tool to call* (open an app, download media, control the system, etc.) and formats the arguments as structured JSON — this is the "autonomous tool-calling" mechanism. If all APIs are down, a keyword-based local fallback handles basic commands (destructive actions are excluded offline).
+4. **Gate** — every tool call passes `command_policy.check_tool_call()`: PowerShell is limited to a read-only allowlist, dangerous hotkeys are blocked, and destructive actions (recycle bin, PC lock, note wipe) require explicit user confirmation.
+5. **Execute** — the single implementations in `access_os/actions.py` run against your OS (via `pyautogui`, `subprocess`, `yt-dlp`, etc.).
+6. **Respond** — the result is summarized into a short natural-language reply and spoken back through the TTS failover chain (Rumik → Edge-TTS → Pyttsx3).
+7. **Reflect** — the GUI (`gui.py`) updates its live status badge throughout (`● Listening...` → `⚡ Thinking...` → `● Ready`) so you always know what state JARVIS is in.
 
 ---
 
@@ -332,9 +354,13 @@ Run these first whenever something doesn't behave as expected — they'll usuall
 
 ## 🔒 Security & Privacy
 - **API Keys**: All credentials are kept in `.env` (never committed) and excluded from version control via `.gitignore`. Only `env.example`, with placeholder values, is tracked in the repo.
-- **System Safety**: Command execution uses verified white-listed system calls and sandboxed parameter verification — JARVIS won't run arbitrary shell commands from LLM output.
+- **Allowlisted automation** (`access_os/command_policy.py`): every tool call the AI wants to run passes through a security gate first. PowerShell is restricted to a read-only allowlist (file/process lookups) — destructive cmdlets, command chaining, and downloads are denied by default. Dangerous hotkeys (`alt+f4`, `win+r`, …) are blocked.
+- **Confirm-before-destroy**: emptying the Recycle Bin, locking the PC, wiping notes, and any other irreversible action requires your explicit confirmation (a dialog in the GUI, or a spoken "say yes to confirm"). Confirmations expire after 60 seconds.
+- **Audit trail**: every tool call — allowed, confirmed, or blocked — is logged to `jarvis_audit.log` (local, git-ignored, never uploaded).
+- **Prompt-hygiene**: the system prompt carries non-negotiable safety rules (read-only shell, no exfiltration of notes/screenshots, ask-before-destroy), and the validator inspects the final command string, so it holds even if the model is jailbroken.
 - **Fail-Safe Operation**: `pyautogui.FAILSAFE` protections are integrated to prevent runaway cursor movements (move your mouse to a screen corner to force-abort any automated action).
 - **Local-First Notes**: Notes are stored locally in `notes.txt` and never transmitted anywhere outside your machine.
+- **Honest limits**: speech recognition uses Google's cloud speech API (an internet connection is needed for voice input); only the `pyttsx3` voice tier works fully offline.
 
 ---
 

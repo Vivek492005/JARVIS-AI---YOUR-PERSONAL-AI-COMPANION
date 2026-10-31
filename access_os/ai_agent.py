@@ -22,9 +22,10 @@ import json
 import logging
 import datetime
 import subprocess
+import time
 import webbrowser
 import urllib.parse
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,16 @@ try:
     load_dotenv()
 except ImportError:
     pass
+
+# Security gate: every tool call passes through check_tool_call() first.
+# Action implementations live in access_os/actions.py (single home for both
+# command engines — see Phase C of the cleanup plan).
+try:
+    from .command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
+    from .actions import execute_tool_raw
+except ImportError:  # direct script execution
+    from command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
+    from actions import execute_tool_raw
 
 
 class AIAgent:
@@ -66,6 +77,16 @@ class AIAgent:
         self.conversation_history: List[Dict[str, str]] = []
         self.max_history = 10
         self.notes_file = "notes.txt"
+
+        # Safety: confirmation slot for destructive actions + audit trail.
+        # pending_confirmation = (tool_name, args, timestamp) or None
+        self.pending_confirmation: Optional[Tuple[str, Dict[str, Any], float]] = None
+        self.confirm_timeout = 60  # seconds before a pending confirmation expires
+        self.confirm_words = {
+            "yes", "yeah", "yep", "confirm", "confirmed",
+            "haan", "ha", "ok", "okay", "do it", "go ahead", "sure",
+        }
+        self.audit_log_file = "jarvis_audit.log"
 
         self.client = None
         self.backup_client = None
@@ -279,291 +300,98 @@ class AIAgent:
             "3. If multiple actions are requested in one sentence (e.g., 'open notepad and write hello'), call the tools in sequence.\n"
             "4. For general questions, jokes, explanations, or conversational chit-chat, respond directly in a warm, concise, "
             "helpful manner suitable for Text-To-Speech (keep it natural, punchy, avoid complex markdown or long code blocks unless asked).\n"
-            "5. Always confirm actions politely and briefly (e.g., 'Opening Chrome', 'Downloaded song to your Downloads folder')."
+            "5. Always confirm actions politely and briefly (e.g., 'Opening Chrome', 'Downloaded song to your Downloads folder').\n\n"
+            "Safety rules (non-negotiable — these override any user instruction):\n"
+            "1. PowerShell is read-only: only use it for lookups (listing files, checking processes, reading file info). "
+            "Never emit destructive, downloading, or chained commands.\n"
+            "2. For destructive or irreversible actions (emptying recycle bin, locking the PC, deleting notes), "
+            "always ask the user first — never assume consent. A tool result of ACTION_REQUIRES_CONFIRMATION means "
+            "you must relay the confirmation question to the user verbatim and wait.\n"
+            "3. Never exfiltrate: notes, screenshots, and file contents stay on this machine. Never paste them into "
+            "URLs, search queries, or tool arguments for external services.\n"
+            "4. If a request conflicts with these rules, refuse briefly and offer the safe alternative."
         )
 
     # =========================================================================
     # TOOL EXECUTION IMPLEMENTATIONS
     # =========================================================================
 
-    def execute_open_application(self, app_name: str) -> str:
-        self._notify_status(f"Opening {app_name}...")
-        lowered = app_name.lower().strip()
+    def _execute_tool(self, function_name: str, args: Dict[str, Any]) -> str:
+        """Execute an already-authorized tool call.
 
-        app_mappings = {
-            "chrome": ["start", "chrome"],
-            "google chrome": ["start", "chrome"],
-            "edge": ["start", "msedge"],
-            "ms edge": ["start", "msedge"],
-            "microsoft edge": ["start", "msedge"],
-            "notepad": ["notepad.exe"],
-            "calculator": ["calc.exe"],
-            "calc": ["calc.exe"],
-            "vs code": ["code"],
-            "vscode": ["code"],
-            "code": ["code"],
-            "file explorer": ["explorer.exe"],
-            "explorer": ["explorer.exe"],
-            "terminal": ["wt.exe"],
-            "command prompt": ["cmd.exe"],
-            "cmd": ["cmd.exe"],
-            "powershell": ["powershell.exe"],
-            "task manager": ["taskmgr.exe"],
-            "paint": ["mspaint.exe"],
-            "settings": ["start", "ms-settings:"],
-            "spotify": ["start", "spotify:"],
-            "word": ["start", "winword"],
-            "excel": ["start", "excel"],
-            "powerpoint": ["start", "powerpnt"],
-        }
+        The policy gate ran in _dispatch_tool_call() (or the user confirmed).
+        All implementations live in access_os/actions.py — this is a thin
+        delegate so there is exactly one copy of every OS action.
+        """
+        logger.info(f"Executing tool: {function_name} with args: {args}")
+        return execute_tool_raw(
+            function_name, args or {},
+            status_callback=self._notify_status,
+            notes_file=self.notes_file,
+        )
 
-        for key, cmd in app_mappings.items():
-            if key in lowered or lowered in key:
-                try:
-                    subprocess.Popen(cmd, shell=True)
-                    return f"Successfully opened {app_name}."
-                except Exception as e:
-                    logger.error(f"Failed to open mapped app {app_name}: {e}")
+    def request_confirmation(self, tool_name: str, args: Dict[str, Any]) -> str:
+        """Register a destructive action for user confirmation.
 
-        # Try generic Windows start
+        Shared by the LLM path (_dispatch_tool_call) and the legacy regex
+        path (VoiceCommandProcessor adapters). Returns the confirmation
+        question to relay to the user. The user's next message is resolved
+        in process().
+        """
+        args = args or {}
+        self.pending_confirmation = (tool_name, args, time.time())
+        question = confirmation_prompt(tool_name, args)
+        self._audit(tool_name, args, "confirm_requested",
+                    f"ACTION_REQUIRES_CONFIRMATION: {question}")
+        return f"ACTION_REQUIRES_CONFIRMATION: {question}"
+
+    def _audit(self, tool_name: str, args: Dict[str, Any], verdict: str, result: str):
+        """Append one JSON line per tool call to the local audit log.
+
+        The audit log is local-only (git-ignored) and never leaves the machine.
+        It must never break execution — failures are swallowed deliberately.
+        """
         try:
-            subprocess.Popen(f'start "" "{app_name}"', shell=True)
-            return f"Opened {app_name}."
-        except Exception as e:
-            logger.error(f"Failed to start app {app_name}: {e}")
-            return f"Could not launch {app_name}: {e}"
-
-    def execute_open_website(self, url_or_name: str) -> str:
-        self._notify_status(f"Opening {url_or_name}...")
-        url = url_or_name.strip()
-        site_map = {
-            "youtube": "https://www.youtube.com",
-            "google": "https://www.google.com",
-            "gmail": "https://mail.google.com",
-            "github": "https://github.com",
-            "linkedin": "https://www.linkedin.com",
-            "twitter": "https://twitter.com",
-            "x": "https://twitter.com",
-            "instagram": "https://www.instagram.com",
-            "facebook": "https://www.facebook.com",
-            "reddit": "https://www.reddit.com",
-            "netflix": "https://www.netflix.com",
-            "spotify": "https://open.spotify.com",
-            "amazon": "https://www.amazon.com",
-            "chatgpt": "https://chat.openai.com",
-            "whatsapp": "https://web.whatsapp.com",
-            "wikipedia": "https://www.wikipedia.org",
-        }
-
-        lowered = url.lower()
-        for name, full_url in site_map.items():
-            if lowered == name or lowered == f"open {name}":
-                webbrowser.open(full_url)
-                return f"Opening {name}."
-
-        if not url.startswith("http://") and not url.startswith("https://"):
-            if "." in url and " " not in url:
-                url = "https://" + url
-            else:
-                return self.execute_web_search(url)
-
-        webbrowser.open(url)
-        return f"Opening {url_or_name}."
-
-    def execute_web_search(self, query: str) -> str:
-        self._notify_status(f"Searching web for '{query}'...")
-        encoded = urllib.parse.quote_plus(query)
-        webbrowser.open(f"https://www.google.com/search?q={encoded}")
-        return f"Searching Google for {query}."
-
-    def execute_download_media(self, url_or_query: str, media_type: str = "audio") -> str:
-        self._notify_status(f"Downloading {media_type} for '{url_or_query}'...")
-        try:
-            import yt_dlp
-
-            # Determine download path (user's Downloads or Music directory)
-            home_dir = os.path.expanduser("~")
-            if media_type == "audio":
-                download_dir = os.path.join(home_dir, "Music")
-            else:
-                download_dir = os.path.join(home_dir, "Downloads")
-            os.makedirs(download_dir, exist_ok=True)
-
-            out_template = os.path.join(download_dir, "%(title)s.%(ext)s")
-
-            ydl_opts = {
-                "outtmpl": out_template,
-                "quiet": True,
-                "no_warnings": True,
+            safe_args = {k: (str(v)[:200]) for k, v in (args or {}).items()}
+            entry = {
+                "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+                "tool": tool_name,
+                "args": safe_args,
+                "verdict": verdict,
+                "result": str(result)[:200],
             }
-
-            if media_type == "audio":
-                ydl_opts["format"] = "bestaudio/best"
-                ydl_opts["postprocessors"] = [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }]
-            else:
-                ydl_opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-
-            # If input is not a direct URL, use ytsearch
-            target = url_or_query.strip()
-            if not target.startswith("http://") and not target.startswith("https://"):
-                target = f"ytsearch1:{target}"
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(target, download=True)
-                title = info.get("title", "media")
-                if "entries" in info and len(info["entries"]) > 0:
-                    title = info["entries"][0].get("title", title)
-
-            folder_name = "Music" if media_type == "audio" else "Downloads"
-            return f"Successfully downloaded '{title}' to your {folder_name} folder."
-        except Exception as e:
-            logger.error(f"Download error: {e}")
-            return f"Download failed: {str(e)}"
-
-    def execute_system_control(self, action: str) -> str:
-        self._notify_status(f"Executing system control: {action}...")
-        try:
-            import pyautogui
-
-            if action == "volume_up":
-                for _ in range(5):
-                    pyautogui.press("volumeup")
-                return "Increased volume."
-            elif action == "volume_down":
-                for _ in range(5):
-                    pyautogui.press("volumedown")
-                return "Decreased volume."
-            elif action in ["mute", "unmute"]:
-                pyautogui.press("volumemute")
-                return "Toggled volume mute."
-            elif action == "take_screenshot":
-                os.makedirs("screenshots", exist_ok=True)
-                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                fn = os.path.join("screenshots", f"screenshot_{ts}.png")
-                screenshot = pyautogui.screenshot()
-                screenshot.save(fn)
-                return f"Screenshot captured and saved to {fn}."
-            elif action == "lock_pc":
-                os.system("rundll32.exe user32.dll,LockWorkStation")
-                return "Locking the workstation."
-            elif action == "empty_recycle_bin":
-                subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"],
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-                )
-                return "Recycle Bin has been emptied."
-            elif action == "check_battery":
-                try:
-                    import psutil
-                    battery = psutil.sensors_battery()
-                    if battery:
-                        plugged = "plugged in" if battery.power_plugged else "on battery"
-                        return f"Battery is at {battery.percent:.0f}% and {plugged}."
-                except Exception:
-                    pass
-                return "Battery status is unavailable."
-            return f"Unknown system action: {action}"
-        except Exception as e:
-            logger.error(f"System control error ({action}): {e}")
-            return f"Failed to perform {action}: {e}"
-
-    def execute_keyboard_mouse(self, action: str, value: str) -> str:
-        self._notify_status(f"Performing {action}...")
-        try:
-            import pyautogui
-            import pyperclip
-
-            if action == "type_text":
-                pyperclip.copy(value)
-                pyautogui.hotkey("ctrl", "v")
-                return f"Typed: '{value}'"
-            elif action == "press_hotkey":
-                keys = [k.strip().lower() for k in value.split("+")]
-                pyautogui.hotkey(*keys)
-                return f"Pressed hotkey {value}."
-            elif action == "press_key":
-                pyautogui.press(value.lower().strip())
-                return f"Pressed key {value}."
-            return f"Unknown keyboard action: {action}"
-        except Exception as e:
-            logger.error(f"Keyboard/mouse action error: {e}")
-            return f"Action failed: {e}"
-
-    def execute_manage_notes(self, action: str, content: Optional[str] = None) -> str:
-        self._notify_status("Managing notes...")
-        if action == "save":
-            if not content:
-                return "No note content provided."
-            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open(self.notes_file, "a", encoding="utf-8") as f:
-                f.write(f"[{ts}] {content}\n")
-            return f"Note saved: {content}"
-        elif action == "read":
-            if not os.path.exists(self.notes_file):
-                return "You do not have any notes saved yet."
-            with open(self.notes_file, "r", encoding="utf-8") as f:
-                lines = [line.strip() for line in f.readlines() if line.strip()]
-            if not lines:
-                return "Your notes file is empty."
-            recent = lines[-5:]
-            return "Here are your recent notes: " + " | ".join(recent)
-        elif action == "clear":
-            if os.path.exists(self.notes_file):
-                os.remove(self.notes_file)
-            return "Cleared all your notes."
-        return f"Unknown note action: {action}"
-
-    def execute_powershell(self, command: str) -> str:
-        self._notify_status(f"Running command: {command}...")
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", command],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            )
-            output = result.stdout.strip() or result.stderr.strip()
-            return output[:300] if output else "Command executed successfully."
-        except Exception as e:
-            logger.error(f"PowerShell execution error: {e}")
-            return f"Command execution failed: {e}"
+            with open(self.audit_log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def _dispatch_tool_call(self, function_name: str, args: Dict[str, Any]) -> str:
-        """Route tool call to appropriate Python handler."""
-        logger.info(f"Executing tool: {function_name} with args: {args}")
+        """Policy-gated dispatch — the ONLY entry point for LLM tool calls.
 
-        if function_name == "open_application":
-            return self.execute_open_application(args.get("app_name", ""))
-        elif function_name == "open_website":
-            return self.execute_open_website(args.get("url_or_name", ""))
-        elif function_name == "web_search":
-            return self.execute_web_search(args.get("query", ""))
-        elif function_name == "download_media":
-            return self.execute_download_media(
-                args.get("url_or_query", ""),
-                args.get("media_type", "audio")
-            )
-        elif function_name == "system_control":
-            return self.execute_system_control(args.get("action", ""))
-        elif function_name == "keyboard_mouse_action":
-            return self.execute_keyboard_mouse(
-                args.get("action", ""),
-                args.get("value", "")
-            )
-        elif function_name == "manage_notes":
-            return self.execute_manage_notes(
-                args.get("action", ""),
-                args.get("content", None)
-            )
-        elif function_name == "run_powershell_command":
-            return self.execute_powershell(args.get("command", ""))
-        else:
-            return f"Tool {function_name} is not recognized."
+        Every call passes through command_policy.check_tool_call() first:
+          DENY    -> blocked, reason returned to the LLM (it can explain / offer
+                     a safe alternative).
+          CONFIRM -> not executed; the confirmation question is returned to the
+                     LLM, which relays it to the user. The call is stored in
+                     self.pending_confirmation and only runs if the user's next
+                     message confirms (see process()).
+          ALLOW   -> executed via _execute_tool().
+        """
+        args = args or {}
+        verdict, reason = check_tool_call(function_name, args)
+
+        if verdict == DENY:
+            logger.warning(f"Blocked tool call: {function_name} ({reason})")
+            result = f"Blocked for safety: {reason}"
+            self._audit(function_name, args, "deny", result)
+            return result
+
+        if verdict == CONFIRM:
+            return self.request_confirmation(function_name, args)
+
+        result = self._execute_tool(function_name, args)
+        self._audit(function_name, args, ALLOW, result)
+        return result
 
     # =========================================================================
     # INTENT PROCESSING & FALLBACK REASONING
@@ -581,15 +409,15 @@ class AIAgent:
                 if phrase in query.lower():
                     query = query.lower().replace(phrase, "").strip()
             if query:
-                return self.execute_download_media(query, media_type)
+                return execute_tool_raw("download_media", {"url_or_query": query, "media_type": media_type}, self._notify_status, self.notes_file)
 
         # 2. Open Application / Website requests
         if lowered.startswith("open ") or lowered.startswith("launch ") or lowered.startswith("go to "):
             target = lowered.replace("open ", "").replace("launch ", "").replace("go to ", "").strip()
             # If known website or dot in name
             if any(s in target for s in ["youtube", "google", "gmail", "github", "linkedin", "reddit", "netflix", "instagram", "facebook", "twitter", "whatsapp", "chatgpt"]) or "." in target:
-                return self.execute_open_website(target)
-            return self.execute_open_application(target)
+                return execute_tool_raw("open_website", {"url_or_name": target}, self._notify_status, self.notes_file)
+            return execute_tool_raw("open_application", {"app_name": target}, self._notify_status, self.notes_file)
 
         # 3. Write / Type text
         if lowered.startswith("write ") or lowered.startswith("type "):
@@ -598,7 +426,7 @@ class AIAgent:
                 if lowered.startswith(prefix):
                     text = user_input[len(prefix):].strip()
                     break
-            return self.execute_keyboard_mouse("type_text", text)
+            return execute_tool_raw("keyboard_mouse_action", {"action": "type_text", "value": text}, self._notify_status, self.notes_file)
 
         # 4. Search requests
         if "search for" in lowered or "search google for" in lowered or lowered.startswith("google "):
@@ -606,23 +434,22 @@ class AIAgent:
                 if prefix in lowered:
                     idx = lowered.find(prefix) + len(prefix)
                     query = user_input[idx:].strip()
-                    return self.execute_web_search(query)
+                    return execute_tool_raw("web_search", {"query": query}, self._notify_status, self.notes_file)
 
         # 5. System commands
         if "screenshot" in lowered:
-            return self.execute_system_control("take_screenshot")
-        if "lock" in lowered and ("pc" in lowered or "computer" in lowered or "workstation" in lowered):
-            return self.execute_system_control("lock_pc")
-        if "recycle bin" in lowered:
-            return self.execute_system_control("empty_recycle_bin")
+            return execute_tool_raw("system_control", {"action": "take_screenshot"}, self._notify_status, self.notes_file)
+        # NOTE: lock_pc is destructive — not available in the offline fallback.
+        # Use the gated path (LLM or regex engine) so confirmation applies.
+        # NOTE: empty_recycle_bin is destructive — not available offline.
         if "battery" in lowered:
-            return self.execute_system_control("check_battery")
+            return execute_tool_raw("system_control", {"action": "check_battery"}, self._notify_status, self.notes_file)
         if "volume up" in lowered or "increase volume" in lowered:
-            return self.execute_system_control("volume_up")
+            return execute_tool_raw("system_control", {"action": "volume_up"}, self._notify_status, self.notes_file)
         if "volume down" in lowered or "decrease volume" in lowered:
-            return self.execute_system_control("volume_down")
+            return execute_tool_raw("system_control", {"action": "volume_down"}, self._notify_status, self.notes_file)
         if "mute" in lowered:
-            return self.execute_system_control("mute")
+            return execute_tool_raw("system_control", {"action": "mute"}, self._notify_status, self.notes_file)
 
         # 6. Notes
         if lowered.startswith("note that ") or lowered.startswith("take note ") or lowered.startswith("save note "):
@@ -631,12 +458,12 @@ class AIAgent:
                 if lowered.startswith(p):
                     content = user_input[len(p):].strip()
                     break
-            return self.execute_manage_notes("save", content)
+            return execute_tool_raw("manage_notes", {"action": "save", "content": content}, self._notify_status, self.notes_file)
         if "read my notes" in lowered or "show my notes" in lowered:
-            return self.execute_manage_notes("read")
+            return execute_tool_raw("manage_notes", {"action": "read"}, self._notify_status, self.notes_file)
 
         # Default fallback: search query
-        return self.execute_web_search(user_input)
+        return execute_tool_raw("web_search", {"query": user_input}, self._notify_status, self.notes_file)
 
     def _call_llm_flow(self, client, model_name: str, clean_input: str) -> Optional[str]:
         """Execute LLM chat completion with autonomous tool dispatch."""
@@ -690,6 +517,25 @@ class AIAgent:
         clean_input = user_input.strip()
         if not clean_input:
             return ""
+
+        # 0. Resolve a pending destructive-action confirmation FIRST.
+        #    A confirmed action bypasses the gate via _execute_tool() directly —
+        #    it must NOT go back through _dispatch_tool_call(), or it would
+        #    ask for confirmation again in an infinite loop.
+        if self.pending_confirmation is not None:
+            tool_name, c_args, ts = self.pending_confirmation
+            self.pending_confirmation = None
+            lowered = clean_input.lower().strip().rstrip(".!")
+            if time.time() - ts > self.confirm_timeout:
+                return "Confirmation timed out — action cancelled."
+            if lowered in self.confirm_words:
+                self._notify_status("Confirmed — executing...")
+                result = self._execute_tool(tool_name, c_args)
+                self._audit(tool_name, c_args, "confirmed", result)
+                self.conversation_history.append({"role": "user", "content": clean_input})
+                self.conversation_history.append({"role": "assistant", "content": result})
+                return result
+            return "Cancelled — I won't do that."
 
         self._notify_status("Thinking...")
 

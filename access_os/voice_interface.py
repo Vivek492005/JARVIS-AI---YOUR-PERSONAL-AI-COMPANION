@@ -39,6 +39,13 @@ try:
 except ImportError:
     from access_os.ai_agent import AIAgent
 
+# Unified action executors (Phase C): the single home for every OS action.
+# The legacy regex adapters below delegate here instead of re-implementing.
+try:
+    from .actions import run_action, execute_tool_raw, ALLOW, CONFIRM, DENY
+except ImportError:
+    from access_os.actions import run_action, execute_tool_raw, ALLOW, CONFIRM, DENY
+
 
 class CommandType(Enum):
     """Categories of voice commands."""
@@ -1143,6 +1150,31 @@ class VoiceCommandProcessor:
 
     # --- Action Implementations ---
 
+    def _gated(self, tool_name: str, args: Dict[str, Any], ok_msg: Optional[str] = None) -> str:
+        """Run a user-parameterized action through the shared policy gate.
+
+        This is what makes the legacy regex engine safe: instead of touching
+        the OS directly, every parameterized action goes through
+        actions.run_action(), the same gate the LLM path uses.
+
+        ALLOW   -> return ok_msg (or the raw result when no ok_msg given).
+        CONFIRM -> register the confirmation on the linked AI agent (which
+                   owns the confirmation state machine) and return the
+                   confirmation question. The user's next message is resolved
+                   via process(), which delegates to the agent while a
+                   confirmation is pending.
+        DENY    -> return the block reason.
+        """
+        verdict, result = run_action(tool_name, args, notes_file=self.notes_file)
+        if verdict == CONFIRM:
+            agent = getattr(self, "ai_agent", None)
+            if agent is not None:
+                return agent.request_confirmation(tool_name, args)
+            return result + " (Confirmation is unavailable — action cancelled.)"
+        if verdict == ALLOW and ok_msg is not None:
+            return ok_msg
+        return result
+
     def _open_url(self, url: str, msg: str) -> str:
         webbrowser.open(url)
         return msg
@@ -1189,8 +1221,8 @@ class VoiceCommandProcessor:
             query = "music"
         encoded = urllib.parse.quote_plus(query)
         url = f"https://www.youtube.com/results?search_query={encoded}"
-        webbrowser.open(url)
-        return f"Searching YouTube for {query}"
+        return self._gated("open_website", {"url_or_name": url},
+                           ok_msg=f"Searching YouTube for {query}")
 
     def _action_download_youtube(self, match, audio_only: bool = False) -> str:
         """Download a YouTube video or audio track using yt_dlp Python API."""
@@ -1231,35 +1263,16 @@ class VoiceCommandProcessor:
 
             # Last resort: search for a trending song
             if not target:
-                target = "ytsearch1:trending song"
+                target = "trending song"
 
-            # Prefix non-URL targets with ytsearch
-            if not target.startswith("http") and not target.startswith("ytsearch"):
-                target = f"ytsearch1:{target}"
-
+            # Single download implementation lives in access_os/actions.py
+            # (it adds the ytsearch: prefix itself when given a plain query).
             try:
-                import yt_dlp
-                ydl_opts = {
-                    "outtmpl": os.path.join(downloads_dir, "%(title)s.%(ext)s"),
-                    "noplaylist": True,
-                    "quiet": True,
-                    "no_warnings": True,
-                }
-                if audio_only:
-                    ydl_opts.update({
-                        "format": "bestaudio/best",
-                        "postprocessors": [{
-                            "key": "FFmpegExtractAudio",
-                            "preferredcodec": "mp3",
-                            "preferredquality": "192",
-                        }],
-                    })
-                else:
-                    ydl_opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([target])
-                logger.info(f"YouTube download complete: {target}")
+                result = execute_tool_raw(
+                    "download_media",
+                    {"url_or_query": target,
+                     "media_type": "audio" if audio_only else "video"})
+                logger.info(f"YouTube download result: {result}")
             except Exception as e:
                 logger.error(f"Download error: {e}")
 
@@ -1293,8 +1306,8 @@ class VoiceCommandProcessor:
             url = f"https://www.google.com/search?q={encoded}"
             name = "AI"
 
-        webbrowser.open(url)
-        return f"Asking {name}: {query}"
+        return self._gated("open_website", {"url_or_name": url},
+                           ok_msg=f"Asking {name}: {query}")
 
     def _action_ai_summarize(self) -> str:
         pyautogui.hotkey("ctrl", "c")
@@ -1304,8 +1317,10 @@ class VoiceCommandProcessor:
             return "Please select or highlight some text first so I can summarize it."
         prompt = f"Please summarize the following text clearly:\n\n{text[:1200]}"
         encoded = urllib.parse.quote_plus(prompt)
-        webbrowser.open(f"https://www.perplexity.ai/search?q={encoded}")
-        return "Sending your selected text to Perplexity AI for summarization."
+        return self._gated(
+            "open_website",
+            {"url_or_name": f"https://www.perplexity.ai/search?q={encoded}"},
+            ok_msg="Sending your selected text to Perplexity AI for summarization.")
 
     def _action_ai_code(self) -> str:
         pyautogui.hotkey("ctrl", "c")
@@ -1315,8 +1330,10 @@ class VoiceCommandProcessor:
             return "Please select the code you want me to explain or debug."
         prompt = f"Please explain this code and fix any bugs or optimizations:\n\n{code[:1200]}"
         encoded = urllib.parse.quote_plus(prompt)
-        webbrowser.open(f"https://www.perplexity.ai/search?q={encoded}")
-        return "Sending your code selection to AI for analysis and fixes."
+        return self._gated(
+            "open_website",
+            {"url_or_name": f"https://www.perplexity.ai/search?q={encoded}"},
+            ok_msg="Sending your code selection to AI for analysis and fixes.")
 
     def _action_find_file(self, match) -> str:
         try:
@@ -1411,41 +1428,36 @@ class VoiceCommandProcessor:
                     query = query[len(prefix):].strip()
         except (IndexError, AttributeError):
             query = "Google"
-        encoded = urllib.parse.quote_plus(query)
-        webbrowser.open(f"https://www.google.com/search?q={encoded}")
-        return f"Searching Google for {query}"
+        return self._gated("web_search", {"query": query},
+                           ok_msg=f"Searching Google for {query}")
 
     def _action_wiki_search(self, match) -> str:
         query = match.group(1).strip()
         encoded = urllib.parse.quote_plus(query)
-        webbrowser.open(f"https://en.wikipedia.org/wiki/Special:Search?search={encoded}")
-        return f"Searching Wikipedia for {query}"
+        return self._gated(
+            "open_website",
+            {"url_or_name": f"https://en.wikipedia.org/wiki/Special:Search?search={encoded}"},
+            ok_msg=f"Searching Wikipedia for {query}")
 
     def _action_weather_city(self, match) -> str:
         city = match.group(1).strip()
-        encoded = urllib.parse.quote_plus(f"weather {city}")
-        webbrowser.open(f"https://www.google.com/search?q={encoded}")
-        return f"Checking weather for {city}"
+        return self._gated("web_search", {"query": f"weather {city}"},
+                           ok_msg=f"Checking weather for {city}")
 
     def _action_weather_general(self) -> str:
-        webbrowser.open("https://www.google.com/search?q=weather")
-        return "Showing the current weather forecast"
+        return self._gated("web_search", {"query": "weather"},
+                           ok_msg="Showing the current weather forecast")
 
     def _action_define_word(self, match) -> str:
         word = match.group(1).strip()
-        encoded = urllib.parse.quote_plus(f"define {word}")
-        webbrowser.open(f"https://www.google.com/search?q={encoded}")
-        return f"Looking up the definition of {word}"
+        return self._gated("web_search", {"query": f"define {word}"},
+                           ok_msg=f"Looking up the definition of {word}")
 
     def _action_type_text(self, match) -> str:
         text_to_type = match.group(1).strip()
-        try:
-            pyperclip.copy(text_to_type)
-            pyautogui.hotkey('ctrl', 'v')
-            return f"Typed: {text_to_type}"
-        except Exception:
-            pyautogui.write(text_to_type)
-            return f"Typed: {text_to_type}"
+        return self._gated("keyboard_mouse_action",
+                           {"action": "type_text", "value": text_to_type},
+                           ok_msg=f"Typed: {text_to_type}")
 
     def _action_get_time(self) -> str:
         now = datetime.datetime.now()
@@ -1465,46 +1477,23 @@ class VoiceCommandProcessor:
         return "Scrolled down" if down else "Scrolled up"
 
     def _action_lock_pc(self) -> str:
-        try:
-            os.system("rundll32.exe user32.dll,LockWorkStation")
-            return "Locking the workstation"
-        except Exception as e:
-            logger.error(f"Error locking PC: {e}")
-            return "Could not lock workstation"
+        # Destructive-adjacent: goes through the policy gate, which asks for
+        # confirmation before executing.
+        return self._gated("system_control", {"action": "lock_pc"},
+                           ok_msg="Locking the workstation")
 
     def _action_take_screenshot(self) -> str:
-        try:
-            os.makedirs("screenshots", exist_ok=True)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = os.path.join("screenshots", f"screenshot_{timestamp}.png")
-            screenshot = pyautogui.screenshot()
-            screenshot.save(filename)
-            return f"Screenshot saved to {filename}"
-        except Exception as e:
-            logger.error(f"Screenshot error: {e}")
-            return "Failed to take screenshot"
+        return self._gated("system_control", {"action": "take_screenshot"},
+                           ok_msg="Screenshot captured.")
 
     def _action_empty_recycle_bin(self) -> str:
-        try:
-            subprocess.run(
-                ["powershell", "-NoProfile", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"],
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            )
-            return "Recycle Bin emptied"
-        except Exception as e:
-            logger.error(f"Error emptying recycle bin: {e}")
-            return "Could not empty recycle bin"
+        # Destructive: goes through the policy gate, which asks for
+        # confirmation before executing.
+        return self._gated("system_control", {"action": "empty_recycle_bin"},
+                           ok_msg="Recycle Bin emptied")
 
     def _action_check_battery(self) -> str:
-        try:
-            import psutil
-            battery = psutil.sensors_battery()
-            if battery:
-                plugged = "plugged in" if battery.power_plugged else "on battery"
-                return f"Battery is at {battery.percent:.0f} percent and {plugged}"
-        except Exception:
-            pass
-        return "Battery status information is unavailable."
+        return self._gated("system_control", {"action": "check_battery"})
 
     def _action_calculate(self, match) -> str:
         expr = match.group(1).strip()
@@ -1540,42 +1529,37 @@ class VoiceCommandProcessor:
 
     def _action_take_note(self, match) -> str:
         note_content = match.group(1).strip()
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            with open(self.notes_file, "a", encoding="utf-8") as f:
-                f.write(f"[{timestamp}] {note_content}\n")
-            return f"Saved note: {note_content}"
-        except Exception as e:
-            logger.error(f"Note save error: {e}")
-            return "Could not save note"
+        return self._gated("manage_notes",
+                           {"action": "save", "content": note_content},
+                           ok_msg=f"Saved note: {note_content}")
 
     def _action_read_notes(self) -> str:
-        if not os.path.exists(self.notes_file):
-            return "You don't have any notes saved yet."
-        try:
-            with open(self.notes_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            if not lines:
-                return "Your notes file is empty."
-            recent = [line.strip() for line in lines[-3:] if line.strip()]
-            return "Your most recent notes are: " + " ; ".join(recent)
-        except Exception as e:
-            logger.error(f"Note read error: {e}")
-            return "Could not read notes."
+        return self._gated("manage_notes", {"action": "read"})
 
     def _action_clear_notes(self) -> str:
-        try:
-            with open(self.notes_file, "w", encoding="utf-8") as f:
-                f.write("")
-            return "Your notes have been cleared."
-        except Exception as e:
-            logger.error(f"Error clearing notes: {e}")
-            return "Could not clear notes."
+        # Destructive: goes through the policy gate, which asks for
+        # confirmation before executing.
+        return self._gated("manage_notes", {"action": "clear"},
+                           ok_msg="Your notes have been cleared.")
 
     def process(self, text: str) -> Dict[str, Any]:
         """Match and execute a command from input text."""
         cleaned_text = text.lower().strip()
-        
+
+        # 0. A pending destructive-action confirmation takes precedence over
+        #    everything: resolve it through the agent's state machine so the
+        #    legacy path and the LLM path share one confirmation flow.
+        agent = getattr(self, "ai_agent", None)
+        if agent is not None and agent.pending_confirmation is not None:
+            resp = agent.process(text)
+            self.last_response = resp
+            return {
+                "id": "confirm_flow",
+                "type": CommandType.AI,
+                "response": resp,
+                "confidence": 0.95
+            }
+
         # 1. Check Regex Patterns
         for cmd in self.commands:
             for pattern in cmd["patterns"]:

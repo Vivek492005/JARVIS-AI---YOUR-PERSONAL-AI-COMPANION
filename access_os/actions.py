@@ -1,0 +1,391 @@
+"""
+actions.py — Single home for every OS-manipulating action in JARVIS.
+
+Phase C of the cleanup plan: both command engines (the LLM `AIAgent` and the
+legacy regex `VoiceCommandProcessor`) used to implement the same ~15 OS
+actions independently. Now every action lives here exactly once, as a plain
+function. Both engines call into this module:
+
+* `execute_tool_raw(tool_name, args, ...)` — direct execution, NO policy gate.
+  Only for calls that already passed the gate (LLM path) or were explicitly
+  confirmed by the user.
+* `run_action(tool_name, args, ...)` — full pipeline: runs
+  `command_policy.check_tool_call()` first and returns a
+  `(verdict, result)` tuple. The legacy regex engine uses this so its
+  destructive actions get the same confirm-before-destroy protection.
+
+Tool names match the LLM tool definitions in ai_agent.py:
+  open_application, open_website, web_search, download_media,
+  system_control, keyboard_mouse_action, manage_notes, run_powershell_command
+"""
+
+import os
+import sys
+import json
+import logging
+import datetime
+import subprocess
+import webbrowser
+import urllib.parse
+from typing import Dict, Any, Tuple, Optional, Callable
+
+logger = logging.getLogger(__name__)
+
+try:
+    from .command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
+except ImportError:  # direct script execution
+    from command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
+
+
+# ---------------------------------------------------------------------------
+# Action implementations (moved verbatim from AIAgent, de-methodized:
+# `self._notify_status` -> status_callback param, `self.notes_file` -> param)
+# ---------------------------------------------------------------------------
+
+def open_application(app_name: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Opening {app_name}...")
+    lowered = (app_name or "").lower().strip()
+
+    app_mappings = {
+        "chrome": ["start", "chrome"],
+        "google chrome": ["start", "chrome"],
+        "edge": ["start", "msedge"],
+        "ms edge": ["start", "msedge"],
+        "microsoft edge": ["start", "msedge"],
+        "notepad": ["notepad.exe"],
+        "calculator": ["calc.exe"],
+        "calc": ["calc.exe"],
+        "vs code": ["code"],
+        "vscode": ["code"],
+        "code": ["code"],
+        "file explorer": ["explorer.exe"],
+        "explorer": ["explorer.exe"],
+        "terminal": ["wt.exe"],
+        "command prompt": ["cmd.exe"],
+        "cmd": ["cmd.exe"],
+        "powershell": ["powershell.exe"],
+        "task manager": ["taskmgr.exe"],
+        "paint": ["mspaint.exe"],
+        "settings": ["start", "ms-settings:"],
+        "spotify": ["start", "spotify:"],
+        "word": ["start", "winword"],
+        "excel": ["start", "excel"],
+        "powerpoint": ["start", "powerpnt"],
+    }
+
+    for key, cmd in app_mappings.items():
+        if key in lowered or lowered in key:
+            try:
+                subprocess.Popen(cmd, shell=True)
+                return f"Successfully opened {app_name}."
+            except Exception as e:
+                logger.error(f"Failed to open mapped app {app_name}: {e}")
+
+    # Try generic Windows start
+    try:
+        subprocess.Popen(f'start "" "{app_name}"', shell=True)
+        return f"Opened {app_name}."
+    except Exception as e:
+        logger.error(f"Failed to start app {app_name}: {e}")
+        return f"Could not launch {app_name}: {e}"
+
+
+def open_website(url_or_name: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Opening {url_or_name}...")
+    url = (url_or_name or "").strip()
+    site_map = {
+        "youtube": "https://www.youtube.com",
+        "google": "https://www.google.com",
+        "gmail": "https://mail.google.com",
+        "github": "https://github.com",
+        "linkedin": "https://www.linkedin.com",
+        "twitter": "https://twitter.com",
+        "x": "https://twitter.com",
+        "instagram": "https://www.instagram.com",
+        "facebook": "https://www.facebook.com",
+        "reddit": "https://www.reddit.com",
+        "netflix": "https://www.netflix.com",
+        "spotify": "https://open.spotify.com",
+        "amazon": "https://www.amazon.com",
+        "chatgpt": "https://chat.openai.com",
+        "whatsapp": "https://web.whatsapp.com",
+        "wikipedia": "https://www.wikipedia.org",
+    }
+
+    lowered = url.lower()
+    for name, full_url in site_map.items():
+        if lowered == name or lowered == f"open {name}":
+            webbrowser.open(full_url)
+            return f"Opening {name}."
+
+    if not url.startswith("http://") and not url.startswith("https://"):
+        if "." in url and " " not in url:
+            url = "https://" + url
+        else:
+            return web_search(url, status_callback)
+
+    webbrowser.open(url)
+    return f"Opening {url_or_name}."
+
+
+def web_search(query: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Searching web for '{query}'...")
+    encoded = urllib.parse.quote_plus(query or "")
+    webbrowser.open(f"https://www.google.com/search?q={encoded}")
+    return f"Searching Google for {query}."
+
+
+def download_media(url_or_query: str, media_type: str = "audio",
+                   status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Downloading {media_type} for '{url_or_query}'...")
+    try:
+        import yt_dlp
+
+        # Determine download path (user's Downloads or Music directory)
+        home_dir = os.path.expanduser("~")
+        if media_type == "audio":
+            download_dir = os.path.join(home_dir, "Music")
+        else:
+            download_dir = os.path.join(home_dir, "Downloads")
+        os.makedirs(download_dir, exist_ok=True)
+
+        out_template = os.path.join(download_dir, "%(title)s.%(ext)s")
+
+        ydl_opts = {
+            "outtmpl": out_template,
+            "quiet": True,
+            "no_warnings": True,
+        }
+
+        if media_type == "audio":
+            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }]
+        else:
+            ydl_opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+
+        # If input is not a direct URL, use ytsearch
+        target = (url_or_query or "").strip()
+        if not target.startswith("http://") and not target.startswith("https://"):
+            target = f"ytsearch1:{target}"
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(target, download=True)
+            title = info.get("title", "media")
+            if "entries" in info and len(info["entries"]) > 0:
+                title = info["entries"][0].get("title", title)
+
+        folder_name = "Music" if media_type == "audio" else "Downloads"
+        return f"Successfully downloaded '{title}' to your {folder_name} folder."
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        return f"Download failed: {str(e)}"
+
+
+def system_control(action: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Executing system control: {action}...")
+    try:
+        import pyautogui
+
+        if action == "volume_up":
+            for _ in range(5):
+                pyautogui.press("volumeup")
+            return "Increased volume."
+        elif action == "volume_down":
+            for _ in range(5):
+                pyautogui.press("volumedown")
+            return "Decreased volume."
+        elif action in ["mute", "unmute"]:
+            pyautogui.press("volumemute")
+            return "Toggled volume mute."
+        elif action == "take_screenshot":
+            os.makedirs("screenshots", exist_ok=True)
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            fn = os.path.join("screenshots", f"screenshot_{ts}.png")
+            screenshot = pyautogui.screenshot()
+            screenshot.save(fn)
+            return f"Screenshot captured and saved to {fn}."
+        elif action == "lock_pc":
+            os.system("rundll32.exe user32.dll,LockWorkStation")
+            return "Locking the workstation."
+        elif action == "empty_recycle_bin":
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"],
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            )
+            return "Recycle Bin has been emptied."
+        elif action == "check_battery":
+            try:
+                import psutil
+                battery = psutil.sensors_battery()
+                if battery:
+                    plugged = "plugged in" if battery.power_plugged else "on battery"
+                    return f"Battery is at {battery.percent:.0f}% and {plugged}."
+            except Exception:
+                pass
+            return "Battery status is unavailable."
+        return f"Unknown system action: {action}"
+    except Exception as e:
+        logger.error(f"System control error ({action}): {e}")
+        return f"Failed to perform {action}: {e}"
+
+
+def keyboard_mouse_action(action: str, value: str,
+                          status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Performing {action}...")
+    try:
+        import pyautogui
+        import pyperclip
+
+        if action == "type_text":
+            pyperclip.copy(value)
+            pyautogui.hotkey("ctrl", "v")
+            return f"Typed: '{value}'"
+        elif action == "press_hotkey":
+            keys = [k.strip().lower() for k in (value or "").split("+")]
+            pyautogui.hotkey(*keys)
+            return f"Pressed hotkey {value}."
+        elif action == "press_key":
+            pyautogui.press((value or "").lower().strip())
+            return f"Pressed key {value}."
+        return f"Unknown keyboard action: {action}"
+    except Exception as e:
+        logger.error(f"Keyboard/mouse action error: {e}")
+        return f"Action failed: {e}"
+
+
+def manage_notes(action: str, content: Optional[str] = None, notes_file: str = "notes.txt",
+                 status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback("Managing notes...")
+    if action == "save":
+        if not content:
+            return "No note content provided."
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(notes_file, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] {content}\n")
+        return f"Note saved: {content}"
+    elif action == "read":
+        if not os.path.exists(notes_file):
+            return "You do not have any notes saved yet."
+        with open(notes_file, "r", encoding="utf-8") as f:
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+        if not lines:
+            return "Your notes file is empty."
+        recent = lines[-5:]
+        return "Here are your recent notes: " + " | ".join(recent)
+    elif action == "clear":
+        if os.path.exists(notes_file):
+            os.remove(notes_file)
+        return "Cleared all your notes."
+    return f"Unknown note action: {action}"
+
+
+def run_powershell_command(command: str,
+                           status_callback: Optional[Callable[[str], None]] = None) -> str:
+    if status_callback:
+        status_callback(f"Running command: {command}...")
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", command or ""],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        )
+        output = result.stdout.strip() or result.stderr.strip()
+        return output[:300] if output else "Command executed successfully."
+    except Exception as e:
+        logger.error(f"PowerShell execution error: {e}")
+        return f"Command execution failed: {e}"
+
+
+# ---------------------------------------------------------------------------
+# Dispatch tables
+# ---------------------------------------------------------------------------
+
+_TOOL_EXECUTORS = {
+    "open_application": lambda args, cb, nf: open_application(args.get("app_name", ""), cb),
+    "open_website": lambda args, cb, nf: open_website(args.get("url_or_name", ""), cb),
+    "web_search": lambda args, cb, nf: web_search(args.get("query", ""), cb),
+    "download_media": lambda args, cb, nf: download_media(
+        args.get("url_or_query", ""), args.get("media_type", "audio"), cb),
+    "system_control": lambda args, cb, nf: system_control(args.get("action", ""), cb),
+    "keyboard_mouse_action": lambda args, cb, nf: keyboard_mouse_action(
+        args.get("action", ""), args.get("value", ""), cb),
+    "manage_notes": lambda args, cb, nf: manage_notes(
+        args.get("action", ""), args.get("content", None), nf, cb),
+    "run_powershell_command": lambda args, cb, nf: run_powershell_command(
+        args.get("command", ""), cb),
+}
+
+
+def execute_tool_raw(tool_name: str, args: Dict[str, Any],
+                     status_callback: Optional[Callable[[str], None]] = None,
+                     notes_file: str = "notes.txt") -> str:
+    """Execute a tool with NO policy gate.
+
+    Only call this for tool calls that already passed check_tool_call()
+    (the AIAgent._dispatch_tool_call path) or were explicitly confirmed by
+    the user. Anything else must go through run_action().
+    """
+    executor = _TOOL_EXECUTORS.get(tool_name)
+    if executor is None:
+        return f"Tool {tool_name} is not recognized."
+    return executor(args or {}, status_callback, notes_file)
+
+
+def _audit_log(tool_name: str, args: Dict[str, Any], verdict: str, result: str,
+               audit_file: str = "jarvis_audit.log"):
+    """Append one JSON line per tool call. Local-only, git-ignored, and never
+    allowed to break execution."""
+    try:
+        entry = {
+            "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+            "tool": tool_name,
+            "args": {k: str(v)[:200] for k, v in (args or {}).items()},
+            "verdict": verdict,
+            "result": str(result)[:200],
+        }
+        with open(audit_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def run_action(tool_name: str, args: Dict[str, Any],
+               status_callback: Optional[Callable[[str], None]] = None,
+               notes_file: str = "notes.txt",
+               audit_file: str = "jarvis_audit.log") -> Tuple[str, str]:
+    """Policy-gated execution for the legacy regex engine (and any other
+    non-LLM caller). Returns (verdict, result) where verdict is one of
+    "allow" / "confirm" / "deny".
+
+    Every call is written to the audit log. On "confirm", the caller must ask
+    the user and only call execute_tool_raw() after explicit confirmation —
+    or hand the tool call to AIAgent.request_confirmation(), which owns the
+    confirmation state.
+    """
+    args = args or {}
+    verdict, reason = check_tool_call(tool_name, args)
+    if verdict == DENY:
+        logger.warning(f"Blocked tool call: {tool_name} ({reason})")
+        result = f"Blocked for safety: {reason}"
+        _audit_log(tool_name, args, DENY, result, audit_file)
+        return (DENY, result)
+    if verdict == CONFIRM:
+        result = f"ACTION_REQUIRES_CONFIRMATION: {confirmation_prompt(tool_name, args)}"
+        _audit_log(tool_name, args, "confirm_requested", result, audit_file)
+        return (CONFIRM, result)
+    result = execute_tool_raw(tool_name, args, status_callback, notes_file)
+    _audit_log(tool_name, args, ALLOW, result, audit_file)
+    return (ALLOW, result)
