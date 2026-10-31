@@ -248,6 +248,25 @@ footer{border-top:1px solid var(--line);padding:44px 0;position:relative;z-index
 .foot-links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600}
 .foot-links a:hover{color:var(--acc)}
 
+/* ---------- v2: cinematic layer ---------- */
+#core3d{position:absolute;inset:0;width:100%;height:100%;display:block}
+.core-img.fallback{display:none}
+body.no-webgl #core3d{display:none}
+body.no-webgl .core-img.fallback{display:block}
+.hero-giant{position:absolute;top:4%;left:50%;transform:translateX(-50%);z-index:0;
+  font-family:var(--disp);font-weight:700;font-size:clamp(120px,23vw,330px);line-height:1;
+  letter-spacing:.04em;color:transparent;-webkit-text-stroke:1px rgba(95,242,200,.11);
+  white-space:nowrap;pointer-events:none;user-select:none}
+.manifesto{padding:120px 0;position:relative;z-index:2;text-align:center;overflow:hidden}
+.mani{font-family:var(--disp);font-weight:600;font-size:clamp(28px,4.6vw,62px);line-height:1.28;
+  letter-spacing:-.03em;max-width:1020px;margin:0 auto}
+.mani em{font-style:normal;color:var(--acc)}
+.mani .w{opacity:.1;transition:opacity .45s ease}
+.mani .w.on{opacity:1}
+.arch-cap .d{color:var(--muted);font-size:14px;margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6}
+.f-vis{transition:border-color .3s,box-shadow .3s,transform .35s cubic-bezier(.2,.7,.2,1)}
+.feat:hover .f-vis{transform:translateY(-5px);box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 44px rgba(95,242,200,.08)}
+
 /* ---------- responsive ---------- */
 @media(max-width:1020px){
   .hero-in{grid-template-columns:1fr;gap:60px}
@@ -309,7 +328,7 @@ footer{border-top:1px solid var(--line);padding:44px 0;position:relative;z-index
 
 <main id="top">
 <!-- HERO -->
-<section class="hero"><div class="hero-grid-bg"></div>
+<section class="hero"><div class="hero-grid-bg"></div><div class="hero-giant" aria-hidden="true">JARVIS</div>
   <div class="shell hero-in">
     <div>
       <div class="eyebrow"><i></i>VOICE-FIRST DESKTOP AI · WINDOWS · OPEN SOURCE</div>
@@ -328,7 +347,8 @@ footer{border-top:1px solid var(--line);padding:44px 0;position:relative;z-index
     </div>
     <div class="hero-vis">
       <div class="core-wrap">
-        <img class="core-img" src="assets/jarvis-core.jpg" alt="JARVIS neural core visualization">
+        <canvas id="core3d" aria-label="Interactive 3D JARVIS core — move your cursor to steer it"></canvas>
+        <img class="core-img fallback" src="assets/jarvis-core.jpg" alt="JARVIS neural core visualization">
         <div class="core-ring"></div><div class="core-ring r2"></div>
         <div class="core-tag t1"><strong>NEURAL CORE</strong>QWEN 2.5 72B<br>DEEPSEEK STANDBY</div>
         <div class="core-tag t2"><strong>TOOL BUS ×8</strong>APPS · WEB · SYSTEM<br>POLICY-GATED</div>
@@ -366,6 +386,11 @@ footer{border-top:1px solid var(--line);padding:44px 0;position:relative;z-index
 <div class="mq" aria-hidden="true"><div class="mq-track" id="mq-track">
   <span>QWEN 2.5 72B</span><span>DEEPSEEK FALLBACK</span><span>RUMIK SILK TTS</span><span>POLICY-GATED TOOLS</span><span>8 EXECUTORS</span><span>HINGLISH NATIVE</span><span>GESTURE CONTROL</span><span>MIT OPEN SOURCE</span>
 </div></div>
+
+<!-- MANIFESTO -->
+<section class="manifesto"><div class="shell">
+  <p class="mani rv" id="mani">We're building the <em>world's most advanced</em> desktop assistant — one that doesn't just chat, it <em>acts</em>.</p>
+</div></section>
 
 <!-- SYSTEMS -->
 <section class="sec" id="systems"><div class="shell">
@@ -441,7 +466,7 @@ footer{border-top:1px solid var(--line);padding:44px 0;position:relative;z-index
       <div class="arch-card"><div class="k">04 — TOOL BUS</div><div class="v">It acts.</div><p>Eight executors carry it out — apps, media, system, notes, web, shell.</p></div>
       <div class="arch-card"><div class="k">05 — AUDIT</div><div class="v">It remembers.</div><p>Every call lands in jarvis_audit.log. Nothing happens silently.</p></div>
     </div>
-    <div class="arch-cap"><div class="k" id="arch-k">01 — VOICE</div><div class="v" id="arch-v">It hears you.</div></div>
+    <div class="arch-cap"><div class="k" id="arch-k">01 — VOICE</div><div class="v" id="arch-v">It hears you.</div><div class="d" id="arch-d">Speech-to-text in English, Hindi, or Hinglish — however you actually talk.</div></div>
   </div>
 </div></section>
 
@@ -499,6 +524,7 @@ footer{border-top:1px solid var(--line);padding:44px 0;position:relative;z-index
 </div></footer>
 <noscript><div style="padding:20px;text-align:center;font-family:monospace;color:#8a9ba3">Enable JavaScript for the full interactive experience.</div></noscript>
 
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -544,21 +570,91 @@ if(window.matchMedia&&matchMedia('(pointer:fine)').matches&&!RM){
   });
 }
 
-/* ---------- starfield ---------- */
+/* ---------- neural particle network ---------- */
 (function(){
   var c=$('#stars');if(!c||!c.getContext)return;var ctx=c.getContext('2d');if(!ctx)return;
-  var W,H,stars=[],mx=0,my=0;
+  var W,H,pts=[],mx=0,my=0,N=110;
   function size(){W=c.width=innerWidth;H=c.height=innerHeight;}
   size();addEventListener('resize',size);
-  for(var i=0;i<150;i++)stars.push({x:Math.random(),y:Math.random(),r:Math.random()*1.4+.3,p:Math.random()*6.28,s:.3+Math.random()*.7});
+  for(var i=0;i<N;i++)pts.push({x:Math.random(),y:Math.random(),
+    vx:(Math.random()-.5)*.0007,vy:(Math.random()-.5)*.0007,r:Math.random()*1.6+.5});
   addEventListener('pointermove',function(e){mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5;},{passive:true});
-  function draw(t){ctx.clearRect(0,0,W,H);
-    for(var j=0;j<stars.length;j++){var s=stars[j];
-      var tw=RM?1:(.5+.5*Math.sin(t*.001*s.s+s.p));
-      ctx.globalAlpha=.22+.5*tw;ctx.fillStyle='#9fe8d2';
-      ctx.beginPath();ctx.arc(s.x*W+mx*24*s.r,s.y*H+my*24*s.r,s.r,0,6.29);ctx.fill();}
-    ctx.globalAlpha=1;}
+  function draw(t){
+    ctx.clearRect(0,0,W,H);
+    var i,a,b,p,s,dx,dy,d;
+    for(i=0;i<N;i++){p=pts[i];
+      if(!RM){p.x+=p.vx+mx*.0006;p.y+=p.vy+my*.0006;
+        if(p.x<0)p.x=1;else if(p.x>1)p.x=0;if(p.y<0)p.y=1;else if(p.y>1)p.y=0;}}
+    ctx.lineWidth=1;
+    for(a=0;a<N;a++)for(b=a+1;b<N;b++){
+      dx=(pts[a].x-pts[b].x)*W;dy=(pts[a].y-pts[b].y)*H;d=Math.sqrt(dx*dx+dy*dy);
+      if(d<130){ctx.strokeStyle='rgba(95,242,200,'+(0.13*(1-d/130)).toFixed(3)+')';
+        ctx.beginPath();ctx.moveTo(pts[a].x*W,pts[a].y*H);ctx.lineTo(pts[b].x*W,pts[b].y*H);ctx.stroke();}}
+    for(i=0;i<N;i++){s=pts[i];
+      var tw=RM?1:(.55+.45*Math.sin(t*.0012*(0.5+s.r)+i));
+      ctx.globalAlpha=.28+.5*tw;ctx.fillStyle='#9fe8d2';
+      ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r,0,6.29);ctx.fill();}
+    ctx.globalAlpha=1;
+  }
   if(RM){draw(0);}else{(function loop(t){draw(t||0);raf(loop);})();}
+})();
+
+/* ---------- interactive 3D core (Three.js, guarded) ---------- */
+(function(){
+  var c=$('#core3d');if(!c)return;
+  if(!window.THREE){document.body.classList.add('no-webgl');return;}
+  var ACC=0x5ff2c8;
+  var S=new THREE.Scene(),C=new THREE.PerspectiveCamera(42,1,.1,100),
+      r=new THREE.WebGLRenderer({canvas:c,alpha:true,antialias:true});
+  C.position.set(0,0,8);
+  if(window.devicePixelRatio)r.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  var g=new THREE.Group();S.add(g);
+  var core=new THREE.Mesh(new THREE.IcosahedronGeometry(1.22,3),
+    new THREE.MeshPhysicalMaterial({color:ACC,emissive:0x0a4a3c,emissiveIntensity:.9,
+      metalness:.7,roughness:.25,wireframe:true,transparent:true,opacity:.85}));
+  g.add(core);
+  var inn=new THREE.Mesh(new THREE.IcosahedronGeometry(.72,2),
+    new THREE.MeshBasicMaterial({color:0xd8fff4,wireframe:true,transparent:true,opacity:.5}));
+  g.add(inn);
+  var nuc=new THREE.Mesh(new THREE.SphereGeometry(.3,24,24),
+    new THREE.MeshBasicMaterial({color:0xeafff9,transparent:true,opacity:.95}));
+  g.add(nuc);
+  var h1=new THREE.Mesh(new THREE.TorusGeometry(1.9,.014,8,120),
+    new THREE.MeshBasicMaterial({color:ACC,transparent:true,opacity:.5}));
+  h1.rotation.x=1.15;g.add(h1);
+  var h2=h1.clone();h2.scale.set(.7,.7,.7);h2.rotation.set(.4,-.7,.5);g.add(h2);
+  var sats=[],i,a,rad,d;
+  for(i=0;i<8;i++){rad=2.1+(i%3)*.35;a=i/8*Math.PI*2;
+    d=new THREE.Mesh(new THREE.SphereGeometry(.07,16,16),
+      new THREE.MeshBasicMaterial({color:i%2?ACC:0xd8fff4}));
+    d.position.set(Math.cos(a)*rad,Math.sin(a)*rad,(i%2-.5)*.9);
+    g.add(d);sats.push({d:d,rad:rad,a:a,s:.0016+(i%4)*.0004});}
+  var sg=new THREE.BufferGeometry(),q=[],j,z,t2,p2;
+  for(j=0;j<450;j++){z=2.4+Math.random()*3.2;t2=Math.random()*Math.PI*2;p2=Math.acos(2*Math.random()-1);
+    q.push(z*Math.sin(p2)*Math.cos(t2),z*Math.sin(p2)*Math.sin(t2),z*Math.cos(p2));}
+  sg.setAttribute('position',new THREE.Float32BufferAttribute(q,3));
+  S.add(new THREE.Points(sg,new THREE.PointsMaterial({color:ACC,size:.016,transparent:true,opacity:.5})));
+  var l=new THREE.PointLight(ACC,3,14);l.position.set(2.5,2,4);S.add(l);
+  S.add(new THREE.AmbientLight(0x1a3a32,1.2));
+  var mx=0,my=0;
+  var host=c.parentElement||c;
+  host.addEventListener('pointermove',function(e){var b=c.getBoundingClientRect();if(b.width<2)return;
+    mx=((e.clientX-b.left)/b.width-.5);my=((e.clientY-b.top)/b.height-.5);});
+  function size(){var b=c.getBoundingClientRect();if(!b.width||b.width<2)return;
+    r.setSize(b.width,b.height,false);C.aspect=b.width/b.height;C.updateProjectionMatrix();}
+  if('ResizeObserver' in window){try{new ResizeObserver(size).observe(c);}catch(e){}}
+  addEventListener('resize',size);size();
+  var clock=new THREE.Clock(),k,o;
+  (function loop(){var t=clock.getElapsedTime();
+    if(!RM){g.rotation.y+=.0022+(mx*.9-g.rotation.y)*.02;g.rotation.x+=(my*.7-g.rotation.x)*.02;
+      core.rotation.x=t*.1;core.rotation.y=t*.07;inn.rotation.y=-t*.16;inn.rotation.x=t*.05;
+      nuc.scale.setScalar(1+Math.sin(t*2.4)*.08);
+      h1.rotation.z=t*.09;h2.rotation.z=-t*.12;
+      for(k=0;k<sats.length;k++){o=sats[k];o.a+=o.s;
+        o.d.position.x=Math.cos(o.a)*o.rad;o.d.position.y=Math.sin(o.a)*o.rad;
+        o.d.position.z=Math.sin(o.a*1.6)*.85;}}
+    try{r.render(S,C);}catch(e){document.body.classList.add('no-webgl');return;}
+    raf(loop);})();
 })();
 
 /* ---------- reveal on scroll ---------- */
@@ -646,13 +742,45 @@ $('#cta-demo').addEventListener('click',function(){
   o.observe(d);
 })();
 
+/* ---------- hero giant parallax + manifesto word reveal ---------- */
+(function(){
+  var giant=document.querySelector('.hero-giant'),ticking=false;
+  function par(){ticking=false;if(!giant)return;
+    var y=window.scrollY||window.pageYOffset||0;
+    if(y<innerHeight*1.2)giant.style.transform='translateX(-50%) translateY('+(y*.14)+'px)';}
+  addEventListener('scroll',function(){if(!ticking){ticking=true;raf(par);}},{passive:true});
+
+  var m=$('#mani');if(!m)return;
+  var walker=document.createTreeWalker(m,NodeFilter.SHOW_TEXT),texts=[],t;
+  while(walker.nextNode())texts.push(walker.currentNode);
+  texts.forEach(function(tn){
+    var frag=document.createDocumentFragment();
+    tn.textContent.split(/(\s+)/).forEach(function(part){
+      if(part==='')return;
+      if(/^\s+$/.test(part)){frag.appendChild(document.createTextNode(' '));}
+      else{var s=document.createElement('span');s.className='w';s.textContent=part;frag.appendChild(s);}
+    });
+    tn.parentNode.replaceChild(frag,tn);
+  });
+  var words=Array.prototype.slice.call(m.querySelectorAll('.w'));
+  words.forEach(function(w,i){w.style.transitionDelay=(i*0.05)+'s';});
+  function light(){words.forEach(function(w){w.classList.add('on');});}
+  if(RM||!('IntersectionObserver' in window)){light();return;}
+  var io2=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting){light();io2.disconnect();}});},{threshold:.35});
+  io2.observe(m);
+})();
+
 /* ---------- architecture scroll ---------- */
 (function(){
   var wrap=$('#arch');if(!wrap)return;
   var nodes=$$('.arch-node'),fill=$('#arch-fill'),pulse=$('#arch-pulse');
-  var ak=$('#arch-k'),av=$('#arch-v');
-  var STAGES=[['01 — VOICE','It hears you.'],['02 — AI AGENT','It plans.'],
-              ['03 — POLICY GATE','It checks itself.'],['04 — TOOL BUS','It acts.'],['05 — AUDIT','It remembers.']];
+  var ak=$('#arch-k'),av=$('#arch-v'),ad=$('#arch-d');
+  var STAGES=[['01 — VOICE','It hears you.','Speech-to-text in English, Hindi, or Hinglish — however you actually talk.'],
+              ['02 — AI AGENT','It plans.','Qwen 2.5 72B reasons over your request; DeepSeek stands by as fallback.'],
+              ['03 — POLICY GATE','It checks itself.','Every tool call is judged: allow, ask you first, or deny outright.'],
+              ['04 — TOOL BUS','It acts.','Eight executors carry it out — apps, media, system, notes, web, shell.'],
+              ['05 — AUDIT','It remembers.','Every call lands in jarvis_audit.log. Nothing happens silently.']];
   var LEN=880,X0=60;
   function tick(){try{
     var r=wrap.getBoundingClientRect(),total=r.height-innerHeight,p=-r.top/total;
@@ -661,7 +789,7 @@ $('#cta-demo').addEventListener('click',function(){
     if(pulse)pulse.setAttribute('cx',String(X0+LEN*p));
     var idx=Math.min(4,Math.floor(p*5));
     nodes.forEach(function(n,i){n.classList.toggle('lit',i<=idx);});
-    if(ak&&ak.textContent!==STAGES[idx][0]){ak.textContent=STAGES[idx][0];av.textContent=STAGES[idx][1];}
+    if(ak&&ak.textContent!==STAGES[idx][0]){ak.textContent=STAGES[idx][0];av.textContent=STAGES[idx][1];ad.textContent=STAGES[idx][2];}
   }catch(e){}}
   var t=false;
   addEventListener('scroll',function(){if(!t){t=true;raf(function(){tick();t=false;});}},{passive:true});
