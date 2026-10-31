@@ -1,6 +1,14 @@
 # JARVIS — Cleanup Plan
 
-**Status:** Phases A, B, D implemented 2026-10-30 (commit f7a8f25, local clone only — NOT in Vivek's repo yet); Phase C pending · **Priority:** P1 — do before packaging (Plan 03 depends on it)
+**Status:** ALL PHASES implemented 2026-10-30/31 (commits f7a8f25, b31e73d — local clone only, NOT in Vivek's repo/origin yet) · **Priority:** P1
+
+**Implementation log — Phase C (2026-10-31, commit b31e73d):**
+- New `access_os/actions.py`: single home for all 8 tool executors (moved from AIAgent). Exposes `execute_tool_raw()` (no gate, authorized calls only) and `run_action()` (policy-gated + audited, returns verdict+result).
+- `AIAgent`: 8 `execute_*` methods deleted; `_execute_tool` is a thin delegate; new `request_confirmation()` shared with the legacy path; offline `_local_fallback_process` rewired to `execute_tool_raw` with destructive branches (lock/empty-recycle-bin) removed by design.
+- `VoiceCommandProcessor`: new `_gated()` helper routes every user-parameterized `_action_*` through `run_action()`; CONFIRM registers on the agent; `process()` delegates pending confirmations to the agent's state machine — one confirmation flow for both engines. Hardcoded helpers (`_open_url`, `_press_key`, `_launch_app`, …) untouched (developer-fixed strings, no user input). URL/search adapters routed through the gate; legacy path now audited too.
+- `access_os/__init__.py` made lazy (PEP 562) so `actions`/`command_policy`/`ai_agent` import without heavy deps.
+- Tests: new `tests/test_actions_unified.py` (12 tests), `tests/test_ai_agent.py` rewritten to the new API — **72/72 green**. End-to-end verified with real (unmocked) agent: legacy "empty recycle bin" → confirm question → "yes" → executes exactly once, pending cleared, audit shows confirm_requested → confirmed.
+- Known minor behavior deltas (accepted): notes-read shows last 5 (was 3) with new wording; battery uses "%" (was "percent"); screenshot message simplified.
 **Verified:** every claim below was checked with `grep` against the cloned repo on 2026-10-30.
 
 **Implementation log (2026-10-30):**

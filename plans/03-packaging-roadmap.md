@@ -1,7 +1,15 @@
 # JARVIS — Packaging Roadmap (Windows .exe installer)
 
-**Status:** Plan (not yet implemented) · **Priority:** P2 — starts after Plan 01 (security) and Plan 02 Phases A+B (cleanup)
+**Status:** IMPLEMENTED 2026-10-31 (commit 9f9c909 — local clone only, NOT in Vivek's repo/origin yet) · **Priority:** P2
 **Goal:** a non-technical user downloads `JARVIS-Setup.exe`, double-clicks, answers 3 installer screens, and is talking to JARVIS — no Python, no pip, no `.env` editing by hand.
+
+**Implementation log (2026-10-31):**
+- `packaging/jarvis.spec` — one-dir PyInstaller build, `console=False`, datas (puppy.jpg, configs, env.example, docs), hidden imports, mediapipe/cv2 excluded from v1 (gestures stay source-only).
+- `packaging/jarvis.iss` — Inno Setup 6: installs to `%LOCALAPPDATA%\JARVIS` (no admin), desktop shortcut + autostart tasks, HKCU Run entry, uninstaller ASKS before deleting notes/logs/.env.
+- `access_os/first_run.py` — first-run API key dialog (tkinter, stdlib-only); writes `.env`, picks keys up in-process, never blocks startup; headless-safe (verified: returns False without raising).
+- `main.py --self-test` — headless smoke test (gate checks + notes round-trip), verified exit 0 locally.
+- `.github/workflows/release.yml` — tag `v*` → pytest quality gate → PyInstaller → bundle `--self-test` → Inno compile → GitHub Release via `gh` CLI (no third-party actions); version passed from the tag via `/DMyAppVersion`.
+- **NOT yet verified:** the spec/iss/workflow have never run on Windows — first real verification is the v1.0.0 tag build on GitHub Actions. The v1.0.0 tag must NOT be pushed until the security wiring (Plan 01, already in this clone) is also copied into Vivek's repo.
 
 ---
 
