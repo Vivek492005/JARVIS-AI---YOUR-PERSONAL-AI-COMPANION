@@ -248,6 +248,10 @@ def _inverse_of(tool: str, args: Dict[str, Any]) -> Optional[Tuple[str, Dict[str
         return ("system_control", {"action": "unmute"})
     if tool == "system_control" and args.get("action") == "unmute":
         return ("system_control", {"action": "mute"})
+    if tool in ("move_file", "copy_file"):
+        # Phase 5.6: file inverses live in perception.files.
+        from jarvis.perception import files as _files
+        return _files.inverse_of(tool, args)
     return None
 
 
@@ -261,6 +265,14 @@ class UndoJournal:
         inv = _inverse_of(tool, args)
         if inv:
             self._stack.append((inv[0], inv[1], f"{tool}({args})"))
+        # Phase 5.6: bulk file ops (organize_folder) push per-file inverses
+        # during execution; drain them here so "wapas kar do" replays each.
+        try:
+            from jarvis.perception import files as _files
+            for inv_tool, inv_args in _files.drain_pending_undo():
+                self._stack.append((inv_tool, inv_args, f"{tool} (bulk)"))
+        except Exception:
+            pass
 
     def undo_last(self, executor) -> str:
         """executor: (tool, args) -> str. Returns user-facing message."""

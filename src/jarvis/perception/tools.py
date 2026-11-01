@@ -280,11 +280,133 @@ def _browser_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.6 File intelligence
+# ---------------------------------------------------------------------------
+
+class FindFilesParams(BaseModel):
+    name: Optional[str] = Field(default=None, description="Filename substring.")
+    ext: Optional[str] = Field(default=None, description="Extension, e.g. 'pdf'.")
+    newer_than_days: Optional[float] = Field(default=None, ge=0)
+    root: Optional[str] = Field(default=None, description="Subfolder; default = workspace root.")
+
+
+class FilePathParams(BaseModel):
+    path: str = Field(..., min_length=1, max_length=500)
+
+
+class MoveCopyParams(BaseModel):
+    src: str = Field(..., min_length=1, max_length=500)
+    dst: str = Field(..., min_length=1, max_length=500)
+
+
+class OrganizeParams(BaseModel):
+    path: str = Field(..., min_length=1, max_length=500)
+    dry_run: bool = Field(default=True, description="True = show plan only.")
+
+
+def _files_mod():
+    from jarvis.perception import files as f
+    return f
+
+
+def _h_find_files(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        hits = f.find_files(name=args.get("name"), ext=args.get("ext"),
+                            newer_than_days=args.get("newer_than_days"),
+                            root=args.get("root"))
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+    if not hits:
+        return "no files found"
+    return "\n".join(hits[:20]) + (f"\n...({len(hits)} total)" if len(hits) > 20 else "")
+
+
+def _h_read_file(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        return f.read_file(args["path"])
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+
+
+def _h_summarize_file(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        return f.summarize_file(args["path"])
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+
+
+def _h_move_file(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        return f.move_file(args["src"], args["dst"])
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+
+
+def _h_copy_file(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        return f.copy_file(args["src"], args["dst"])
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+
+
+def _h_organize_folder(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        return f.organize_folder(args["path"], dry_run=bool(args.get("dry_run", True)))
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+
+
+def _h_delete_file(args, _cb, _nf):
+    f = _files_mod()
+    try:
+        return f.delete_file(args["path"])
+    except f.ScopeError as e:
+        return f"Blocked: {e}"
+    except RuntimeError as e:
+        return f"Cannot delete safely: {e}"
+
+
+def _file_specs() -> List[ToolSpec]:
+    return [
+        ToolSpec(name="find_files", risk=Risk.READ,
+                 description="Search the Jarvis workspace by name/extension/age.",
+                 params=FindFilesParams, handler=_h_find_files),
+        ToolSpec(name="read_file", risk=Risk.READ,
+                 description="Read a workspace file (txt/pdf/docx/xlsx). Untrusted.",
+                 params=FilePathParams, handler=_h_read_file,
+                 carries_external_data=True),
+        ToolSpec(name="summarize_file", risk=Risk.READ,
+                 description="Size/type/preview summary of a workspace file.",
+                 params=FilePathParams, handler=_h_summarize_file),
+        ToolSpec(name="move_file", risk=Risk.REVERSIBLE,
+                 description="Move a file inside the workspace (undoable).",
+                 params=MoveCopyParams, handler=_h_move_file),
+        ToolSpec(name="copy_file", risk=Risk.REVERSIBLE,
+                 description="Copy a file inside the workspace (undoable).",
+                 params=MoveCopyParams, handler=_h_copy_file),
+        ToolSpec(name="organize_folder", risk=Risk.DESTRUCTIVE,
+                 description="Sort a folder into subfolders. Dry-run plan first; "
+                             "execute only with dry_run=false (undoable).",
+                 params=OrganizeParams, handler=_h_organize_folder),
+        ToolSpec(name="delete_file", risk=Risk.DESTRUCTIVE,
+                 description="Move a workspace file to the Recycle Bin. "
+                             "Permanent delete is never offered.",
+                 params=FilePathParams, handler=_h_delete_file),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
 def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
     for spec in (_uia_specs() + _screen_specs() + _vlm_specs()
-                 + _browser_specs()):
+                 + _browser_specs() + _file_specs()):
         _reg(spec)
