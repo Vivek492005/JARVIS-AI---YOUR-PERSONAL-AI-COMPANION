@@ -1,0 +1,40 @@
+{"id": "reflex-001", "category": "reflex", "utterance": "chrome kholo", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-002", "category": "reflex", "utterance": "chrome kholo bhai", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-003", "category": "reflex", "utterance": "chrome kholo please", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-004", "category": "reflex", "utterance": "chrome kholo zara", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-005", "category": "reflex", "utterance": "chrome kholo na", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-006", "category": "reflex", "utterance": "open chrome", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-007", "category": "reflex", "utterance": "open chrome bhai", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-008", "category": "reflex", "utterance": "open chrome please", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-009", "category": "reflex", "utterance": "open chrome zara", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-010", "category": "reflex", "utterance": "open chrome na", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "reflex-011", "category": "reflex", "utterance": "notepad khol do", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "notepad"}}}
+{"id": "reflex-012", "category": "reflex", "utterance": "notepad khol do bhai", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "notepad"}}}
+{"id": "reflex-013", "category": "reflex", "utterance": "notepad khol do please", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "notepad"}}}
+{"id": "reflex-014", "category": "reflex", "utterance": "notepad khol do zara", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "notepad"}}}
+{"id": "reflex-015", "category": "reflex", "utterance": "notepad khol do na", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "notepad"}}}
+{"id": "reflex-016", "category": "reflex", "utterance": "calculator kholo", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "calculator"}}}
+{"id": "reflex-017", "category": "reflex", "utterance": "calculator kholo bhai", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "calculator"}}}
+{"id": "reflex-018", "category": "reflex", "utterance": "calculator kholo please", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "calculator"}}}
+{"id": "reflex-019", "category": "reflex", "utterance": "calculator kholo zara", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "calculator"}}}
+{"id": "reflex-020", "category": "reflex", "utterance": "calculator kholo na", "expect": {"reflex": true, "tool": "open_application", "args": {"app_name": "calculator"}}}
+{"id": "reflex-021", "category": "reflex", "utterance": "youtube kholo", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-022", "category": "reflex", "utterance": "youtube kholo bhai", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-023", "category": "reflex", "utterance": "youtube kholo please", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-024", "category": "reflex", "utterance": "youtube kholo zara", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-025", "category": "reflex", "utterance": "youtube kholo na", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-026", "category": "reflex", "utterance": "open youtube", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-027", "category": "reflex", "utterance": "open youtube bhai", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-028", "category": "reflex", "utterance": "open youtube please", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-029", "category": "reflex", "utterance": "open youtube zara", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-030", "category": "reflex", "utterance": "open youtube na", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "reflex-031", "category": "reflex", "utterance": "github kholo", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "github"}}}
+{"id": "reflex-032", "category": "reflex", "utterance": "github kholo bhai", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "github"}}}
+{"id": "reflex-033", "category": "reflex", "utterance": "github kholo please", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "github"}}}
+{"id": "reflex-034", "category": "reflex", "utterance": "github kholo zara", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "github"}}}
+{"id": "reflex-035", "category": "reflex", "utterance": "github kholo na", "expect": {"reflex": true, "tool": "open_website", "args": {"url_or_name": "github"}}}
+{"id": "reflex-036", "category": "reflex", "utterance": "volume badhao", "expect": {"reflex": true, "tool": "system_control", "args": {"action": "volume_up"}}}
+{"id": "reflex-037", "category": "reflex", "utterance": "volume badhao bhai", "expect": {"reflex": true, "tool": "system_control", "args": {"action": "volume_up"}}}
+{"id": "reflex-038", "category": "reflex", "utterance": "volume badhao please", "expect": {"reflex": true, "tool": "system_control", "args": {"action": "volume_up"}}}
+{"id": "reflex-039", "category": "reflex", "utterance": "volume badhao zara", "expect": {"reflex": true, "tool": "system_control", "args": {"action": "volume_up"}}}
+{"id": "reflex-040", "category": "reflex", "utterance": "volume badhao na", "expect": {"reflex": true, "tool": "system_control", "args": {"action": "volume_up"}}}

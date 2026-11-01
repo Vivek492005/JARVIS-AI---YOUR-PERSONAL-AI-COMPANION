@@ -1,0 +1,15 @@
+{"id": "amb-001", "category": "ambiguity", "utterance": "wo wali file kholo", "expect": {"clarify": true}}
+{"id": "amb-002", "category": "ambiguity", "utterance": "usko delete kar do", "expect": {"clarify": true}}
+{"id": "amb-003", "category": "ambiguity", "utterance": "report kholo", "expect": {"clarify": true}}
+{"id": "amb-004", "category": "ambiguity", "utterance": "usme likh do", "expect": {"clarify": true}}
+{"id": "amb-005", "category": "ambiguity", "utterance": "chrome me wo kholo", "expect": {"clarify": true}}
+{"id": "amb-006", "category": "ambiguity", "utterance": "gaana bajao", "expect": {"clarify": true}}
+{"id": "amb-007", "category": "ambiguity", "utterance": "note padho", "expect": {"clarify": true}}
+{"id": "amb-008", "category": "ambiguity", "utterance": "us file ko kholo", "expect": {"clarify": true}}
+{"id": "amb-009", "category": "ambiguity", "utterance": "meeting wala note dikhao", "expect": {"clarify": true}}
+{"id": "amb-010", "category": "ambiguity", "utterance": "wo app kholo", "expect": {"clarify": true}}
+{"id": "amb-011", "category": "ambiguity", "utterance": "isko band kar do", "expect": {"clarify": true}}
+{"id": "amb-012", "category": "ambiguity", "utterance": "usko save kar do", "expect": {"clarify": true}}
+{"id": "amb-013", "category": "ambiguity", "utterance": "photo kholo", "expect": {"clarify": true}}
+{"id": "amb-014", "category": "ambiguity", "utterance": "wahi wala kholo", "expect": {"clarify": true}}
+{"id": "amb-015", "category": "ambiguity", "utterance": "document kholo", "expect": {"clarify": true}}

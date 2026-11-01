@@ -1,0 +1,30 @@
+{"id": "chain-001", "category": "multi-step", "utterance": "notepad kholo aur likho meeting kal 5 baje", "expect": {"tools": ["open_application", "keyboard_mouse_action"]}}
+{"id": "chain-002", "category": "multi-step", "utterance": "notepad kholo aur likho meeting kal 5 baje bhai", "expect": {"tools": ["open_application", "keyboard_mouse_action"]}}
+{"id": "chain-003", "category": "multi-step", "utterance": "notepad kholo aur likho meeting kal 5 baje jaldi", "expect": {"tools": ["open_application", "keyboard_mouse_action"]}}
+{"id": "chain-004", "category": "multi-step", "utterance": "notepad kholo aur likho meeting kal 5 baje please", "expect": {"tools": ["open_application", "keyboard_mouse_action"]}}
+{"id": "chain-005", "category": "multi-step", "utterance": "notepad kholo aur likho meeting kal 5 baje abhi", "expect": {"tools": ["open_application", "keyboard_mouse_action"]}}
+{"id": "chain-006", "category": "multi-step", "utterance": "notepad kholo aur likho meeting kal 5 baje zara", "expect": {"tools": ["open_application", "keyboard_mouse_action"]}}
+{"id": "chain-007", "category": "multi-step", "utterance": "chrome kholo aur youtube search karo lofi", "expect": {"tools": ["open_application", "open_website"]}}
+{"id": "chain-008", "category": "multi-step", "utterance": "chrome kholo aur youtube search karo lofi bhai", "expect": {"tools": ["open_application", "open_website"]}}
+{"id": "chain-009", "category": "multi-step", "utterance": "chrome kholo aur youtube search karo lofi jaldi", "expect": {"tools": ["open_application", "open_website"]}}
+{"id": "chain-010", "category": "multi-step", "utterance": "chrome kholo aur youtube search karo lofi please", "expect": {"tools": ["open_application", "open_website"]}}
+{"id": "chain-011", "category": "multi-step", "utterance": "chrome kholo aur youtube search karo lofi abhi", "expect": {"tools": ["open_application", "open_website"]}}
+{"id": "chain-012", "category": "multi-step", "utterance": "chrome kholo aur youtube search karo lofi zara", "expect": {"tools": ["open_application", "open_website"]}}
+{"id": "chain-013", "category": "multi-step", "utterance": "screenshot lo aur note me likho done", "expect": {"tools": ["system_control", "manage_notes"]}}
+{"id": "chain-014", "category": "multi-step", "utterance": "screenshot lo aur note me likho done bhai", "expect": {"tools": ["system_control", "manage_notes"]}}
+{"id": "chain-015", "category": "multi-step", "utterance": "screenshot lo aur note me likho done jaldi", "expect": {"tools": ["system_control", "manage_notes"]}}
+{"id": "chain-016", "category": "multi-step", "utterance": "screenshot lo aur note me likho done please", "expect": {"tools": ["system_control", "manage_notes"]}}
+{"id": "chain-017", "category": "multi-step", "utterance": "screenshot lo aur note me likho done abhi", "expect": {"tools": ["system_control", "manage_notes"]}}
+{"id": "chain-018", "category": "multi-step", "utterance": "screenshot lo aur note me likho done zara", "expect": {"tools": ["system_control", "manage_notes"]}}
+{"id": "chain-019", "category": "multi-step", "utterance": "volume badhao phir gaana download karo", "expect": {"tools": ["system_control", "download_media"]}}
+{"id": "chain-020", "category": "multi-step", "utterance": "volume badhao phir gaana download karo bhai", "expect": {"tools": ["system_control", "download_media"]}}
+{"id": "chain-021", "category": "multi-step", "utterance": "volume badhao phir gaana download karo jaldi", "expect": {"tools": ["system_control", "download_media"]}}
+{"id": "chain-022", "category": "multi-step", "utterance": "volume badhao phir gaana download karo please", "expect": {"tools": ["system_control", "download_media"]}}
+{"id": "chain-023", "category": "multi-step", "utterance": "volume badhao phir gaana download karo abhi", "expect": {"tools": ["system_control", "download_media"]}}
+{"id": "chain-024", "category": "multi-step", "utterance": "volume badhao phir gaana download karo zara", "expect": {"tools": ["system_control", "download_media"]}}
+{"id": "chain-025", "category": "multi-step", "utterance": "notepad kholo usme likho hello phir save karo", "expect": {"tools": ["open_application", "keyboard_mouse_action", "keyboard_mouse_action"]}}
+{"id": "chain-026", "category": "multi-step", "utterance": "notepad kholo usme likho hello phir save karo bhai", "expect": {"tools": ["open_application", "keyboard_mouse_action", "keyboard_mouse_action"]}}
+{"id": "chain-027", "category": "multi-step", "utterance": "notepad kholo usme likho hello phir save karo jaldi", "expect": {"tools": ["open_application", "keyboard_mouse_action", "keyboard_mouse_action"]}}
+{"id": "chain-028", "category": "multi-step", "utterance": "notepad kholo usme likho hello phir save karo please", "expect": {"tools": ["open_application", "keyboard_mouse_action", "keyboard_mouse_action"]}}
+{"id": "chain-029", "category": "multi-step", "utterance": "notepad kholo usme likho hello phir save karo abhi", "expect": {"tools": ["open_application", "keyboard_mouse_action", "keyboard_mouse_action"]}}
+{"id": "chain-030", "category": "multi-step", "utterance": "notepad kholo usme likho hello phir save karo zara", "expect": {"tools": ["open_application", "keyboard_mouse_action", "keyboard_mouse_action"]}}

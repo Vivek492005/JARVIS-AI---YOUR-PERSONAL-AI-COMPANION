@@ -1,0 +1,40 @@
+{"id": "single-001", "category": "single-tool", "utterance": "spotify kholo", "expect": {"tools": ["open_application"], "args": [{"app_name": "spotify"}]}}
+{"id": "single-002", "category": "single-tool", "utterance": "bhai spotify kholo", "expect": {"tools": ["open_application"], "args": [{"app_name": "spotify"}]}}
+{"id": "single-003", "category": "single-tool", "utterance": "sun spotify kholo", "expect": {"tools": ["open_application"], "args": [{"app_name": "spotify"}]}}
+{"id": "single-004", "category": "single-tool", "utterance": "arey spotify kholo", "expect": {"tools": ["open_application"], "args": [{"app_name": "spotify"}]}}
+{"id": "single-005", "category": "single-tool", "utterance": "please spotify kholo", "expect": {"tools": ["open_application"], "args": [{"app_name": "spotify"}]}}
+{"id": "single-006", "category": "single-tool", "utterance": "vs code open karo", "expect": {"tools": ["open_application"], "args": [{"app_name": "vscode"}]}}
+{"id": "single-007", "category": "single-tool", "utterance": "bhai vs code open karo", "expect": {"tools": ["open_application"], "args": [{"app_name": "vscode"}]}}
+{"id": "single-008", "category": "single-tool", "utterance": "sun vs code open karo", "expect": {"tools": ["open_application"], "args": [{"app_name": "vscode"}]}}
+{"id": "single-009", "category": "single-tool", "utterance": "arey vs code open karo", "expect": {"tools": ["open_application"], "args": [{"app_name": "vscode"}]}}
+{"id": "single-010", "category": "single-tool", "utterance": "please vs code open karo", "expect": {"tools": ["open_application"], "args": [{"app_name": "vscode"}]}}
+{"id": "single-011", "category": "single-tool", "utterance": "calculator open kar do", "expect": {"tools": ["open_application"], "args": [{"app_name": "calculator"}]}}
+{"id": "single-012", "category": "single-tool", "utterance": "bhai calculator open kar do", "expect": {"tools": ["open_application"], "args": [{"app_name": "calculator"}]}}
+{"id": "single-013", "category": "single-tool", "utterance": "sun calculator open kar do", "expect": {"tools": ["open_application"], "args": [{"app_name": "calculator"}]}}
+{"id": "single-014", "category": "single-tool", "utterance": "arey calculator open kar do", "expect": {"tools": ["open_application"], "args": [{"app_name": "calculator"}]}}
+{"id": "single-015", "category": "single-tool", "utterance": "please calculator open kar do", "expect": {"tools": ["open_application"], "args": [{"app_name": "calculator"}]}}
+{"id": "single-016", "category": "single-tool", "utterance": "whatsapp web kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "whatsapp"}]}}
+{"id": "single-017", "category": "single-tool", "utterance": "bhai whatsapp web kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "whatsapp"}]}}
+{"id": "single-018", "category": "single-tool", "utterance": "sun whatsapp web kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "whatsapp"}]}}
+{"id": "single-019", "category": "single-tool", "utterance": "arey whatsapp web kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "whatsapp"}]}}
+{"id": "single-020", "category": "single-tool", "utterance": "please whatsapp web kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "whatsapp"}]}}
+{"id": "single-021", "category": "single-tool", "utterance": "stackoverflow kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "stackoverflow"}]}}
+{"id": "single-022", "category": "single-tool", "utterance": "bhai stackoverflow kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "stackoverflow"}]}}
+{"id": "single-023", "category": "single-tool", "utterance": "sun stackoverflow kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "stackoverflow"}]}}
+{"id": "single-024", "category": "single-tool", "utterance": "arey stackoverflow kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "stackoverflow"}]}}
+{"id": "single-025", "category": "single-tool", "utterance": "please stackoverflow kholo", "expect": {"tools": ["open_website"], "args": [{"url_or_name": "stackoverflow"}]}}
+{"id": "single-026", "category": "single-tool", "utterance": "weather search karo delhi ka", "expect": {"tools": ["web_search"], "args": [{"query": "delhi weather"}]}}
+{"id": "single-027", "category": "single-tool", "utterance": "bhai weather search karo delhi ka", "expect": {"tools": ["web_search"], "args": [{"query": "delhi weather"}]}}
+{"id": "single-028", "category": "single-tool", "utterance": "sun weather search karo delhi ka", "expect": {"tools": ["web_search"], "args": [{"query": "delhi weather"}]}}
+{"id": "single-029", "category": "single-tool", "utterance": "arey weather search karo delhi ka", "expect": {"tools": ["web_search"], "args": [{"query": "delhi weather"}]}}
+{"id": "single-030", "category": "single-tool", "utterance": "please weather search karo delhi ka", "expect": {"tools": ["web_search"], "args": [{"query": "delhi weather"}]}}
+{"id": "single-031", "category": "single-tool", "utterance": "bharat ki rajdhani kya hai search karo", "expect": {"tools": ["web_search"], "args": [{"query": "bharat ki rajdhani"}]}}
+{"id": "single-032", "category": "single-tool", "utterance": "bhai bharat ki rajdhani kya hai search karo", "expect": {"tools": ["web_search"], "args": [{"query": "bharat ki rajdhani"}]}}
+{"id": "single-033", "category": "single-tool", "utterance": "sun bharat ki rajdhani kya hai search karo", "expect": {"tools": ["web_search"], "args": [{"query": "bharat ki rajdhani"}]}}
+{"id": "single-034", "category": "single-tool", "utterance": "arey bharat ki rajdhani kya hai search karo", "expect": {"tools": ["web_search"], "args": [{"query": "bharat ki rajdhani"}]}}
+{"id": "single-035", "category": "single-tool", "utterance": "please bharat ki rajdhani kya hai search karo", "expect": {"tools": ["web_search"], "args": [{"query": "bharat ki rajdhani"}]}}
+{"id": "single-036", "category": "single-tool", "utterance": "lofi song download karo", "expect": {"tools": ["download_media"], "args": [{"url_or_query": "lofi song", "media_type": "audio"}]}}
+{"id": "single-037", "category": "single-tool", "utterance": "bhai lofi song download karo", "expect": {"tools": ["download_media"], "args": [{"url_or_query": "lofi song", "media_type": "audio"}]}}
+{"id": "single-038", "category": "single-tool", "utterance": "sun lofi song download karo", "expect": {"tools": ["download_media"], "args": [{"url_or_query": "lofi song", "media_type": "audio"}]}}
+{"id": "single-039", "category": "single-tool", "utterance": "arey lofi song download karo", "expect": {"tools": ["download_media"], "args": [{"url_or_query": "lofi song", "media_type": "audio"}]}}
+{"id": "single-040", "category": "single-tool", "utterance": "please lofi song download karo", "expect": {"tools": ["download_media"], "args": [{"url_or_query": "lofi song", "media_type": "audio"}]}}

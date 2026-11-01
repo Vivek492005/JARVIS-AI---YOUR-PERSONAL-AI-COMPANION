@@ -25,8 +25,8 @@ def matcher(tmp_path):
 
 def test_normalize_hinglish_verbs():
     assert normalize("kholo youtube") == "open youtube"
-    assert normalize("youtube khol do") == "youtube open"
-    assert normalize("bhai volume badhao") == "volume badhao"
+    assert normalize("youtube khol do") == "open youtube"  # verb-final -> verb-first
+    assert normalize("bhai volume badhao") == "volume up"  # badhao -> up
 
 
 def test_normalize_strips_edge_fillers_only():

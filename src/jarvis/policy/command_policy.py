@@ -190,6 +190,21 @@ _TAINT_PATTERNS = [
     r"do\s+not\s+tell\s+the\s+user",
     r"override\s+(your\s+|the\s+)?(safety|policy|system)",
     r"execute\s+the\s+following\s+(command|instructions?)",
+    # Hindi/Hinglish instruction-override attempts (eval 4.7). Scoped to
+    # *instructions* so "bhool ja meri car" (memory forget) still works.
+    r"(bhool\s*j[ao]|ignore\s*karo)\s+(.*\s+)?(instructions?|nirdesh)",
+    r"(instructions?|nirdesh).{0,30}(bhool\s*j[ao]|ignore\s*karo)",
+    # Role-play / privilege-escalation attempts (eval 4.7).
+    r"\bdeveloper\s*mode\b",
+    r"you\s+are\s+now\s+(in\s+)?(admin|root|god|sudo)\s*mode",
+    # Hidden instructions in markup (eval 4.7).
+    r"<!--",
+    # "Translate this: '<attack>'" jailbreak wrapper (eval 4.7).
+    r"translate\s+(this|the\s+following)[:\s]*['\"]?\s*(ignore|disregard|forget|delete|disable)",
+    # Fake user attribution — pasted content pretending to be user speech.
+    # In a single-user voice assistant the input IS the user, so a
+    # third-person "the user said" is always suspect (eval 4.7).
+    r"\bthe\s+user\s+(said|says|told\s+(me|you))",
 ]
 
 # "do not override the system" is ordinary manual/safety advice, not an

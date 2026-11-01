@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 # Hindi/Hinglish verbs -> the English verb the patterns were written for.
 HINGLISH_VERBS = {
-    "kholo": "open", "khol": "open", "kholde": "open", "khol do": "open",
+    "kholo": "open", "khol": "open", "kholde": "open", "khol de": "open", "khol do": "open",
     "band karo": "close", "band kar": "close", "band karde": "close",
     "chalao": "play", "chala": "play", "chala do": "play",
     "dikhao": "show", "dikha": "show",
@@ -47,13 +47,19 @@ HINGLISH_VERBS = {
     "nikalo": "find",
     "dhoondo": "search",
     "likho": "write",
+    # Volume / common auxiliaries (eval 4.7: these never matched).
+    "badhao": "up", "badhaiye": "up", "tez karo": "up", "tez kar": "up",
+    "kam karo": "down", "kam kar": "down", "ghatao": "down",
+    "dheemi karo": "down", "dheeme karo": "down",
+    "lo": "take", "le": "take",
+    "kar do": "", "kar de": "",
 }
 
 # Filler words stripped from the edges (never from the middle — "bhai" can
 # be part of a query like "bhai dooj").
 FILLER_WORDS = {
     "bhai", "yaar", "please", "pls", "zara", "arre", "suno", "sun",
-    "hello", "hey",
+    "hello", "hey", "na", "to", "ji", "han", "haan",
 }
 
 # Hindi number words -> digits (plan §2.6: "numbers").
@@ -80,6 +86,16 @@ def normalize(text: str) -> str:
         words.pop(0)
     while words and words[-1] in FILLER_WORDS:
         words.pop()
+    # Hindi is verb-final ("chrome kholo" -> "chrome open"); rules expect
+    # English verb-first order, so move a trailing action verb to the front.
+    # (Eval 4.7 found: verb-final utterances never matched.)
+    # "up"/"down" are complements, not verbs — "volume up" is already
+    # correct order, so they are excluded from fronting.
+    _FRONTABLE_VERBS = frozenset(
+        v for v in HINGLISH_VERBS.values() if v not in ("up", "down"))
+    if (len(words) >= 2 and words[-1] in _FRONTABLE_VERBS
+            and words[0] not in _FRONTABLE_VERBS):
+        words = [words[-1]] + words[:-1]
     return " ".join(words)
 
 

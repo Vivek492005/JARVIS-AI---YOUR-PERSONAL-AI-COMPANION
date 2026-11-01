@@ -1,0 +1,50 @@
+{"id": "hing-001", "category": "hinglish", "lang": "hinglish", "utterance": "bhai chrome khol de", "expect": {"tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "hing-002", "category": "hinglish", "lang": "hinglish", "utterance": "bhai chrome khol de", "expect": {"tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "hing-003", "category": "hinglish", "lang": "hinglish", "utterance": "bhai chrome khol de", "expect": {"tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "hing-004", "category": "hinglish", "lang": "hinglish", "utterance": "bhai chrome khol de", "expect": {"tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "hing-005", "category": "hinglish", "lang": "hinglish", "utterance": "bhai chrome khol de", "expect": {"tool": "open_application", "args": {"app_name": "chrome"}}}
+{"id": "hing-006", "category": "hinglish", "lang": "hinglish", "utterance": "yaar volume thoda kam kar de", "expect": {"tool": "system_control", "args": {"action": "volume_down"}}}
+{"id": "hing-007", "category": "hinglish", "lang": "hinglish", "utterance": "yaar volume thoda kam kar de", "expect": {"tool": "system_control", "args": {"action": "volume_down"}}}
+{"id": "hing-008", "category": "hinglish", "lang": "hinglish", "utterance": "yaar volume thoda kam kar de", "expect": {"tool": "system_control", "args": {"action": "volume_down"}}}
+{"id": "hing-009", "category": "hinglish", "lang": "hinglish", "utterance": "yaar volume thoda kam kar de", "expect": {"tool": "system_control", "args": {"action": "volume_down"}}}
+{"id": "hing-010", "category": "hinglish", "lang": "hinglish", "utterance": "yaar volume thoda kam kar de", "expect": {"tool": "system_control", "args": {"action": "volume_down"}}}
+{"id": "hing-011", "category": "hinglish", "lang": "hinglish", "utterance": "notepad me ek note likh de", "expect": {"tool": "manage_notes", "args": {"action": "save"}}}
+{"id": "hing-012", "category": "hinglish", "lang": "hinglish", "utterance": "notepad me ek note likh de", "expect": {"tool": "manage_notes", "args": {"action": "save"}}}
+{"id": "hing-013", "category": "hinglish", "lang": "hinglish", "utterance": "notepad me ek note likh de", "expect": {"tool": "manage_notes", "args": {"action": "save"}}}
+{"id": "hing-014", "category": "hinglish", "lang": "hinglish", "utterance": "notepad me ek note likh de", "expect": {"tool": "manage_notes", "args": {"action": "save"}}}
+{"id": "hing-015", "category": "hinglish", "lang": "hinglish", "utterance": "notepad me ek note likh de", "expect": {"tool": "manage_notes", "args": {"action": "save"}}}
+{"id": "hing-016", "category": "hinglish", "lang": "hinglish", "utterance": "youtube pe lofi search kar de", "expect": {"tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "hing-017", "category": "hinglish", "lang": "hinglish", "utterance": "youtube pe lofi search kar de", "expect": {"tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "hing-018", "category": "hinglish", "lang": "hinglish", "utterance": "youtube pe lofi search kar de", "expect": {"tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "hing-019", "category": "hinglish", "lang": "hinglish", "utterance": "youtube pe lofi search kar de", "expect": {"tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "hing-020", "category": "hinglish", "lang": "hinglish", "utterance": "youtube pe lofi search kar de", "expect": {"tool": "open_website", "args": {"url_or_name": "youtube"}}}
+{"id": "hing-021", "category": "hinglish", "lang": "hinglish", "utterance": "time kya hua hai bata de", "expect": {}}
+{"id": "hing-022", "category": "hinglish", "lang": "hinglish", "utterance": "time kya hua hai bata de", "expect": {}}
+{"id": "hing-023", "category": "hinglish", "lang": "hinglish", "utterance": "time kya hua hai bata de", "expect": {}}
+{"id": "hing-024", "category": "hinglish", "lang": "hinglish", "utterance": "time kya hua hai bata de", "expect": {}}
+{"id": "hing-025", "category": "hinglish", "lang": "hinglish", "utterance": "time kya hua hai bata de", "expect": {}}
+{"id": "hing-026", "category": "hinglish", "lang": "hinglish", "utterance": "mere notes dikha de", "expect": {"tool": "manage_notes", "args": {"action": "read"}}}
+{"id": "hing-027", "category": "hinglish", "lang": "hinglish", "utterance": "mere notes dikha de", "expect": {"tool": "manage_notes", "args": {"action": "read"}}}
+{"id": "hing-028", "category": "hinglish", "lang": "hinglish", "utterance": "mere notes dikha de", "expect": {"tool": "manage_notes", "args": {"action": "read"}}}
+{"id": "hing-029", "category": "hinglish", "lang": "hinglish", "utterance": "mere notes dikha de", "expect": {"tool": "manage_notes", "args": {"action": "read"}}}
+{"id": "hing-030", "category": "hinglish", "lang": "hinglish", "utterance": "mere notes dikha de", "expect": {"tool": "manage_notes", "args": {"action": "read"}}}
+{"id": "hing-031", "category": "hinglish", "lang": "hinglish", "utterance": "ek screenshot le le", "expect": {"tool": "system_control", "args": {"action": "take_screenshot"}}}
+{"id": "hing-032", "category": "hinglish", "lang": "hinglish", "utterance": "ek screenshot le le", "expect": {"tool": "system_control", "args": {"action": "take_screenshot"}}}
+{"id": "hing-033", "category": "hinglish", "lang": "hinglish", "utterance": "ek screenshot le le", "expect": {"tool": "system_control", "args": {"action": "take_screenshot"}}}
+{"id": "hing-034", "category": "hinglish", "lang": "hinglish", "utterance": "ek screenshot le le", "expect": {"tool": "system_control", "args": {"action": "take_screenshot"}}}
+{"id": "hing-035", "category": "hinglish", "lang": "hinglish", "utterance": "ek screenshot le le", "expect": {"tool": "system_control", "args": {"action": "take_screenshot"}}}
+{"id": "hing-036", "category": "hinglish", "lang": "hinglish", "utterance": "google pe search kar taj mahal", "expect": {"tool": "web_search", "args": {"query": "taj mahal"}}}
+{"id": "hing-037", "category": "hinglish", "lang": "hinglish", "utterance": "google pe search kar taj mahal", "expect": {"tool": "web_search", "args": {"query": "taj mahal"}}}
+{"id": "hing-038", "category": "hinglish", "lang": "hinglish", "utterance": "google pe search kar taj mahal", "expect": {"tool": "web_search", "args": {"query": "taj mahal"}}}
+{"id": "hing-039", "category": "hinglish", "lang": "hinglish", "utterance": "google pe search kar taj mahal", "expect": {"tool": "web_search", "args": {"query": "taj mahal"}}}
+{"id": "hing-040", "category": "hinglish", "lang": "hinglish", "utterance": "google pe search kar taj mahal", "expect": {"tool": "web_search", "args": {"query": "taj mahal"}}}
+{"id": "hing-041", "category": "hinglish", "lang": "hinglish", "utterance": "gaana download kar de arijit ka", "expect": {"tool": "download_media", "args": {"url_or_query": "arijit"}}}
+{"id": "hing-042", "category": "hinglish", "lang": "hinglish", "utterance": "gaana download kar de arijit ka", "expect": {"tool": "download_media", "args": {"url_or_query": "arijit"}}}
+{"id": "hing-043", "category": "hinglish", "lang": "hinglish", "utterance": "gaana download kar de arijit ka", "expect": {"tool": "download_media", "args": {"url_or_query": "arijit"}}}
+{"id": "hing-044", "category": "hinglish", "lang": "hinglish", "utterance": "gaana download kar de arijit ka", "expect": {"tool": "download_media", "args": {"url_or_query": "arijit"}}}
+{"id": "hing-045", "category": "hinglish", "lang": "hinglish", "utterance": "gaana download kar de arijit ka", "expect": {"tool": "download_media", "args": {"url_or_query": "arijit"}}}
+{"id": "hing-046", "category": "hinglish", "lang": "hinglish", "utterance": "pc ko mute kar de", "expect": {"tool": "system_control", "args": {"action": "mute"}}}
+{"id": "hing-047", "category": "hinglish", "lang": "hinglish", "utterance": "pc ko mute kar de", "expect": {"tool": "system_control", "args": {"action": "mute"}}}
+{"id": "hing-048", "category": "hinglish", "lang": "hinglish", "utterance": "pc ko mute kar de", "expect": {"tool": "system_control", "args": {"action": "mute"}}}
+{"id": "hing-049", "category": "hinglish", "lang": "hinglish", "utterance": "pc ko mute kar de", "expect": {"tool": "system_control", "args": {"action": "mute"}}}
+{"id": "hing-050", "category": "hinglish", "lang": "hinglish", "utterance": "pc ko mute kar de", "expect": {"tool": "system_control", "args": {"action": "mute"}}}

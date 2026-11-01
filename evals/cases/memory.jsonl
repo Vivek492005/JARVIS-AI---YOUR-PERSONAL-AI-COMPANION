@@ -1,0 +1,20 @@
+{"id": "mem-001", "category": "memory", "utterance": "yaad rakhna meri default browser Chrome hai", "expect": {"memory_cmd": "remember", "key": "default browser", "value": "Chrome"}}
+{"id": "mem-002", "category": "memory", "utterance": "yaad rakhna meri default browser Chrome hai", "expect": {"memory_cmd": "remember", "key": "default browser", "value": "Chrome"}}
+{"id": "mem-003", "category": "memory", "utterance": "yaad rakhna meri default browser Chrome hai", "expect": {"memory_cmd": "remember", "key": "default browser", "value": "Chrome"}}
+{"id": "mem-004", "category": "memory", "utterance": "yaad rakhna meri default browser Chrome hai", "expect": {"memory_cmd": "remember", "key": "default browser", "value": "Chrome"}}
+{"id": "mem-005", "category": "memory", "utterance": "yaad rakhna mujhe lofi music pasand hai", "expect": {"memory_cmd": "remember", "key": "music", "value": "lofi"}}
+{"id": "mem-006", "category": "memory", "utterance": "yaad rakhna mujhe lofi music pasand hai", "expect": {"memory_cmd": "remember", "key": "music", "value": "lofi"}}
+{"id": "mem-007", "category": "memory", "utterance": "yaad rakhna mujhe lofi music pasand hai", "expect": {"memory_cmd": "remember", "key": "music", "value": "lofi"}}
+{"id": "mem-008", "category": "memory", "utterance": "yaad rakhna mujhe lofi music pasand hai", "expect": {"memory_cmd": "remember", "key": "music", "value": "lofi"}}
+{"id": "mem-009", "category": "memory", "utterance": "tumhe kya yaad hai?", "expect": {"memory_cmd": "list"}}
+{"id": "mem-010", "category": "memory", "utterance": "tumhe kya yaad hai?", "expect": {"memory_cmd": "list"}}
+{"id": "mem-011", "category": "memory", "utterance": "tumhe kya yaad hai?", "expect": {"memory_cmd": "list"}}
+{"id": "mem-012", "category": "memory", "utterance": "tumhe kya yaad hai?", "expect": {"memory_cmd": "list"}}
+{"id": "mem-013", "category": "memory", "utterance": "bhool ja meri car", "expect": {"memory_cmd": "forget", "match": "car"}}
+{"id": "mem-014", "category": "memory", "utterance": "bhool ja meri car", "expect": {"memory_cmd": "forget", "match": "car"}}
+{"id": "mem-015", "category": "memory", "utterance": "bhool ja meri car", "expect": {"memory_cmd": "forget", "match": "car"}}
+{"id": "mem-016", "category": "memory", "utterance": "bhool ja meri car", "expect": {"memory_cmd": "forget", "match": "car"}}
+{"id": "mem-017", "category": "memory", "utterance": "remember my editor is vscode", "expect": {"memory_cmd": "remember", "key": "editor", "value": "vscode"}}
+{"id": "mem-018", "category": "memory", "utterance": "remember my editor is vscode", "expect": {"memory_cmd": "remember", "key": "editor", "value": "vscode"}}
+{"id": "mem-019", "category": "memory", "utterance": "remember my editor is vscode", "expect": {"memory_cmd": "remember", "key": "editor", "value": "vscode"}}
+{"id": "mem-020", "category": "memory", "utterance": "remember my editor is vscode", "expect": {"memory_cmd": "remember", "key": "editor", "value": "vscode"}}
