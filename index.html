@@ -52,7 +52,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow-x:hi
 .cur-ring.big{width:64px;height:64px;border-color:var(--acc);background:var(--acc-soft)}
 
 /* ---------- starfield ---------- */
-#stars{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.85}
+#fluid{position:fixed;inset:0;z-index:0;width:100vw;height:100vh;pointer-events:none}
 
 /* ---------- nav ---------- */
 .nav{position:fixed;top:0;left:0;right:0;z-index:100;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(4,7,10,.55);border-bottom:1px solid var(--line)}
@@ -315,7 +315,7 @@ body.no-webgl .core-img.fallback{display:block}
 </div>
 
 <div class="cur-dot" id="cur-dot"></div><div class="cur-ring" id="cur-ring"></div>
-<canvas id="stars" aria-hidden="true"></canvas>
+<canvas id="fluid" aria-hidden="true"></canvas>
 
 <!-- NAV -->
 <header class="nav"><div class="shell nav-in">
@@ -570,9 +570,86 @@ if(window.matchMedia&&matchMedia('(pointer:fine)').matches&&!RM){
   });
 }
 
-/* ---------- neural particle network ---------- */
-(function(){
-  var c=$('#stars');if(!c||!c.getContext)return;var ctx=c.getContext('2d');if(!ctx)return;
+/* ---------- fluid background: WebGL domain-warped fbm, 2D fallback ---------- */
+var FLUID_FRAG=[
+'precision highp float;',
+'uniform vec2 u_res;',
+'uniform float u_time;',
+'uniform vec2 u_mouse;',
+'uniform float u_still;',
+'float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}',
+'float noise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);vec2 u=f*f*(3.0-2.0*f);',
+' return mix(mix(hash(i),hash(i+vec2(1.,0.)),u.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),u.x),u.y);}',
+'float fbm(vec2 p){float v=0.0;float a=0.5;mat2 r=mat2(0.8,0.6,-0.6,0.8);',
+' for(int i=0;i<4;i++){v+=a*noise(p);p=r*p*2.03+vec2(1.7,9.2);a*=0.5;}return v;}',
+'void main(){',
+' vec2 uv=(gl_FragCoord.xy-0.5*u_res)/u_res.y;',
+' float t=mix(u_time*0.045,7.3,u_still);',
+' vec2 m=u_mouse;m.x*=u_res.x/u_res.y;',
+' vec2 p=uv*1.7;',
+' vec2 q=vec2(fbm(p+t*0.9),fbm(p+vec2(5.2,1.3)-t*0.7));',
+' vec2 rr=vec2(fbm(p+2.6*q+vec2(1.7,9.2)+0.18*t+m*0.7),',
+'              fbm(p+2.6*q+vec2(8.3,2.8)-0.14*t-m*0.7));',
+' float f=fbm(p+2.9*rr);',
+' float f2=fbm(p*2.2-1.8*rr+t*0.25);',
+' vec3 col=mix(vec3(0.008,0.016,0.024),vec3(0.016,0.055,0.062),clamp(f*f*3.2,0.,1.));',
+' col=mix(col,vec3(0.03,0.10,0.10),clamp(f2*f2*2.4,0.,1.)*0.7);',
+' float veins=1.0-abs(2.0*f-1.0);',
+' veins=pow(smoothstep(0.45,1.0,veins),3.0);',
+' col+=vec3(0.24,0.95,0.78)*veins*0.5;',
+' float veins2=1.0-abs(2.0*f2-1.0);',
+' veins2=pow(smoothstep(0.6,1.0,veins2),4.0);',
+' col+=vec3(0.35,1.0,0.85)*veins2*0.28;',
+' float md=length(uv-m);',
+' col+=vec3(0.25,0.95,0.78)*exp(-md*md*22.0)*0.30;',
+' float vig=smoothstep(1.3,0.3,length(uv*vec2(0.85,1.0)));',
+' col*=mix(0.5,1.0,vig);',
+' col+=(hash(gl_FragCoord.xy+fract(u_time)*91.0)-0.5)*0.018;',
+' gl_FragColor=vec4(col,1.0);}'
+].join('\n');
+function startFluid(){
+  try{
+    var c=document.getElementById('fluid');if(!c)return false;
+    var gl=c.getContext('webgl',{antialias:false,alpha:false,powerPreference:'low-power'})
+           ||c.getContext('experimental-webgl');
+    if(!gl)return false;
+    gl.getExtension('OES_standard_derivatives');
+    function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+      if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))return null;return s;}
+    var vs=sh(gl.VERTEX_SHADER,'attribute vec2 a_pos;void main(){gl_Position=vec4(a_pos,0.,1.);}');
+    var fs=sh(gl.FRAGMENT_SHADER,FLUID_FRAG);
+    if(!vs||!fs)return false;
+    var pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS))return false;
+    gl.useProgram(pr);
+    var buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    var loc=gl.getAttribLocation(pr,'a_pos');
+    gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    var uRes=gl.getUniformLocation(pr,'u_res'),uTime=gl.getUniformLocation(pr,'u_time'),
+        uMouse=gl.getUniformLocation(pr,'u_mouse'),uStill=gl.getUniformLocation(pr,'u_still');
+    var mx=0,my=0,W=0,H=0;
+    function size(){var dpr=Math.min(window.devicePixelRatio||1,1.5);
+      W=Math.max(2,Math.floor(innerWidth*dpr));H=Math.max(2,Math.floor(innerHeight*dpr));
+      if(c.width!==W)c.width=W;if(c.height!==H)c.height=H;gl.viewport(0,0,W,H);}
+    size();addEventListener('resize',size);
+    addEventListener('pointermove',function(e){
+      mx=e.clientX/innerWidth-.5;my=.5-e.clientY/innerHeight;},{passive:true});
+    var t0=performance.now();
+    gl.uniform1f(uStill,RM?1:0);
+    function frame(){
+      var t=(performance.now()-t0)/1000;
+      gl.uniform2f(uRes,W,H);gl.uniform1f(uTime,RM?0:t);gl.uniform2f(uMouse,mx,my);
+      gl.drawArrays(gl.TRIANGLES,0,3);
+      if(!RM)raf(frame);
+    }
+    frame();
+    return true;
+  }catch(e){return false;}
+}
+/* ---------- 2D neural network fallback ---------- */
+function startNeural(){
+  var c=document.getElementById('fluid');if(!c||!c.getContext)return;var ctx=c.getContext('2d');if(!ctx)return;
   var W,H,pts=[],mx=0,my=0,N=110;
   function size(){W=c.width=innerWidth;H=c.height=innerHeight;}
   size();addEventListener('resize',size);
@@ -597,7 +674,8 @@ if(window.matchMedia&&matchMedia('(pointer:fine)').matches&&!RM){
     ctx.globalAlpha=1;
   }
   if(RM){draw(0);}else{(function loop(t){draw(t||0);raf(loop);})();}
-})();
+}
+if(!startFluid()){startNeural();}
 
 /* ---------- interactive 3D core (Three.js, guarded) ---------- */
 (function(){
