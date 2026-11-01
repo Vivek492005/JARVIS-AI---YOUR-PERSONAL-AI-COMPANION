@@ -1692,9 +1692,13 @@ class VoiceCommandProcessor:
 class VoiceInterface:
     """Handles microphone capture, TTS speech output, and assistant coordination."""
 
-    def __init__(self, config_file: str = "voice_config.json", status_callback: Optional[Callable[[str], None]] = None):
+    def __init__(self, config_file: str = "voice_config.json", status_callback: Optional[Callable[[str], None]] = None,
+                 bus=None):
         self.config_file = config_file
         self.status_callback = status_callback
+        # Task 2.2: event bus (default: process-wide bus).
+        from jarvis.core.events import get_bus
+        self.bus = bus or get_bus()
         self.config = self._load_config()
         self.wake_word = self.config.get("wake_word", "JARVIS").lower()
         self.require_wake_word = self.config.get("require_wake_word", False)
@@ -1886,27 +1890,34 @@ class VoiceInterface:
         print(f"\n[JARVIS]: {text}")
 
         def _speak_thread():
-            with self._tts_lock:
-                # Task 1.10: Privacy Mode => offline engine only.
-                local_only = self._privacy_tts_only_local()
-                # 1. Primary: Rumik AI Silk TTS
-                tts_engine = self.config.get("tts_engine", "rumik")
-                if tts_engine == "rumik" and not local_only:
-                    if self._speak_rumik(text):
-                        return
+            # Task 2.2: GUI and other clients subscribe to speech events
+            # instead of monkey-patching this method (F-14).
+            from jarvis.core.events import SpeechStarted, SpeechStopped
+            self.bus.emit(SpeechStarted(text=text))
+            try:
+                with self._tts_lock:
+                    # Task 1.10: Privacy Mode => offline engine only.
+                    local_only = self._privacy_tts_only_local()
+                    # 1. Primary: Rumik AI Silk TTS
+                    tts_engine = self.config.get("tts_engine", "rumik")
+                    if tts_engine == "rumik" and not local_only:
+                        if self._speak_rumik(text):
+                            return
 
-                # 2. Secondary Fallback: Microsoft Natural Neural Voice
-                if tts_engine in ["rumik", "neural"] and not local_only:
-                    if self._speak_neural(text):
-                        return
+                    # 2. Secondary Fallback: Microsoft Natural Neural Voice
+                    if tts_engine in ["rumik", "neural"] and not local_only:
+                        if self._speak_neural(text):
+                            return
 
-                # 3. Tertiary Fallback: Offline pyttsx3
-                if self.engine:
-                    try:
-                        self.engine.say(text)
-                        self.engine.runAndWait()
-                    except Exception as e:
-                        logger.error(f"TTS Speech error: {e}")
+                    # 3. Tertiary Fallback: Offline pyttsx3
+                    if self.engine:
+                        try:
+                            self.engine.say(text)
+                            self.engine.runAndWait()
+                        except Exception as e:
+                            logger.error(f"TTS Speech error: {e}")
+            finally:
+                self.bus.emit(SpeechStopped())
 
         if wait:
             _speak_thread()

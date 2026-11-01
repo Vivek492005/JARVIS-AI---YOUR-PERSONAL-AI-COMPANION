@@ -54,8 +54,12 @@ class AIAgent:
         temperature: float = 0.3,
         status_callback: Optional[Callable[[str], None]] = None,
         provider: str = "huggingface",
+        bus=None,
     ):
         self.provider = provider or os.getenv("AI_PROVIDER", "huggingface")
+        # Task 2.2: event bus (default: process-wide bus).
+        from jarvis.core.events import get_bus
+        self.bus = bus or get_bus()
         
         # Primary: Hugging Face with Qwen 2.5 72B Instruct
         from jarvis.core.secrets import get_secret
@@ -116,6 +120,13 @@ class AIAgent:
                 self.status_callback(msg)
             except Exception:
                 pass
+
+    def _emit(self, ev):
+        """Publish on the event bus (no-op when constructed without one,
+        e.g. ``AIAgent.__new__`` in unit tests)."""
+        bus = getattr(self, "bus", None)
+        if bus is not None:
+            bus.emit(ev)
 
     def _init_clients(self):
         """Initialize primary (Hugging Face Qwen) and secondary (DeepSeek) clients."""
@@ -277,12 +288,17 @@ class AIAgent:
         # (set by Task 1.5 when untrusted content enters the context).
         ctx = PolicyContext(tainted=getattr(self, "tainted", False),
                             rate_limited=getattr(self, "rate_limited", False))
+        from jarvis.core.events import ToolRequested, ToolFinished
+        self._emit(ToolRequested(trace=getattr(self, "session_id", ""), tool=function_name,
+                                    args=dict(args)))
         verdict, reason = self._decide(function_name, args, ctx)
 
         if verdict == DENY:
             logger.warning(f"Blocked tool call: {function_name} ({reason})")
             result = f"Blocked for safety: {reason}"
             self._audit(function_name, args, "deny", reason=reason)
+            self._emit(ToolFinished(trace=getattr(self, "session_id", ""), tool=function_name,
+                                        ok=False, result=reason))
             return result
 
         if verdict == CONFIRM:
@@ -303,6 +319,11 @@ class AIAgent:
         latency_ms = (time.time() - _t0) * 1000.0
         self._audit(function_name, args, ALLOW, reason=reason,
                      latency_ms=latency_ms)
+        self._emit(ToolFinished(trace=getattr(self, "session_id", ""), tool=function_name,
+                                    ok=not result.startswith(("Action failed:",
+                                                              "Command failed:",
+                                                              "Blocked for safety")),
+                                    result=result[:500]))
         return result
 
     def _decide(self, tool_name: str, args: Dict[str, Any], ctx=None):
@@ -516,6 +537,9 @@ class AIAgent:
             return "Cancelled — I won't do that."
 
         self._notify_status("Thinking...")
+        # Task 2.2: publish thinking state on the event bus.
+        from jarvis.core.events import AgentThinking
+        self._emit(AgentThinking(trace=getattr(self, "session_id", ""), status="Thinking..."))
 
         # Task 1.10: Privacy Mode — local-only chain, no cloud LLM calls.
         if self._privacy_on():

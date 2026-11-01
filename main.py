@@ -50,22 +50,20 @@ class JARVISAssistant:
             status_callback=self._on_ai_status
         )
 
-        # Hook into voice.speak() so every TTS output is also shown in the GUI
-        self._orig_speak = self.voice.speak
-        self.voice.speak = self._hooked_speak
+        # Task 2.2 (F-14): no more monkey-patching voice.speak — the GUI
+        # subscribes to SpeechStarted events on the bus instead.
+        from jarvis.core.events import get_bus, SpeechStarted
+        get_bus().on(SpeechStarted, self._on_speech_started)
+
+    def _on_speech_started(self, ev):
+        """Show every spoken line in the GUI (replaces the speak hook)."""
+        if self.gui is not None:
+            self.gui.set_assistant_text(str(ev.text))
 
     def _on_ai_status(self, status: str):
         """Update GUI with current AI agent status (thinking, tool execution, etc)."""
         if self.gui is not None:
             self.gui.set_status(f"⚡ {status}")
-
-    # ── TTS hook ──────────────────────────────────────────────────────────────
-
-    def _hooked_speak(self, text: str, wait: bool = False):
-        """Forward every spoken line to the GUI status label (thread-safe)."""
-        if self.gui is not None:
-            self.gui.set_assistant_text(str(text))
-        self._orig_speak(text, wait)
 
     # ── Voice command callback ─────────────────────────────────────────────────
 
