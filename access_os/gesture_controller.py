@@ -23,7 +23,10 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # Disable pyautogui failsafe
-pyautogui.FAILSAFE = False
+# Task 0.7/A-05: the failsafe MUST stay on — moving the mouse to the
+# top-left corner aborts any automated movement (runaway protection).
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 
 
 class GestureType(Enum):

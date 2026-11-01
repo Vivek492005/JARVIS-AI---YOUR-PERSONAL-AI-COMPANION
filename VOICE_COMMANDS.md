@@ -1,6 +1,6 @@
 ﻿# 🤖 JARVIS — Complete Voice Commands & AI Agent Guide
 
-**JARVIS** is an intelligent, production-grade AI voice companion for Windows. Driven by **Qwen 2.5 72B Instruct (via Hugging Face Router)** and **Rumik AI Silk TTS**, it combines an autonomous function-calling LLM brain with 100+ local OS automation tools.
+**JARVIS** is an intelligent AI voice companion for Windows (alpha). Driven by **Qwen 2.5 72B Instruct (via Hugging Face Router)** and **Rumik AI Silk TTS**, it combines an autonomous function-calling LLM brain with 156 fixed-phrase voice commands and 8 LLM tools for local OS automation.
 
 ---
 

@@ -5,9 +5,14 @@
 [![Voice](https://img.shields.io/badge/Voice-Rumik%20AI%20Silk%20TTS-purple.svg)](https://rumik.ai/)
 [![OS](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6.svg)](https://www.microsoft.com/windows/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-alpha-orange.svg)](README.md)
 [![Stars](https://img.shields.io/github/stars/Vivek492005/JARVIS-AI---YOUR-PERSONAL-AI-COMPANION?style=social)](https://github.com/Vivek492005/JARVIS-AI---YOUR-PERSONAL-AI-COMPANION/stargazers)
 
-**JARVIS** is an intelligent, autonomous hands-free voice and text assistant for Windows. Unlike legacy voice assistants that rely on rigid regex keywords or predefined patterns, JARVIS is driven by **state-of-the-art Large Language Models (Qwen 2.5 72B Instruct via Hugging Face Router and DeepSeek V4)** paired with an **autonomous tool-calling engine** and **Rumik AI Silk TTS voice synthesis**.
+> **Status: alpha.** JARVIS controls your keyboard, mouse, microphone and shell.
+> It is designed to fail safe (policy gate, confirmations, audit log), but it
+> is not finished software — see [Known limitations](#-known-limitations).
+
+**JARVIS** is an intelligent, autonomous hands-free voice and text assistant for Windows. It combines a **fast local phrase matcher** (156 fixed voice commands, no API round-trip) with a **state-of-the-art Large Language Model brain (Qwen 2.5 72B Instruct via Hugging Face Router and DeepSeek)** driving an **autonomous tool-calling engine**, plus **Rumik AI Silk TTS voice synthesis**.
 
 Whether you speak in casual English, Hindi, Hinglish, or give complex multi-action instructions, JARVIS understands intent dynamically, performs real-world desktop operations, controls OS settings, queries the web, writes notes, downloads media, and speaks back naturally — with your voice, on your machine, entirely under your control.
 
@@ -87,7 +92,7 @@ Need API keys first? Jump to [API Key Configuration](#-api-key-configuration) �
   - High-resolution screen capture (`screenshots/screenshot_YYYYMMDD_HHMMSS.png`).
   - Workstation lock (`rundll32 user32.dll,LockWorkStation`).
   - Recycle bin auto-clean and hardware battery status reporting.
-- **Keyboard & Typing Automation (`keyboard_mouse_action`)**: Auto-types arbitrary text, pastes clipboard contents, and fires hotkeys (`ctrl+s`, `alt+f4`, `ctrl+c`, `ctrl+v`, etc.).
+- **Keyboard & Typing Automation (`keyboard_mouse_action`)**: Auto-types text, pastes clipboard contents, and fires allowlisted hotkeys (`ctrl+s`, `ctrl+c`, `ctrl+v`, …). Dangerous combinations (`alt+f4`, `win+r`, …) are blocked by the policy gate.
 - **Notes Manager (`manage_notes`)**: Saves, reads, and clears persistent timestamped notes in `notes.txt`.
 - **Live Web Research (`web_search` & `open_website`)**: Searches Google or opens specific URLs and web applications.
 
@@ -101,10 +106,10 @@ Need API keys first? Jump to [API Key Configuration](#-api-key-configuration) �
 - Optional webcam-based hand-gesture control layer (`access_os/gesture_controller.py`), runnable standalone via `run_gestures.py`.
 - Full gesture reference: [GESTURE_COMMANDS.md](GESTURE_COMMANDS.md).
 
-### 6. 🛡 Zero-Downtime Multi-Level Resiliency
+### 6. 🛡 Graceful Degradation
 - If the primary API runs out of tokens or drops internet connectivity, the assistant automatically cascades:
   `Hugging Face Qwen 72B ➔ DeepSeek Cloud ➔ Smart Local Heuristic Parser`.
-- The assistant **never crashes or freezes**.
+- The assistant is built to degrade gracefully rather than crash: exceptions in the command pipeline are caught, the GUI status returns to `● Ready`, and the audit log records what happened. Like all alpha software, unexpected failures are still possible — report them.
 
 ---
 
@@ -224,7 +229,7 @@ RUMIK_MODEL=muga
 
 > 🔒 **Never commit your real `.env` file.** It's already excluded via `.gitignore`. Only `env.example` (with placeholder values) should ever be pushed to GitHub. If you ever accidentally commit real keys, rotate/regenerate them immediately on the provider's dashboard — deleting the file later does not remove it from git history.
 
-If both Hugging Face and DeepSeek are ever unreachable, JARVIS silently falls back to a local heuristic parser rather than crashing — see [Zero-Downtime Resiliency](#6--zero-downtime-multi-level-resiliency).
+If both Hugging Face and DeepSeek are ever unreachable, JARVIS silently falls back to a local heuristic parser rather than crashing — see [Graceful Degradation](#6--graceful-degradation).
 
 ---
 
@@ -310,6 +315,17 @@ jarvis_audit.log                         ← every verdict, local only
 
 ---
 
+## ⚠️ Known limitations
+
+- **Voice input needs the cloud.** Speech recognition uses Google's Web Speech API; without internet, voice commands don't work (typed commands do).
+- **Prompt injection is not solved.** Web pages, PDFs, and clipboard text are *data*, but a sufficiently clever hidden instruction can still confuse the model. JARVIS contains this (untrusted-data tagging, taint tracking, confirm-before-act) — it does not claim to prevent it. See `docs/THREAT_MODEL.md`.
+- **The mic is always listening when unmuted** (until Phase 3's wake-word engine lands, `require_wake_word` defaults to ON — JARVIS ignores speech that doesn't start with the wake word).
+- **No real vision yet.** Screenshots are captured but not *seen* by the model; screen understanding arrives in Phase 5.
+- **Windows only.** Linux/macOS are not supported.
+- **Long commands:** the default 30 s utterance cap (`max_utterance_s`) can be raised in `settings.toml`.
+
+---
+
 ## 🧪 Running Tests & Diagnostics
 
 All diagnostic and verification tests are organized in `tests/`:
@@ -364,8 +380,15 @@ Run these first whenever something doesn't behave as expected — they'll usuall
 
 ---
 
-## 🗺 Roadmap & Future Scope
+## ⚖️ Legal notes
 
+- **Media downloads:** `download_media` uses `yt-dlp`. Downloading copyrighted content may violate your country's laws or a platform's Terms of Service — use it only for content you own or that is explicitly permitted. This is your responsibility.
+- **Name:** "JARVIS" is famously a Marvel/Disney character name. Fine for a personal project; pick an original name before any public release or branding.
+- *We are not lawyers; get proper legal advice if you need it.*
+
+---
+
+## 🗺 Roadmap & Future Scope
 Ideas for where this project could go next (contributions welcome on any of these):
 
 - [ ] Cross-platform support (macOS / Linux) for the core tool suite
