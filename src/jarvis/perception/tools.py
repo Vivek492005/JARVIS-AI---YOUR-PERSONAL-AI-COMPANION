@@ -526,6 +526,39 @@ def _context_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.10 Agent sandbox
+# ---------------------------------------------------------------------------
+
+class SandboxExecParams(BaseModel):
+    command: List[str] = Field(..., min_length=1, max_length=20,
+                               description="Command argv to run in the container.")
+    image: str = Field(default="python:3.12-slim", max_length=200)
+    timeout_s: float = Field(default=60.0, ge=5.0, le=600.0)
+
+
+def _h_sandbox_exec(args, _cb, _nf):
+    from jarvis.perception.sandbox import build_container_spec, run_in_container
+    try:
+        spec = build_container_spec(args["command"],
+                                    image=args.get("image", "python:3.12-slim"),
+                                    timeout_s=float(args.get("timeout_s", 60.0)))
+    except ValueError as e:
+        return f"Blocked: {e}"
+    return run_in_container(spec)
+
+
+def _sandbox_specs() -> List[ToolSpec]:
+    return [
+        # SYSTEM: arbitrary code execution, even containerized.
+        ToolSpec(name="sandbox_exec", risk=Risk.SYSTEM,
+                 description="Run a command in a locked-down container "
+                             "(no network, CPU/RAM/time limits, workspace "
+                             "read-only, outputs to workspace/out only).",
+                 params=SandboxExecParams, handler=_h_sandbox_exec),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
@@ -533,5 +566,5 @@ def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
     for spec in (_uia_specs() + _screen_specs() + _vlm_specs()
                  + _browser_specs() + _file_specs() + _app_specs()
-                 + _context_specs()):
+                 + _context_specs() + _sandbox_specs()):
         _reg(spec)

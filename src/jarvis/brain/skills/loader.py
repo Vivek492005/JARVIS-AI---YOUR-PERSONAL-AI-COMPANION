@@ -121,6 +121,14 @@ def load_skill(skill_dir: Path, trust: TrustLevel = TrustLevel.THIRD_PARTY,
     """
     manifest = load_manifest(skill_dir)
     manifest.trust = trust
+    # Phase 5.10: untrusted (third-party) skills need sandbox Level B+.
+    try:
+        from jarvis.perception.sandbox import assert_skill_allowed
+        assert_skill_allowed(manifest.name, manifest.trust.value
+                             if hasattr(manifest.trust, "value")
+                             else str(manifest.trust))
+    except PermissionError:
+        raise
     if manifest.permissions:
         logger.info("skill '%s' requests permissions: %s",
                     manifest.name, ", ".join(manifest.permissions))
