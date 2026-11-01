@@ -195,6 +195,13 @@ def main():
         except (OSError, ValueError) as e:
             logger.warning(f"Could not install handler for {_sig}: {e}")
 
+    # Task 1.9: scrub secret values out of every log record from here on.
+    try:
+        from access_os.secrets import install_secret_redaction
+        install_secret_redaction()
+    except Exception as e:
+        logger.warning(f"Secret log-redaction unavailable: {e}")
+
     # Task 1.8: kill switch — Ctrl+Alt+Shift+J stops everything, now.
     try:
         from access_os.safety import KillSwitch

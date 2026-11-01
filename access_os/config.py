@@ -188,7 +188,20 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Cached single Settings instance for the process."""
-    return Settings()
+    s = Settings()
+    # Task 1.9: backfill empty secret fields from the OS keyring
+    # (best-effort; env/.env already handled by pydantic-settings).
+    try:
+        from .secrets import get_secret
+        if not s.huggingface_api_key:
+            s.huggingface_api_key = get_secret("HUGGINGFACE_API_KEY")
+        if not s.deepseek_api_key:
+            s.deepseek_api_key = get_secret("DEEPSEEK_API_KEY")
+        if not s.rumik_api_key:
+            s.rumik_api_key = get_secret("RUMIK_API_KEY")
+    except Exception:
+        pass
+    return s
 
 
 def reset_settings_cache() -> None:

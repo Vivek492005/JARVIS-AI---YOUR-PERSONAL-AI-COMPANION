@@ -41,6 +41,9 @@ vision = ["opencv-python>=4.7.0", "mediapipe>=0.10.0"]
 voice-local = ["faster-whisper", "openwakeword", "silero-vad"]
 browser = ["playwright"]
 server = ["fastapi", "uvicorn[standard]"]
+# Task 1.9: OS keyring for secrets (Windows Credential Manager etc.).
+# Optional — without it, .env remains the secrets home.
+keyring = ["keyring>=25.0.0"]
 dev = [
     "pytest>=7.3.1",
     "pytest-cov>=4.0.0",

@@ -1779,7 +1779,8 @@ class VoiceInterface:
 
     def _speak_rumik(self, text: str) -> bool:
         """Synthesize and play speech using Rumik AI Silk TTS."""
-        api_key = os.getenv("RUMIK_API_KEY", "rk_live_Mb5_0-QAzl5JjVR5JtB7rqzYyLRqMTAyFzj9LevmwGA")
+        from .secrets import get_secret
+        api_key = get_secret("RUMIK_API_KEY")
         if not api_key:
             return False
 

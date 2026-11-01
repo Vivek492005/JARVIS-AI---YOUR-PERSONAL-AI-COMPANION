@@ -62,12 +62,13 @@ class AIAgent:
         self.provider = provider or os.getenv("AI_PROVIDER", "huggingface")
         
         # Primary: Hugging Face with Qwen 2.5 72B Instruct
-        self.hf_api_key = os.getenv("HUGGINGFACE_API_KEY", "")
+        from .secrets import get_secret
+        self.hf_api_key = get_secret("HUGGINGFACE_API_KEY")
         self.hf_base_url = os.getenv("HUGGINGFACE_BASE_URL", "https://router.huggingface.co/v1")
         self.hf_model = model or os.getenv("HUGGINGFACE_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 
         # Secondary: DeepSeek
-        self.ds_api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        self.ds_api_key = api_key or get_secret("DEEPSEEK_API_KEY")
         self.ds_base_url = base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
         self.ds_model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
