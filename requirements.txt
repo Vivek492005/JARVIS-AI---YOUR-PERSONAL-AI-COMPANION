@@ -3,6 +3,12 @@
 # with grep over all *.py files). Heavy ML / web deps that were declared but
 # never imported were moved to requirements-optional.txt with reasons.
 # Dev/test/lint tools live in requirements-dev.txt (which includes this file).
+# NOTE: pyproject.toml is the canonical source; this file mirrors it for
+# plain `pip install -r` workflows.
+
+# Single typed config (Task 0.3)
+pydantic>=2
+pydantic-settings>=2
 
 # LLM providers (OpenAI-compatible: Qwen 2.5 72B primary, DeepSeek fallback)
 openai>=1.0.0

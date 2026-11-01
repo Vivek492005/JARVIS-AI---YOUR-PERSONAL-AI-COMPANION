@@ -29,9 +29,13 @@ if exist ".venv\Scripts\activate.bat" (
 echo [2/4] Activating virtual environment...
 call .venv\Scripts\activate.bat
 
-echo [3/4] Installing dependencies from requirements.txt...
+echo [3/4] Installing dependencies from pyproject.toml...
 pip install --upgrade pip >nul
-pip install -r requirements.txt
+pip install -e .
+REM Optional extras (uncomment what you need):
+REM pip install -e ".[vision]"      - camera / hand-gesture stack
+REM pip install -e ".[voice-local]" - offline STT (faster-whisper)
+REM pip install -e ".[dev]"         - pytest / lint tooling
 
 if errorlevel 1 (
     echo.
