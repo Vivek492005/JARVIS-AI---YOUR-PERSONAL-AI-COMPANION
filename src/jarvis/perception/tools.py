@@ -256,6 +256,11 @@ def _h_browser_submit(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
     return _browser_ctl().submit(args.get("ref"))
 
 
+class BrowserReadParams(BaseModel):
+    max_chars: int = Field(default=4000, ge=100, le=20000,
+                           description="Max chars of the snapshot.")
+
+
 def _browser_specs() -> List[ToolSpec]:
     return [
         ToolSpec(name="browser_open", risk=Risk.REVERSIBLE,
@@ -265,7 +270,7 @@ def _browser_specs() -> List[ToolSpec]:
         ToolSpec(name="browser_read", risk=Risk.READ,
                  description="Accessibility snapshot of the current page "
                              "(untrusted).",
-                 params=BaseModel, handler=_h_browser_read,
+                 params=BrowserReadParams, handler=_h_browser_read,
                  carries_external_data=True),
         ToolSpec(name="browser_click", risk=Risk.REVERSIBLE,
                  description="Click an element ref from browser_read.",
