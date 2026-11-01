@@ -104,6 +104,21 @@ class BrainCfg(BaseModel):
     temperature: float = 0.3
     enable_ai_agent: bool = True
     fallback_to_local: bool = True
+    # --- Phase 4: Brain 2.0 ---
+    # 4.2 model router tiers (F-24: bake-off winners go here, never hard-coded)
+    t1_model: str = ""  # fast: intent -> single tool, short Q&A
+    t2_model: str = ""  # strong: planning, multi-step, coding
+    t3_model: str = ""  # local: offline / privacy-mode (Ollama)
+    daily_token_budget: int = 0  # 0 = unlimited
+    daily_cost_inr_budget: float = 0.0  # 0 = unlimited
+    semantic_cache_ttl_s: float = 600.0
+    # 4.4 memory
+    memory_db: str = ""  # empty = ~/.jarvis/memory.db
+    memory_workspace: str = ""  # empty = ~/.jarvis/workspace (USER.md/MEMORY.md)
+    # 4.6 skills
+    skills_dir: str = "skills"
+    # 4.1 agent loop hard limits
+    loop_wall_time_s: float = 90.0
 
 
 class SafetyCfg(BaseModel):
