@@ -499,11 +499,39 @@ def _app_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.8 Context awareness
+# ---------------------------------------------------------------------------
+
+class GetContextParams(BaseModel):
+    detail: str = Field(default="basic",
+                        description="basic|selection|clipboard — content only on explicit ask.")
+
+
+def _h_get_context(args, _cb, _nf):
+    from jarvis.perception.context import format_snapshot, get_context
+    detail = (args.get("detail") or "basic").lower()
+    if detail not in ("basic", "selection", "clipboard"):
+        return f"unknown detail {detail!r}; use basic|selection|clipboard"
+    return format_snapshot(get_context(detail=detail))
+
+
+def _context_specs() -> List[ToolSpec]:
+    return [
+        ToolSpec(name="get_context", risk=Risk.READ,
+                 description="Privacy-safe context: active window, selection/ "
+                             "clipboard presence; content only when asked.",
+                 params=GetContextParams, handler=_h_get_context,
+                 carries_external_data=True),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
 def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
     for spec in (_uia_specs() + _screen_specs() + _vlm_specs()
-                 + _browser_specs() + _file_specs() + _app_specs()):
+                 + _browser_specs() + _file_specs() + _app_specs()
+                 + _context_specs()):
         _reg(spec)

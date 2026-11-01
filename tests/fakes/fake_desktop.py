@@ -197,10 +197,12 @@ class FakeVLM(B.VLMBackend):
 class FakeContext(B.ContextBackend):
     def __init__(self, title: str = "Untitled - Notepad",
                  process: str = "notepad.exe",
-                 selection: str = "", clipboard: bool = False) -> None:
+                 selection: str = "", clipboard: bool = False,
+                 clipboard_text: str = "") -> None:
         self._win = WindowInfo(handle=1, title=title, process=process)
         self._selection = selection
         self._clipboard = clipboard
+        self._clipboard_text = clipboard_text
 
     def active_window(self) -> WindowInfo:
         return self._win
@@ -210,6 +212,9 @@ class FakeContext(B.ContextBackend):
 
     def clipboard_has_text(self) -> bool:
         return self._clipboard
+
+    def clipboard_text(self) -> str:
+        return self._clipboard_text
 
 
 class FakeApps:
