@@ -26,9 +26,8 @@ import collections
 import logging
 import queue
 import threading
-import time
 from dataclasses import dataclass, field
-from typing import Callable, Deque, Dict, List, Optional, Protocol
+from typing import Callable, Deque, List, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -156,8 +155,8 @@ class SoundDeviceSource:
         try:
             self._stream.stop()
             self._stream.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"audio source close failed: {e}")
 
 
 class EchoGuard:

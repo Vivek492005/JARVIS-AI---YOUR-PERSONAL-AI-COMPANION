@@ -24,7 +24,7 @@ import math
 import struct
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Protocol
 
 logger = logging.getLogger(__name__)

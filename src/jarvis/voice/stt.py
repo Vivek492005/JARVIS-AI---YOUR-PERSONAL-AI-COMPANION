@@ -32,8 +32,8 @@ import io
 import logging
 import time
 import wave
-from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Optional, Protocol
+from dataclasses import dataclass
+from typing import Dict, Iterator, List, Protocol
 
 logger = logging.getLogger(__name__)
 
