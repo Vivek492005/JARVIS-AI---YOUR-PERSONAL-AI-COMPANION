@@ -24,9 +24,14 @@ def agent(tmp_path, monkeypatch):
 
 
 def _audit_entries(tmp_path):
-    log = tmp_path / "jarvis_audit.log"
-    assert log.exists(), "audit log was not written"
-    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    # Task 1.7: audit now lives in audit/YYYY-MM-DD.jsonl (redacted).
+    files = sorted((tmp_path / "audit").glob("*.jsonl"))
+    assert files, "audit log was not written"
+    entries = []
+    for f in files:
+        entries += [json.loads(line) for line in
+                    f.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return entries
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +47,7 @@ def test_deny_does_not_execute(agent, tmp_path):
     assert agent.pending_confirmation is None
     entries = _audit_entries(tmp_path)
     assert entries[-1]["tool"] == "run_powershell_command"
-    assert entries[-1]["verdict"] == "deny"
+    assert entries[-1]["decision"] == "deny"
 
 
 def test_deny_dangerous_hotkey(agent):
@@ -112,7 +117,7 @@ def test_confirm_audit_trail(agent, tmp_path):
     agent._dispatch_tool_call("manage_notes", {"action": "clear"})
     with mock.patch.object(agent, "_execute_tool", return_value="cleared."):
         agent.process("yes")
-    verdicts = [e["verdict"] for e in _audit_entries(tmp_path)]
+    verdicts = [e["decision"] for e in _audit_entries(tmp_path)]
     assert "confirm_requested" in verdicts
     assert "confirmed" in verdicts
 
@@ -130,7 +135,7 @@ def test_allow_executes_and_audits(agent, tmp_path):
     assert "ACTION_REQUIRES_CONFIRMATION" not in resp
     m.assert_called_once()
     entries = _audit_entries(tmp_path)
-    assert entries[-1]["verdict"] == "allow"
+    assert entries[-1]["decision"] == "allow"
 
 
 def test_l1_reversible_needs_confirmation(agent):

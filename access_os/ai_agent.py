@@ -94,7 +94,10 @@ class AIAgent:
         self.tainted = False
         # Task 1.8: set to True by the rate limiter when over budget.
         self.rate_limited = False
-        self.audit_log_file = "jarvis_audit.log"
+        # Task 1.7: structured audit log (audit/YYYY-MM-DD.jsonl).
+        from .audit import AuditLogger
+        self._audit_logger = AuditLogger()
+        self.session_id = self._audit_logger.session_id
 
         self.client = None
         self.backup_client = None
@@ -193,28 +196,18 @@ class AIAgent:
         self.pending_confirmation = (tool_name, args, time.time())
         question = confirmation_prompt(tool_name, args)
         self._audit(tool_name, args, "confirm_requested",
-                    f"ACTION_REQUIRES_CONFIRMATION: {question}")
+                    reason=question)
         return f"ACTION_REQUIRES_CONFIRMATION: {question}"
 
-    def _audit(self, tool_name: str, args: Dict[str, Any], verdict: str, result: str):
-        """Append one JSON line per tool call to the local audit log.
+    def _audit(self, tool_name: str, args: Dict[str, Any], decision: str,
+               reason: str = "", latency_ms: Optional[float] = None):
+        """Write one redacted entry to audit/YYYY-MM-DD.jsonl (Task 1.7).
 
-        The audit log is local-only (git-ignored) and never leaves the machine.
-        It must never break execution — failures are swallowed deliberately.
+        Never breaks execution — the logger swallows its own failures.
         """
-        try:
-            safe_args = {k: (str(v)[:200]) for k, v in (args or {}).items()}
-            entry = {
-                "ts": datetime.datetime.now().isoformat(timespec="seconds"),
-                "tool": tool_name,
-                "args": safe_args,
-                "verdict": verdict,
-                "result": str(result)[:200],
-            }
-            with open(self.audit_log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
+        self._audit_logger.log(tool_name, args, decision, reason=reason,
+                               latency_ms=latency_ms)
+
 
     def _dispatch_tool_call(self, function_name: str, args: Dict[str, Any]) -> str:
         """Policy-gated dispatch — the ONLY entry point for LLM tool calls.
@@ -241,14 +234,17 @@ class AIAgent:
         if verdict == DENY:
             logger.warning(f"Blocked tool call: {function_name} ({reason})")
             result = f"Blocked for safety: {reason}"
-            self._audit(function_name, args, "deny", result)
+            self._audit(function_name, args, "deny", reason=reason)
             return result
 
         if verdict == CONFIRM:
             return self.request_confirmation(function_name, args)
 
+        _t0 = time.time()
         result = self._execute_tool(function_name, args)
-        self._audit(function_name, args, ALLOW, result)
+        latency_ms = (time.time() - _t0) * 1000.0
+        self._audit(function_name, args, ALLOW, reason=reason,
+                     latency_ms=latency_ms)
         return result
 
     def _decide(self, tool_name: str, args: Dict[str, Any], ctx=None):
@@ -442,8 +438,11 @@ class AIAgent:
                 return "Confirmation timed out — action cancelled."
             if lowered in self.confirm_words:
                 self._notify_status("Confirmed — executing...")
+                _t0 = time.time()
                 result = self._execute_tool(tool_name, c_args)
-                self._audit(tool_name, c_args, "confirmed", result)
+                latency_ms = (time.time() - _t0) * 1000.0
+                self._audit(tool_name, c_args, "confirmed",
+                            reason="user confirmed", latency_ms=latency_ms)
                 self.conversation_history.append({"role": "user", "content": clean_input})
                 self.conversation_history.append({"role": "assistant", "content": result})
                 return result

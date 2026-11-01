@@ -22,6 +22,7 @@ Tool names match the LLM tool definitions in ai_agent.py:
 import os
 import sys
 import json
+import time
 import logging
 import datetime
 import re
@@ -600,19 +601,18 @@ def execute_tool_raw(tool_name: str, args: Dict[str, Any],
 
 
 def _audit_log(tool_name: str, args: Dict[str, Any], verdict: str, result: str,
-               audit_file: str = "jarvis_audit.log"):
-    """Append one JSON line per tool call. Local-only, git-ignored, and never
-    allowed to break execution."""
+               audit_file: str = "jarvis_audit.log",
+               latency_ms: Optional[float] = None):
+    """Append one JSON line per tool call (Task 1.7).
+
+    All audit output now goes through AuditLogger -> audit/YYYY-MM-DD.jsonl
+    (redacted). The legacy ``audit_file`` parameter is accepted for
+    backward compatibility but no longer used.
+    """
+    from .audit import AuditLogger
     try:
-        entry = {
-            "ts": datetime.datetime.now().isoformat(timespec="seconds"),
-            "tool": tool_name,
-            "args": {k: str(v)[:200] for k, v in (args or {}).items()},
-            "verdict": verdict,
-            "result": str(result)[:200],
-        }
-        with open(audit_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        AuditLogger().log(tool_name, args, verdict,
+                          reason=str(result)[:300], latency_ms=latency_ms)
     except Exception:
         pass
 
@@ -661,6 +661,9 @@ def run_action(tool_name: str, args: Dict[str, Any],
         result = f"ACTION_REQUIRES_CONFIRMATION: {confirmation_prompt(tool_name, args)}"
         _audit_log(tool_name, args, "confirm_requested", result, audit_file)
         return (CONFIRM, result)
+    _t0 = time.time()
     result = execute_tool_raw(tool_name, args, status_callback, notes_file)
-    _audit_log(tool_name, args, ALLOW, result, audit_file)
+    latency_ms = (time.time() - _t0) * 1000.0
+    _audit_log(tool_name, args, ALLOW, result, audit_file,
+               latency_ms=latency_ms)
     return (ALLOW, result)
