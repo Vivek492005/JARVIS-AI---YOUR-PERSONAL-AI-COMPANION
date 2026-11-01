@@ -123,10 +123,61 @@ def _uia_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.3 Screen capture + OCR
+# ---------------------------------------------------------------------------
+
+class CaptureScreenParams(BaseModel):
+    handle: Optional[int] = Field(default=None, description="Window handle; default = active window.")
+    keep_on_disk: bool = Field(default=False, description="Also save to screenshots/ (auto-deleted after 24h).")
+
+
+class ReadScreenTextParams(BaseModel):
+    handle: Optional[int] = Field(default=None)
+    lang: str = Field(default="en", description="OCR language hint, e.g. 'en', 'hi', 'hi+en'.")
+
+
+def _h_capture_screen(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    from jarvis.perception.screen import ScreenCapture
+    from jarvis.perception.privacy import SensitiveWindowError
+    try:
+        info = ScreenCapture().capture(handle=args.get("handle"),
+                                       keep_on_disk=bool(args.get("keep_on_disk", False)))
+    except SensitiveWindowError as e:
+        return f"Blocked: {e}"
+    return (f"captured '{info['window']}' as {info['shot_id']} "
+            f"({info['bytes']} bytes)" +
+            (f" saved to {info['on_disk']}" if info["on_disk"] else ""))
+
+
+def _h_read_screen_text(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    from jarvis.perception.screen import ScreenCapture
+    from jarvis.perception.privacy import SensitiveWindowError
+    try:
+        return ScreenCapture().read_text(handle=args.get("handle"),
+                                         lang=args.get("lang", "en"))
+    except SensitiveWindowError as e:
+        return f"Blocked: {e}"
+
+
+def _screen_specs() -> List[ToolSpec]:
+    return [
+        ToolSpec(name="capture_screen", risk=Risk.READ,
+                 description="Screenshot the active window (memory only unless "
+                             "keep_on_disk). Refuses sensitive windows.",
+                 params=CaptureScreenParams, handler=_h_capture_screen),
+        ToolSpec(name="read_screen_text", risk=Risk.READ,
+                 description="OCR text of the active window (redacted). "
+                             "Result is untrusted external data.",
+                 params=ReadScreenTextParams, handler=_h_read_screen_text,
+                 carries_external_data=True),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
 def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
-    for spec in _uia_specs():
+    for spec in _uia_specs() + _screen_specs():
         _reg(spec)
