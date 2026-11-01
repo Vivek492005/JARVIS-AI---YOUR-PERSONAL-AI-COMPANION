@@ -1,6 +1,8 @@
 # Gesture Controller Commands
 
-ACCESS-OS uses computer vision and hand tracking (via MediaPipe) to recognize hand gestures for navigation, system control, mouse pointer tracking, and accessibility.
+> **Legacy module.** These gestures belong to the experimental standalone gesture controller (`run_gestures.py` / `access_os/gesture_controller.py`), kept for accessibility experiments. The main JARVIS voice companion does not use them.
+
+JARVIS uses computer vision and hand tracking (via MediaPipe) to recognize hand gestures for navigation, system control, mouse pointer tracking, and accessibility.
 
 ---
 
@@ -8,11 +10,11 @@ ACCESS-OS uses computer vision and hand tracking (via MediaPipe) to recognize ha
 
 - **Swipe Left**  
   *Action:* Move hand quickly to the left  
-  *Function:* Switch to **Gesture Mode** / Navigate backward
+  *Function:* Switch to **Gesture Mode** / Navigate backward *(legacy accessibility-era mapping)*
   
 - **Swipe Right**  
   *Action:* Move hand quickly to the right  
-  *Function:* Switch to **Voice Mode** / Navigate forward
+  *Function:* Switch to **Voice Mode** / Navigate forward *(legacy accessibility-era mapping)*
 
 - **Swipe Up**  
   *Action:* Move hand quickly upward  
@@ -63,7 +65,7 @@ When mouse control is enabled (`enable_mouse_control: true`):
 - **ESC Key**  
   *Function:* Exit the application gracefully from the camera window
 - **Camera Window ('X' Button)**  
-  *Function:* Closes the camera view and safely terminates ACCESS-OS
+  *Function:* Closes the camera view and safely terminates JARVIS gesture mode
 - **Pinch in Settings Mode**  
   *Function:* Closes the settings view and returns to Idle / Home
 
@@ -122,4 +124,4 @@ Gesture settings are configured in `gesture_config.json` and `config.json`:
 - **Accidental Triggers:**
   - Increase the gesture cooldown or lower sensitivity in configuration.
 - **Multiple Hands:**
-  - ACCESS-OS tracks up to 2 hands; designate your dominant hand as primary for mouse controls.
+  - JARVIS gesture mode tracks up to 2 hands; designate your dominant hand as primary for mouse controls.
