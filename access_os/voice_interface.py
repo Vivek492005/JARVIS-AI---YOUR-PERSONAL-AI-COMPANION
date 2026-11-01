@@ -1680,27 +1680,20 @@ class VoiceInterface:
             logger.warning(f"Could not initialize microphone: {e}")
 
     def _load_config(self) -> Dict[str, Any]:
-        default = {
-            "language": "en-US",
-            "voice_rate": 160,
-            "voice_volume": 1.0,
-            "wake_word": "JARVIS",
-            "require_wake_word": False,
-            "energy_threshold": 300,
-            "pause_threshold": 0.8
-        }
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    return {**default, **json.load(f)}
-            except Exception as e:
-                logger.error(f"Error loading {self.config_file}: {e}")
-        return default
+        # Task 0.3: single source of truth is access_os.config.Settings.
+        # A legacy voice_config.json is migrated one time into settings.toml;
+        # the flat dict below keeps all existing self.config.get() call sites
+        # working unchanged.
+        from .config import get_settings, migrate_legacy_voice_config
+        migrate_legacy_voice_config(self.config_file)
+        return get_settings().legacy_voice_dict()
 
     def _save_config(self):
+        # Task 0.3: persist through Settings (writes settings.toml, never the
+        # legacy JSON file, never secrets).
         try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=4)
+            from .config import save_legacy_voice_dict
+            save_legacy_voice_dict(self.config)
         except Exception as e:
             logger.error(f"Error saving config: {e}")
 
@@ -1942,7 +1935,8 @@ class VoiceInterface:
 
             while self.is_listening and not self._stop_event.is_set():
                 try:
-                    audio = self.recognizer.listen(source, timeout=2.0, phrase_time_limit=6.0)
+                    audio = self.recognizer.listen(source, timeout=2.0,
+                                                       phrase_time_limit=self.config.get("max_utterance_s", 30.0))
                     try:
                         text = self.recognizer.recognize_google(audio).strip()
                         if not text:
