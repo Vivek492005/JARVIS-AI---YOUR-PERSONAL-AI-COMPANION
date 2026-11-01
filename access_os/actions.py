@@ -240,7 +240,9 @@ def system_control(action: str, status_callback: Optional[Callable[[str], None]]
             screenshot.save(fn)
             return f"Screenshot captured and saved to {fn}."
         elif action == "lock_pc":
-            os.system("rundll32.exe user32.dll,LockWorkStation")
+            # Task 1.4: no os.system — fixed argv, no shell.
+            subprocess.run(["rundll32.exe", "user32.dll,LockWorkStation"],
+                           check=False)
             return "Locking the workstation."
         elif action == "empty_recycle_bin":
             subprocess.run(
@@ -264,10 +266,68 @@ def system_control(action: str, status_callback: Optional[Callable[[str], None]]
         return f"Failed to perform {action}: {e}"
 
 
+# Task 1.4: typing into (or Enter-ing inside) a terminal, the Run dialog,
+# regedit, taskmgr, … is the classic prompt-injection kill chain
+# (win+r -> type -> enter). These foreground processes are never typed into.
+_TERMINAL_PROCESSES = frozenset({
+    "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe",
+    "wt.exe", "conhost.exe",
+    "regedit.exe", "taskmgr.exe",
+})
+
+
+def get_foreground_process() -> Optional[str]:
+    """Process name (lowercase exe) of the foreground window.
+
+    Windows only; returns None when it cannot be determined (non-Windows,
+    or the Win32 query failed) — the guard then passes open.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return None
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        hproc = kernel32.OpenProcess(0x1000, False, pid.value)  # QUERY_LIMITED_INFORMATION
+        if not hproc:
+            return None
+        try:
+            buf = ctypes.create_unicode_buffer(260)
+            size = wintypes.DWORD(260)
+            if kernel32.QueryFullProcessImageNameW(hproc, 0, buf, ctypes.byref(size)):
+                return os.path.basename(buf.value).lower() or None
+        finally:
+            kernel32.CloseHandle(hproc)
+    except Exception:
+        pass
+    return None
+
+
+def _foreground_guard() -> Optional[str]:
+    """Returns a block message if the foreground window is a terminal etc."""
+    fg = get_foreground_process()
+    if fg in _TERMINAL_PROCESSES:
+        return (f"Blocked for safety: the foreground window is {fg} — "
+                f"typing into terminals is disabled (Task 1.4).")
+    return None
+
+
 def keyboard_mouse_action(action: str, value: str,
                           status_callback: Optional[Callable[[str], None]] = None) -> str:
     if status_callback:
         status_callback(f"Performing {action}...")
+    # Task 1.4: foreground-window guard runs before any keystroke.
+    if action in ("type_text", "press_key", "press_hotkey"):
+        blocked = _foreground_guard()
+        if blocked:
+            logger.warning(f"Foreground guard blocked {action}: {blocked}")
+            return blocked
     try:
         import pyautogui
         import pyperclip
@@ -346,6 +406,34 @@ def run_powershell_command(command: str,
 # here — the single home for implementations (Phase C).
 # ---------------------------------------------------------------------------
 
+# Task 1.4.3: allowlisted shell-style commands. The LLM only picks a KEY —
+# it never supplies a command string. Fixed argv, shell=False, timeout.
+_ALLOWED_COMMANDS = {
+    "ipconfig": ["ipconfig"],
+    "disk_free": ["powershell", "-NoProfile",
+                  "-Command", "Get-PSDrive -PSProvider FileSystem"],
+}
+
+
+def run_command(command_key: str,
+                status_callback: Optional[Callable[[str], None]] = None) -> str:
+    """Run one allowlisted diagnostic command template (read-only)."""
+    argv = _ALLOWED_COMMANDS.get(command_key or "")
+    if argv is None:
+        return (f"Unknown command '{command_key}'. "
+                f"Available: {', '.join(sorted(_ALLOWED_COMMANDS))}.")
+    if status_callback:
+        status_callback(f"Running {command_key}...")
+    try:
+        out = subprocess.run(argv, shell=False, capture_output=True,
+                             text=True, timeout=10)
+        body = (out.stdout or "").strip()[:2000]
+        return body if body else "(no output)"
+    except Exception as e:
+        logger.error(f"run_command {command_key} failed: {e}")
+        return f"Command failed: {e}"
+
+
 def _register_tools():
     from .tools.registry import (
         DownloadMediaParams,
@@ -354,6 +442,7 @@ def _register_tools():
         OpenApplicationParams,
         OpenWebsiteParams,
         Risk,
+        RunCommandParams,
         RunPowershellParams,
         SystemControlParams,
         WebSearchParams,
@@ -418,9 +507,24 @@ def _register_tools():
         # SYSTEM until the Task 1.4 foreground-window guard lands.
         name="keyboard_mouse_action", risk=Risk.SYSTEM,
         description="Types text or fires a hotkey. Blocked hotkeys "
-                    "(alt+f4, win+r, …) are denied by the policy gate.",
+                    "(alt+f4, win+r, …) are denied by the policy gate; "
+                    "typing into terminals is blocked by the foreground "
+                    "guard.",
         params=KeyboardMouseParams,
         handler=_BASE_HANDLERS["keyboard_mouse_action"]))
+    # Task 1.4.2: per-action tiers (the foreground guard in the executor is
+    # the last line of defense even when a tier auto-allows).
+    _sub("keyboard_mouse_action.type_text", Risk.REVERSIBLE,
+         "Type text into the foreground window (never a terminal).",
+         KeyboardMouseParams)
+    _sub("keyboard_mouse_action.press_key", Risk.REVERSIBLE,
+         "Press a single key.", KeyboardMouseParams)
+    _sub("keyboard_mouse_action.press_hotkey_safe", Risk.REVERSIBLE,
+         "Press an allowlisted hotkey (ctrl+c/v/x/z/s/f/a/t/w/r, win+d).",
+         KeyboardMouseParams)
+    _sub("keyboard_mouse_action.press_hotkey_other", Risk.SYSTEM,
+         "Press a non-allowlisted hotkey (always confirmed; blocked ones "
+         "are denied outright).", KeyboardMouseParams)
     tool(ToolSpec(
         name="manage_notes", risk=Risk.REVERSIBLE,
         description="Save, read, or clear the user's persistent notes.",
@@ -434,6 +538,13 @@ def _register_tools():
                     "the allowlist; destructive cmdlets are denied).",
         params=RunPowershellParams,
         handler=_BASE_HANDLERS["run_powershell_command"]))
+    tool(ToolSpec(
+        # Task 1.4.3: fixed read-only templates; the LLM picks only a key.
+        name="run_command", risk=Risk.READ,
+        description="Runs one allowlisted read-only diagnostic template "
+                    "(ipconfig, disk_free). No arbitrary commands.",
+        params=RunCommandParams,
+        handler=_BASE_HANDLERS["run_command"]))
 
 
 _BASE_HANDLERS = {
@@ -450,6 +561,8 @@ _BASE_HANDLERS = {
         args.get("action", ""), args.get("content", None), nf, cb),
     "run_powershell_command": lambda args, cb, nf: run_powershell_command(
         args.get("command", ""), cb),
+    "run_command": lambda args, cb, nf: run_command(
+        args.get("command_key", ""), cb),
 }
 
 _register_tools()

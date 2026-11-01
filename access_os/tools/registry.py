@@ -58,9 +58,23 @@ def resolve(tool_name: str, args: Optional[Dict[str, Any]] = None) -> Optional[T
     multi-action tool can carry per-action risk tiers. Unknown actions fall
     back to the base tool spec (registered at the *highest* applicable risk,
     i.e. fail-closed).
+
+    ``press_hotkey`` is special: hotkeys on SAFE_HOTKEYS resolve to the
+    REVERSIBLE sub-spec, everything else stays at the SYSTEM base tier
+    (and the command_policy blocklist still denies the dangerous ones).
     """
+    from ..command_policy import _normalize_hotkey
+
     args = args or {}
     action = args.get("action")
+    if (tool_name == "keyboard_mouse_action" and action == "press_hotkey"):
+        norm = _normalize_hotkey(args.get("value", ""))
+        sub = ("keyboard_mouse_action.press_hotkey_safe"
+               if norm in SAFE_HOTKEYS
+               else "keyboard_mouse_action.press_hotkey_other")
+        spec = REGISTRY.get(sub)
+        if spec is not None:
+            return spec
     if isinstance(action, str) and action:
         sub = REGISTRY.get(f"{tool_name}.{action}")
         if sub is not None:
@@ -156,3 +170,17 @@ class RunPowershellParams(BaseModel):
         ..., min_length=1, max_length=2000,
         description="A read-only PowerShell command (validated against the "
                     "allowlist; destructive cmdlets are denied).")
+
+
+class RunCommandParams(BaseModel):
+    command_key: str = Field(
+        ...,
+        description="Which allowlisted diagnostic to run.",
+        pattern="^(ipconfig|disk_free)$")
+
+
+# Task 1.4.2: hotkeys on this list are ordinary editing/navigation keys.
+SAFE_HOTKEYS = frozenset({
+    "ctrl+c", "ctrl+v", "ctrl+x", "ctrl+z", "ctrl+s", "ctrl+f", "ctrl+a",
+    "ctrl+t", "ctrl+w", "ctrl+r", "win+d",
+})

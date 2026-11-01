@@ -125,6 +125,12 @@ def decide_tool_call(tool_name: str, args: Optional[Dict[str, Any]],
     if spec is None:
         return Decision.DENY, f"Tool {tool_name} is not recognized."
 
+    # Schema validation at the gate: malformed args never reach the executor.
+    try:
+        spec.params(**args)
+    except Exception as e:
+        return Decision.DENY, f"invalid arguments: {e}"
+
     tier_decision = decide(spec, ctx, level)
 
     cp_verdict, cp_reason = check_tool_call(tool_name, args)

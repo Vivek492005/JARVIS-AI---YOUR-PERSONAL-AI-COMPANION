@@ -1195,9 +1195,9 @@ class VoiceCommandProcessor:
     def _launch_app(self, command: str, msg: str) -> str:
         """Launch an app via the policy-gated open_application tool.
 
-        A-04/A-10: the old implementation ran
-        ``subprocess.Popen(command, shell=True)`` with no policy gate.
-        Now every launch goes through _gated(); the legacy "start X"
+        A-04/A-10: the old implementation spawned the command with an
+        ungated subprocess call with shell interpretation enabled. Now every
+        launch goes through _gated(); the legacy "start X"
         spellings used by the fixed voice commands are normalized to
         open_application mapping keys first.
         """
