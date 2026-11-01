@@ -127,6 +127,101 @@ def _cmd_reflex(args) -> int:
     return 2
 
 
+def _skills_dir():
+    from pathlib import Path
+    from jarvis.core.config import get_settings
+    try:
+        d = Path(get_settings().brain.skills_dir)
+    except Exception:
+        d = Path("skills")
+    if not d.is_absolute():
+        d = Path.cwd() / d
+    return d
+
+
+def _cmd_skill(args) -> int:
+    from jarvis.brain.skills import load_all, load_manifest
+    from jarvis.brain.skills.scaffold import new_skill
+    from jarvis.brain.skills.trust import TrustLevel
+
+    skills_dir = _skills_dir()
+    cmd, arg = args.skill_cmd, args.skill_arg
+    if cmd == "list":
+        if not skills_dir.exists():
+            print("(no skills dir)")
+            return 0
+        for child in sorted(skills_dir.iterdir()):
+            if not (child / "SKILL.md").exists():
+                continue
+            try:
+                m = load_manifest(child)
+                tools = ", ".join(f"{t.name}[{t.risk}]" for t in m.tools)
+                print(f"{m.name} v{m.version} [{m.trust.value if hasattr(m, 'trust') else '?'}] - {tools}")
+                print(f"    {m.description}")
+                if m.permissions:
+                    print(f"    permissions: {', '.join(m.permissions)}")
+            except Exception as e:
+                print(f"{child.name}: ERROR {e}")
+        return 0
+    if cmd == "new":
+        if not arg:
+            print("usage: jarvis skill new <name>", file=sys.stderr)
+            return 2
+        d = new_skill(skills_dir, arg)
+        print(f"skill scaffold created: {d}")
+        print("Edit SKILL.md, then implement tool.py and restart jarvisd.")
+        return 0
+    if cmd in ("enable", "disable"):
+        # Enable/disable is tracked via a disabled file; the loader skips it.
+        if not arg:
+            print(f"usage: jarvis skill {cmd} <name>", file=sys.stderr)
+            return 2
+        flag = skills_dir / arg / ".disabled"
+        if cmd == "disable":
+            flag.write_text("disabled", encoding="utf-8")
+            print(f"skill '{arg}' disabled (restart to apply)")
+        else:
+            if flag.exists():
+                flag.unlink()
+            print(f"skill '{arg}' enabled (restart to apply)")
+        return 0
+    print("usage: jarvis skill [list|new|enable|disable]", file=sys.stderr)
+    return 2
+
+
+def _cmd_memory(args) -> int:
+    from jarvis.brain.memory.commands import MemoryCommands, parse
+    from jarvis.brain.memory.store import MemoryStore
+    store = MemoryStore()
+    mc = MemoryCommands(store)
+    cmd, arg = args.memory_cmd, args.memory_arg or ""
+    if cmd == "list":
+        print(mc.handle(parse("tumhe kya yaad hai?")))
+    elif cmd == "forget":
+        print(mc.handle(parse(f"bhool ja {arg}")))
+    elif cmd == "remember":
+        print(mc.handle(parse(f"yaad rakhna {arg}")))
+    elif cmd == "export":
+        print(mc.handle(parse("memory export")))
+    elif cmd == "wipe":
+        out = mc.handle(parse("memory delete all"))
+        if out.startswith("CONFIRM_WIPE:"):
+            print(out)
+            answer = input("Confirm wipe? (haan/nahi): ").strip().lower()
+            if answer in ("haan", "yes", "y"):
+                print(mc.confirm_wipe())
+            else:
+                print("Cancelled.")
+        else:
+            print(out)
+    else:
+        print("usage: jarvis memory [list|forget|export|wipe|remember]",
+              file=sys.stderr)
+        return 2
+    store.close()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jarvis", description="JARVIS AI companion")
     sub = p.add_subparsers(dest="command", required=True)
@@ -153,6 +248,18 @@ def build_parser() -> argparse.ArgumentParser:
     r = sub.add_parser("reflex", help="reflex layer utilities (Task 2.6)")
     r.add_argument("reflex_cmd", nargs="?", default="stats")
     r.set_defaults(func=_cmd_reflex)
+
+    sk = sub.add_parser("skill", help="skill management (Task 4.6)")
+    sk.add_argument("skill_cmd", nargs="?", default="list",
+                    help="list | new <name> | enable <name> | disable <name>")
+    sk.add_argument("skill_arg", nargs="?", default=None)
+    sk.set_defaults(func=_cmd_skill)
+
+    mem = sub.add_parser("memory", help="memory controls (Task 4.4)")
+    mem.add_argument("memory_cmd", nargs="?", default="list",
+                     help="list | forget <text> | export | wipe | remember <text>")
+    mem.add_argument("memory_arg", nargs="?", default=None)
+    mem.set_defaults(func=_cmd_memory)
     return p
 
 
