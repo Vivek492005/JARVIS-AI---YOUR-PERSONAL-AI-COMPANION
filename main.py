@@ -5,23 +5,32 @@ Launches the floating JARVIS companion widget.
 
 import os
 import sys
+import queue
 import signal
 import logging
 import threading
+from logging.handlers import RotatingFileHandler
 
 from access_os.voice_interface import VoiceInterface, VoiceCommand
 from access_os.first_run import ensure_api_keys
 from gui import JARVISGUI
 
 # ── Logging ──────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("jarvis.log", encoding="utf-8"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
+# F-15: rotating logs (was unbounded FileHandler) + signal import actually used.
+def _setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            RotatingFileHandler("jarvis.log", maxBytes=5_000_000, backupCount=3,
+                                encoding="utf-8"),
+            logging.StreamHandler(sys.stdout),
+        ],
+        force=True,
+    )
+
+
+_setup_logging()
 logger = logging.getLogger("JARVIS")
 
 
@@ -31,6 +40,9 @@ class JARVISAssistant:
     def __init__(self):
         self.running = False
         self.gui: JARVISGUI | None = None
+        # F-11: single command queue — one action at a time, never parallel
+        # pyautogui streams from two threads.
+        self._cmd_q: "queue.Queue[str | None]" = queue.Queue()
 
         logger.info("Initializing JARVIS Voice Companion…")
         self.voice = VoiceInterface(
@@ -61,28 +73,44 @@ class JARVISAssistant:
         """Called by VoiceInterface when a command is recognised."""
         if self.gui is not None:
             self.gui.set_user_text(cmd.text)
-            self.gui.set_status("● Listening...")
+            # F-13: this is the thinking state, not "Listening...".
+            self.gui.set_status("⚡ Thinking...")
 
     def send_text_command(self, text: str):
-        """Process typed command directly through the assistant pipeline."""
+        """Enqueue a typed command; the _cmd_loop worker runs it serially."""
         if not text.strip():
             return
         if self.gui is not None:
             self.gui.set_user_text(text)
-            self.gui.set_status("⚡ Processing...")
+        self._cmd_q.put(text)
 
-        def _worker():
-            resp = self.voice.execute_text_command(text)
-            if self.gui is not None:
-                self.gui.set_status("● Ready")
-
-        threading.Thread(target=_worker, daemon=True).start()
+    def _cmd_loop(self):
+        """Single worker: one command at a time, status always restored."""
+        while self.running:
+            text = self._cmd_q.get()
+            if text is None:  # shutdown sentinel from stop()
+                break
+            try:
+                if self.gui is not None:
+                    self.gui.set_status("⚡ Thinking...")
+                # F-12: no unused `resp`; exceptions must not wedge the status.
+                self.voice.execute_text_command(text)
+            except Exception:
+                logger.exception("command failed: %r", text)
+            finally:
+                # F-12: status returns to Ready even when the command raised.
+                if self.gui is not None:
+                    self.gui.set_status("● Ready")
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def start(self):
         """Create the companion GUI and start voice listening."""
         self.running = True
+
+        # F-11: start the single command worker before anything can enqueue.
+        threading.Thread(target=self._cmd_loop, daemon=True,
+                         name="JARVIS-cmd-loop").start()
 
         # Build companion widget
         self.gui = JARVISGUI(self)
@@ -103,6 +131,8 @@ class JARVISAssistant:
         if not self.running:
             return
         self.running = False
+        # Unblock the _cmd_loop worker if it is waiting on the queue.
+        self._cmd_q.put(None)
         logger.info("JARVIS shutting down…")
         try:
             self.voice.stop_listening()
@@ -153,6 +183,18 @@ def main():
     ensure_api_keys()
 
     assistant = JARVISAssistant()
+
+    # F-15: graceful shutdown on Ctrl+C / taskkill — was an unused import.
+    def _handle_signal(signum, frame):
+        logger.info(f"Received signal {signum}; shutting down…")
+        assistant.stop()
+
+    for _sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(_sig, _handle_signal)
+        except (OSError, ValueError) as e:
+            logger.warning(f"Could not install handler for {_sig}: {e}")
+
     assistant.start()
 
 
