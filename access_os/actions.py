@@ -24,6 +24,7 @@ import sys
 import json
 import logging
 import datetime
+import re
 import subprocess
 import webbrowser
 import urllib.parse
@@ -42,10 +43,17 @@ except ImportError:  # direct script execution
 # `self._notify_status` -> status_callback param, `self.notes_file` -> param)
 # ---------------------------------------------------------------------------
 
+# A-02: strict charset for the open_application() generic fallback.
+# Excludes every cmd.exe metacharacter (& | < > ^ % ! " ') so a
+# tool-arg-controlled name cannot break out of the `start` command line.
+_APP_NAME_SAFE = re.compile(r"^[A-Za-z0-9_\-. ]{1,60}$")
+
 def open_application(app_name: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
     if status_callback:
         status_callback(f"Opening {app_name}...")
     lowered = (app_name or "").lower().strip()
+    if not lowered:
+        return "Please tell me which application to open."
 
     app_mappings = {
         "chrome": ["start", "chrome"],
@@ -77,14 +85,28 @@ def open_application(app_name: str, status_callback: Optional[Callable[[str], No
     for key, cmd in app_mappings.items():
         if key in lowered or lowered in key:
             try:
-                subprocess.Popen(cmd, shell=True)
+                # A-02: never shell=True here. Every mapping entry is
+                # hardcoded, so a list-form spawn without a shell is
+                # injection-proof. `start` is a cmd.exe builtin, hence
+                # the explicit `cmd /c` for those entries.
+                if cmd[0].lower() == "start":
+                    subprocess.Popen(["cmd", "/c"] + cmd)
+                else:
+                    subprocess.Popen(cmd)
                 return f"Successfully opened {app_name}."
             except Exception as e:
                 logger.error(f"Failed to open mapped app {app_name}: {e}")
 
-    # Try generic Windows start
+    # Generic Windows start — A-02: app_name is tool-arg-controlled, so it
+    # must pass a strict charset check first. Without it, cmd.exe
+    # metacharacters would allow command injection through the `start`
+    # builtin's own argument parsing.
+    name = (app_name or "").strip()
+    if not _APP_NAME_SAFE.match(name):
+        return (f"Could not launch {app_name}: the name contains unsupported "
+                f"characters. Try the application's full name from the list.")
     try:
-        subprocess.Popen(f'start "" "{app_name}"', shell=True)
+        subprocess.Popen(["cmd", "/c", "start", "", name])
         return f"Opened {app_name}."
     except Exception as e:
         logger.error(f"Failed to start app {app_name}: {e}")

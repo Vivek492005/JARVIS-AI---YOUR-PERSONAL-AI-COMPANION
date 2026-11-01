@@ -41,10 +41,10 @@ except ImportError:
 # command engines — see Phase C of the cleanup plan).
 try:
     from .command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
-    from .actions import execute_tool_raw
+    from .actions import execute_tool_raw, run_action
 except ImportError:  # direct script execution
     from command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
-    from actions import execute_tool_raw
+    from actions import execute_tool_raw, run_action
 
 
 class AIAgent:
@@ -397,6 +397,25 @@ class AIAgent:
     # INTENT PROCESSING & FALLBACK REASONING
     # =========================================================================
 
+    def _fallback_exec(self, tool_name: str, args: Dict[str, Any]) -> str:
+        """Policy-gated execution for the offline fallback path.
+
+        Audit A-01: the fallback used to call execute_tool_raw() directly,
+        bypassing the policy gate entirely (so e.g. open_application's
+        shell fallback ran on raw user input). Every call now goes through
+        run_action(); CONFIRM verdicts are registered on the agent's
+        confirmation state machine, and the user's next message resolves
+        them (process() checks pending confirmations first).
+        """
+        verdict, result = run_action(
+            tool_name, args,
+            status_callback=self._notify_status,
+            notes_file=self.notes_file,
+        )
+        if verdict == CONFIRM:
+            return self.request_confirmation(tool_name, args)
+        return result
+
     def _local_fallback_process(self, user_input: str) -> str:
         """Heuristic-based intelligent fallback if API balance is empty or offline."""
         lowered = user_input.lower().strip()
@@ -409,15 +428,15 @@ class AIAgent:
                 if phrase in query.lower():
                     query = query.lower().replace(phrase, "").strip()
             if query:
-                return execute_tool_raw("download_media", {"url_or_query": query, "media_type": media_type}, self._notify_status, self.notes_file)
+                return self._fallback_exec("download_media", {"url_or_query": query, "media_type": media_type})
 
         # 2. Open Application / Website requests
         if lowered.startswith("open ") or lowered.startswith("launch ") or lowered.startswith("go to "):
             target = lowered.replace("open ", "").replace("launch ", "").replace("go to ", "").strip()
             # If known website or dot in name
             if any(s in target for s in ["youtube", "google", "gmail", "github", "linkedin", "reddit", "netflix", "instagram", "facebook", "twitter", "whatsapp", "chatgpt"]) or "." in target:
-                return execute_tool_raw("open_website", {"url_or_name": target}, self._notify_status, self.notes_file)
-            return execute_tool_raw("open_application", {"app_name": target}, self._notify_status, self.notes_file)
+                return self._fallback_exec("open_website", {"url_or_name": target})
+            return self._fallback_exec("open_application", {"app_name": target})
 
         # 3. Write / Type text
         if lowered.startswith("write ") or lowered.startswith("type "):
@@ -426,7 +445,7 @@ class AIAgent:
                 if lowered.startswith(prefix):
                     text = user_input[len(prefix):].strip()
                     break
-            return execute_tool_raw("keyboard_mouse_action", {"action": "type_text", "value": text}, self._notify_status, self.notes_file)
+            return self._fallback_exec("keyboard_mouse_action", {"action": "type_text", "value": text})
 
         # 4. Search requests
         if "search for" in lowered or "search google for" in lowered or lowered.startswith("google "):
@@ -434,22 +453,22 @@ class AIAgent:
                 if prefix in lowered:
                     idx = lowered.find(prefix) + len(prefix)
                     query = user_input[idx:].strip()
-                    return execute_tool_raw("web_search", {"query": query}, self._notify_status, self.notes_file)
+                    return self._fallback_exec("web_search", {"query": query})
 
         # 5. System commands
         if "screenshot" in lowered:
-            return execute_tool_raw("system_control", {"action": "take_screenshot"}, self._notify_status, self.notes_file)
+            return self._fallback_exec("system_control", {"action": "take_screenshot"})
         # NOTE: lock_pc is destructive — not available in the offline fallback.
         # Use the gated path (LLM or regex engine) so confirmation applies.
         # NOTE: empty_recycle_bin is destructive — not available offline.
         if "battery" in lowered:
-            return execute_tool_raw("system_control", {"action": "check_battery"}, self._notify_status, self.notes_file)
+            return self._fallback_exec("system_control", {"action": "check_battery"})
         if "volume up" in lowered or "increase volume" in lowered:
-            return execute_tool_raw("system_control", {"action": "volume_up"}, self._notify_status, self.notes_file)
+            return self._fallback_exec("system_control", {"action": "volume_up"})
         if "volume down" in lowered or "decrease volume" in lowered:
-            return execute_tool_raw("system_control", {"action": "volume_down"}, self._notify_status, self.notes_file)
+            return self._fallback_exec("system_control", {"action": "volume_down"})
         if "mute" in lowered:
-            return execute_tool_raw("system_control", {"action": "mute"}, self._notify_status, self.notes_file)
+            return self._fallback_exec("system_control", {"action": "mute"})
 
         # 6. Notes
         if lowered.startswith("note that ") or lowered.startswith("take note ") or lowered.startswith("save note "):
@@ -458,12 +477,12 @@ class AIAgent:
                 if lowered.startswith(p):
                     content = user_input[len(p):].strip()
                     break
-            return execute_tool_raw("manage_notes", {"action": "save", "content": content}, self._notify_status, self.notes_file)
+            return self._fallback_exec("manage_notes", {"action": "save", "content": content})
         if "read my notes" in lowered or "show my notes" in lowered:
-            return execute_tool_raw("manage_notes", {"action": "read"}, self._notify_status, self.notes_file)
+            return self._fallback_exec("manage_notes", {"action": "read"})
 
         # Default fallback: search query
-        return execute_tool_raw("web_search", {"query": user_input}, self._notify_status, self.notes_file)
+        return self._fallback_exec("web_search", {"query": user_input})
 
     def _call_llm_flow(self, client, model_name: str, clean_input: str) -> Optional[str]:
         """Execute LLM chat completion with autonomous tool dispatch."""
