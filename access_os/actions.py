@@ -287,6 +287,11 @@ def keyboard_mouse_action(action: str, value: str,
 
 def manage_notes(action: str, content: Optional[str] = None, notes_file: str = "notes.txt",
                  status_callback: Optional[Callable[[str], None]] = None) -> str:
+    # A-06: notes_file is dispatcher-provided and must stay a plain filename
+    # inside the working directory — never a path (no traversal).
+    if (os.path.basename(notes_file) != notes_file or ".." in notes_file
+            or os.path.isabs(notes_file)):
+        return "Invalid notes file."
     if status_callback:
         status_callback("Managing notes...")
     if action == "save":
@@ -332,10 +337,102 @@ def run_powershell_command(command: str,
 
 
 # ---------------------------------------------------------------------------
-# Dispatch tables
+# Tool registry wiring (Task 1.2). The registry is the single authority on
+# which tools exist, their arg schemas and their risk tiers. Handlers stay
+# here — the single home for implementations (Phase C).
 # ---------------------------------------------------------------------------
 
-_TOOL_EXECUTORS = {
+def _register_tools():
+    from .tools.registry import (
+        DownloadMediaParams,
+        KeyboardMouseParams,
+        ManageNotesParams,
+        OpenApplicationParams,
+        OpenWebsiteParams,
+        Risk,
+        RunPowershellParams,
+        SystemControlParams,
+        WebSearchParams,
+        tool,
+        ToolSpec,
+    )
+
+    def _sub(name, risk, description, params):
+        # Sub-action specs share the base tool's handler; resolve() picks the
+        # right risk tier from the `action` argument.
+        base = _BASE_HANDLERS[name.split(".")[0]]
+        tool(ToolSpec(name=name, description=description, params=params,
+                      risk=risk, handler=base))
+
+    tool(ToolSpec(
+        name="open_application", risk=Risk.REVERSIBLE,
+        description="Opens or launches an application or program installed on "
+                    "the Windows PC (e.g. Chrome, Notepad, VS Code, "
+                    "Calculator, Spotify, WhatsApp, Word, Excel, File "
+                    "Explorer, Command Prompt, etc.).",
+        params=OpenApplicationParams,
+        handler=_BASE_HANDLERS["open_application"]))
+    tool(ToolSpec(
+        name="open_website", risk=Risk.REVERSIBLE,
+        description="Opens a specific website or web portal in the user's "
+                    "default browser.",
+        params=OpenWebsiteParams,
+        handler=_BASE_HANDLERS["open_website"]))
+    tool(ToolSpec(
+        name="web_search", risk=Risk.READ,
+        description="Searches Google or the web for real-time information, "
+                    "answers, queries, or news requested by the user.",
+        params=WebSearchParams,
+        handler=_BASE_HANDLERS["web_search"]))
+    tool(ToolSpec(
+        name="download_media", risk=Risk.REVERSIBLE,
+        description="Downloads video or audio from YouTube or any media URL, "
+                    "or searches and downloads the requested song or video "
+                    "using yt-dlp.",
+        params=DownloadMediaParams,
+        handler=_BASE_HANDLERS["download_media"]))
+    # system_control: per-action risk tiers; base is SYSTEM (fail-closed).
+    tool(ToolSpec(
+        name="system_control", risk=Risk.SYSTEM,
+        description="Controls Windows OS system functions: volume "
+                    "adjustments, mute, screenshot capture, lock workstation, "
+                    "empty recycle bin, battery check.",
+        params=SystemControlParams,
+        handler=_BASE_HANDLERS["system_control"]))
+    _sub("system_control.take_screenshot", Risk.READ,
+         "Capture a screenshot.", SystemControlParams)
+    _sub("system_control.check_battery", Risk.READ,
+         "Report battery status.", SystemControlParams)
+    for _vol in ("volume_up", "volume_down", "mute", "unmute"):
+        _sub(f"system_control.{_vol}", Risk.REVERSIBLE,
+             f"System {_vol.replace('_', ' ')}.", SystemControlParams)
+    _sub("system_control.empty_recycle_bin", Risk.DESTRUCTIVE,
+         "Permanently empty the Recycle Bin.", SystemControlParams)
+    _sub("system_control.lock_pc", Risk.SYSTEM,
+         "Lock the workstation.", SystemControlParams)
+    tool(ToolSpec(
+        # SYSTEM until the Task 1.4 foreground-window guard lands.
+        name="keyboard_mouse_action", risk=Risk.SYSTEM,
+        description="Types text or fires a hotkey. Blocked hotkeys "
+                    "(alt+f4, win+r, …) are denied by the policy gate.",
+        params=KeyboardMouseParams,
+        handler=_BASE_HANDLERS["keyboard_mouse_action"]))
+    tool(ToolSpec(
+        name="manage_notes", risk=Risk.REVERSIBLE,
+        description="Save, read, or clear the user's persistent notes.",
+        params=ManageNotesParams,
+        handler=_BASE_HANDLERS["manage_notes"]))
+    _sub("manage_notes.clear", Risk.DESTRUCTIVE,
+         "Permanently clear all notes.", ManageNotesParams)
+    tool(ToolSpec(
+        name="run_powershell_command", risk=Risk.SYSTEM,
+        description="Runs a read-only PowerShell command (validated against "
+                    "the allowlist; destructive cmdlets are denied).",
+        params=RunPowershellParams,
+        handler=_BASE_HANDLERS["run_powershell_command"]))
+
+
+_BASE_HANDLERS = {
     "open_application": lambda args, cb, nf: open_application(args.get("app_name", ""), cb),
     "open_website": lambda args, cb, nf: open_website(args.get("url_or_name", ""), cb),
     "web_search": lambda args, cb, nf: web_search(args.get("query", ""), cb),
@@ -344,11 +441,14 @@ _TOOL_EXECUTORS = {
     "system_control": lambda args, cb, nf: system_control(args.get("action", ""), cb),
     "keyboard_mouse_action": lambda args, cb, nf: keyboard_mouse_action(
         args.get("action", ""), args.get("value", ""), cb),
+    # A-06: notes_file is dispatcher-provided, never part of the tool schema.
     "manage_notes": lambda args, cb, nf: manage_notes(
         args.get("action", ""), args.get("content", None), nf, cb),
     "run_powershell_command": lambda args, cb, nf: run_powershell_command(
         args.get("command", ""), cb),
 }
+
+_register_tools()
 
 
 def execute_tool_raw(tool_name: str, args: Dict[str, Any],
@@ -359,11 +459,23 @@ def execute_tool_raw(tool_name: str, args: Dict[str, Any],
     Only call this for tool calls that already passed check_tool_call()
     (the AIAgent._dispatch_tool_call path) or were explicitly confirmed by
     the user. Anything else must go through run_action().
+
+    Task 1.2: the tool MUST be registered and its args MUST validate
+    against the spec's pydantic model — otherwise the call is rejected.
     """
-    executor = _TOOL_EXECUTORS.get(tool_name)
-    if executor is None:
+    from .tools.registry import resolve
+    from pydantic import ValidationError
+
+    spec = resolve(tool_name, args or {})
+    if spec is None:
         return f"Tool {tool_name} is not recognized."
-    return executor(args or {}, status_callback, notes_file)
+    try:
+        validated = spec.params(**(args or {}))
+    except ValidationError as e:
+        first = e.errors()[0]
+        loc = ".".join(str(p) for p in first["loc"])
+        return f"Invalid arguments for {tool_name}: {loc}: {first['msg']}"
+    return spec.handler(validated.model_dump(), status_callback, notes_file)
 
 
 def _audit_log(tool_name: str, args: Dict[str, Any], verdict: str, result: str,

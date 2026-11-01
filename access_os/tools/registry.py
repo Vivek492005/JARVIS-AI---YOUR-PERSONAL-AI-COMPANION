@@ -1,0 +1,158 @@
+"""Tool registry with risk tiers (Master Plan Task 1.2).
+
+Every executable tool is a declared :class:`ToolSpec`: a pydantic params
+model (JSON-schema + validation), a risk tier, a handler, a timeout and
+optional scopes. **Nothing executes without a ToolSpec** — unregistered
+names are rejected, and arguments are validated before the handler runs.
+
+Risk tiers:
+    READ (0)        — only reads state (time, battery, search, describe)
+    REVERSIBLE (1)  — can be undone (open app, write note, volume)
+    DESTRUCTIVE (2) — data/state loss or outward send (delete, clear, send)
+    SYSTEM (3)      — OS-level (lock, shutdown, shell, install)
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import IntEnum
+from typing import Any, Callable, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class Risk(IntEnum):
+    READ = 0
+    REVERSIBLE = 1
+    DESTRUCTIVE = 2
+    SYSTEM = 3
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    name: str
+    description: str
+    params: type[BaseModel]          # pydantic model = schema + validation
+    risk: Risk
+    handler: Callable[[Dict[str, Any], Any, str], str]
+    timeout_s: float = 15.0
+    scopes: frozenset = field(default_factory=frozenset)
+
+
+REGISTRY: Dict[str, ToolSpec] = {}
+
+
+def tool(spec: ToolSpec) -> ToolSpec:
+    """Register a ToolSpec. Duplicate names are a programming error."""
+    if spec.name in REGISTRY:
+        raise ValueError(f"duplicate tool registration: {spec.name}")
+    REGISTRY[spec.name] = spec
+    return spec
+
+
+def resolve(tool_name: str, args: Optional[Dict[str, Any]] = None) -> Optional[ToolSpec]:
+    """Find the spec for a tool call.
+
+    Sub-action tools are addressed with a dotted name derived from the
+    ``action`` argument (e.g. ``system_control.empty_recycle_bin``), so one
+    multi-action tool can carry per-action risk tiers. Unknown actions fall
+    back to the base tool spec (registered at the *highest* applicable risk,
+    i.e. fail-closed).
+    """
+    args = args or {}
+    action = args.get("action")
+    if isinstance(action, str) and action:
+        sub = REGISTRY.get(f"{tool_name}.{action}")
+        if sub is not None:
+            return sub
+    return REGISTRY.get(tool_name)
+
+
+def function_schemas() -> List[Dict[str, Any]]:
+    """OpenAI-compatible function definitions, auto-generated from the registry.
+
+    Only base tools (no dots) are exposed to the LLM; sub-action risk tiers
+    are enforced server-side at dispatch.
+    """
+    schemas = []
+    for name in sorted(REGISTRY):
+        if "." in name:
+            continue
+        spec = REGISTRY[name]
+        schemas.append({
+            "type": "function",
+            "function": {
+                "name": spec.name,
+                "description": spec.description,
+                "parameters": spec.params.model_json_schema(),
+            },
+        })
+    return schemas
+
+
+# ---------------------------------------------------------------------------
+# Parameter models (one per tool; notes_file-style dispatcher args are NOT
+# part of any schema — see A-06)
+# ---------------------------------------------------------------------------
+
+class OpenApplicationParams(BaseModel):
+    app_name: str = Field(
+        ..., min_length=1, max_length=60,
+        description="The common name of the application to launch "
+                    "(e.g. 'chrome', 'notepad', 'calculator', 'spotify').")
+
+
+class OpenWebsiteParams(BaseModel):
+    url_or_name: str = Field(
+        ..., min_length=1, max_length=500,
+        description="The URL (e.g. 'https://youtube.com') or website name "
+                    "(e.g. 'youtube', 'github').")
+
+
+class WebSearchParams(BaseModel):
+    query: str = Field(..., min_length=1, max_length=500,
+                       description="The search query.")
+
+
+class DownloadMediaParams(BaseModel):
+    url_or_query: str = Field(
+        ..., min_length=1, max_length=500,
+        description="The media URL or the search term of the song/video.")
+    media_type: str = Field(
+        default="audio",
+        description="Whether to download audio (mp3/m4a) or video (mp4).",
+        pattern="^(audio|video)$")
+
+
+class SystemControlParams(BaseModel):
+    action: str = Field(
+        ...,
+        description="The specific system action to perform.",
+        pattern="^(volume_up|volume_down|mute|unmute|take_screenshot|"
+                "lock_pc|empty_recycle_bin|check_battery)$")
+
+
+class KeyboardMouseParams(BaseModel):
+    action: str = Field(
+        ...,
+        description="One of: type_text, press_key, press_hotkey.",
+        pattern="^(type_text|press_key|press_hotkey)$")
+    value: str = Field(default="",
+                       description="Text to type, or key/hotkey like 'ctrl+s'.",
+                       max_length=2000)
+
+
+class ManageNotesParams(BaseModel):
+    action: str = Field(
+        ..., description="One of: save, read, clear.",
+        pattern="^(save|read|clear)$")
+    content: Optional[str] = Field(
+        default=None, max_length=10000,
+        description="Note text (required for 'save').")
+
+
+class RunPowershellParams(BaseModel):
+    command: str = Field(
+        ..., min_length=1, max_length=2000,
+        description="A read-only PowerShell command (validated against the "
+                    "allowlist; destructive cmdlets are denied).")

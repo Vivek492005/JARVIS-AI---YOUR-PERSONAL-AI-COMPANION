@@ -1267,11 +1267,14 @@ class VoiceCommandProcessor:
 
             # Single download implementation lives in access_os/actions.py
             # (it adds the ytsearch: prefix itself when given a plain query).
+            # A-08: route through the policy gate (_gated), not execute_tool_raw
+            # — the old code bypassed both the gate and the audit log.
             try:
-                result = execute_tool_raw(
+                result = self._gated(
                     "download_media",
                     {"url_or_query": target,
-                     "media_type": "audio" if audio_only else "video"})
+                     "media_type": "audio" if audio_only else "video"},
+                    ok_msg="Download started.")
                 logger.info(f"YouTube download result: {result}")
             except Exception as e:
                 logger.error(f"Download error: {e}")
@@ -1496,13 +1499,42 @@ class VoiceCommandProcessor:
         return self._gated("system_control", {"action": "check_battery"})
 
     def _action_calculate(self, match) -> str:
+        # A-07: the old eval() (even sandboxed) allowed CPU-DoS via huge
+        # exponents (9^9^9^9). Now a strict AST evaluator: only arithmetic
+        # nodes, capped input length and exponent size.
+        import ast
+        import operator
         expr = match.group(1).strip()
-        # Clean expression
+        if len(expr) > 100:
+            return "Sorry, that expression is too long."
         sanitized = re.sub(r'[^0-9\+\-\*\/\%\(\)\.\^ ]', '', expr)
         sanitized = sanitized.replace('^', '**')
+        if not sanitized.strip():
+            return f"Sorry, could not calculate {expr}"
+        _binops = {ast.Add: operator.add, ast.Sub: operator.sub,
+                   ast.Mult: operator.mul, ast.Div: operator.truediv,
+                   ast.Mod: operator.mod, ast.Pow: operator.pow}
+        _unaryops = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+
+        def _eval(node, depth=0):
+            if depth > 64:
+                raise ValueError("expression too deep")
+            if isinstance(node, ast.Expression):
+                return _eval(node.body, depth + 1)
+            if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                return node.value
+            if isinstance(node, ast.BinOp) and type(node.op) in _binops:
+                left = _eval(node.left, depth + 1)
+                right = _eval(node.right, depth + 1)
+                if type(node.op) is ast.Pow and (abs(right) > 100 or abs(left) > 10 ** 6):
+                    raise ValueError("exponent too large")
+                return _binops[type(node.op)](left, right)
+            if isinstance(node, ast.UnaryOp) and type(node.op) in _unaryops:
+                return _unaryops[type(node.op)](_eval(node.operand, depth + 1))
+            raise ValueError("unsupported expression")
+
         try:
-            # Safe evaluation for basic arithmetic
-            result = eval(sanitized, {"__builtins__": None}, {})
+            result = _eval(ast.parse(sanitized, mode="eval"))
             return f"{expr} is {result}"
         except Exception:
             return f"Sorry, could not calculate {expr}"
