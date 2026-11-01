@@ -110,6 +110,11 @@ def _cmd_send(args) -> int:
 
 def _cmd_doctor(args) -> int:
     from jarvis.core.doctor import run_doctor
+    if getattr(args, "latency", False):
+        from jarvis.voice.latency import latency_summary, format_latency_report
+        from jarvis.core.metrics import _metrics_dir
+        print(format_latency_report(latency_summary(_metrics_dir())))
+        return 0
     return run_doctor()
 
 
@@ -141,6 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
     snd.set_defaults(func=_cmd_send)
 
     d = sub.add_parser("doctor", help="run diagnostics (Task 2.7)")
+    d.add_argument("--latency", action="store_true",
+                   help="latency budget report (Task 3.10)")
     d.set_defaults(func=_cmd_doctor)
 
     r = sub.add_parser("reflex", help="reflex layer utilities (Task 2.6)")
