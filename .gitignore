@@ -25,3 +25,16 @@ access_os.log
 # Temporary / OS files
 .DS_Store
 Thumbs.db
+
+# JARVIS local settings (Task 0.3/0.5: user-local; never commit)
+settings.toml
+
+# Audit output (Task 1.7 writes audit/*.jsonl)
+audit/
+
+# Local workspace / scratch
+workspace/
+
+# Large media (covered by check-added-large-files in pre-commit)
+*.wav
+*.mp3
