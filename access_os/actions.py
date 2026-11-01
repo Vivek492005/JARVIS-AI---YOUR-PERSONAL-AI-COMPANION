@@ -476,7 +476,8 @@ def _register_tools():
         description="Searches Google or the web for real-time information, "
                     "answers, queries, or news requested by the user.",
         params=WebSearchParams,
-        handler=_BASE_HANDLERS["web_search"]))
+        handler=_BASE_HANDLERS["web_search"],
+        carries_external_data=True))
     tool(ToolSpec(
         name="download_media", risk=Risk.REVERSIBLE,
         description="Downloads video or audio from YouTube or any media URL, "
@@ -529,7 +530,8 @@ def _register_tools():
         name="manage_notes", risk=Risk.REVERSIBLE,
         description="Save, read, or clear the user's persistent notes.",
         params=ManageNotesParams,
-        handler=_BASE_HANDLERS["manage_notes"]))
+        handler=_BASE_HANDLERS["manage_notes"],
+        carries_external_data=True))
     _sub("manage_notes.clear", Risk.DESTRUCTIVE,
          "Permanently clear all notes.", ManageNotesParams)
     tool(ToolSpec(
@@ -537,14 +539,16 @@ def _register_tools():
         description="Runs a read-only PowerShell command (validated against "
                     "the allowlist; destructive cmdlets are denied).",
         params=RunPowershellParams,
-        handler=_BASE_HANDLERS["run_powershell_command"]))
+        handler=_BASE_HANDLERS["run_powershell_command"],
+        carries_external_data=True))
     tool(ToolSpec(
         # Task 1.4.3: fixed read-only templates; the LLM picks only a key.
         name="run_command", risk=Risk.READ,
         description="Runs one allowlisted read-only diagnostic template "
                     "(ipconfig, disk_free). No arbitrary commands.",
         params=RunCommandParams,
-        handler=_BASE_HANDLERS["run_command"]))
+        handler=_BASE_HANDLERS["run_command"],
+        carries_external_data=True))
 
 
 _BASE_HANDLERS = {

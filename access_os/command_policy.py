@@ -139,6 +139,88 @@ def validate_hotkey(value: str) -> Verdict:
 
 
 # ---------------------------------------------------------------------------
+# URL scheme policy (Task 1.5.3)
+# ---------------------------------------------------------------------------
+
+# Only remote web pages may be opened. file://, javascript:, data:, vbscript:
+# and ms-* (Windows protocol handlers like ms-settings:, ms-officecmd:) are
+# classic injection vectors — a poisoned web result must never be able to
+# reach them through the assistant.
+_ALLOWED_URL_SCHEMES = ("http://", "https://")
+
+
+def validate_url(url: str) -> Verdict:
+    """Allow only http/https URLs."""
+    u = (url or "").strip().lower()
+    if u.startswith(_ALLOWED_URL_SCHEMES):
+        return (ALLOW, "URL scheme permitted")
+    scheme = u.split(":", 1)[0] if ":" in u else "(none)"
+    return (DENY, f"URL scheme '{scheme}' is not allowed")
+
+
+# ---------------------------------------------------------------------------
+# Injection hygiene (Task 1.5.4 / 1.5.2)
+# ---------------------------------------------------------------------------
+
+# Zero-width / invisible characters attackers use to hide instructions inside
+# otherwise-innocent text. Stripped from tool results before they reach the LLM.
+_HIDDEN_CHARS = "".join(
+    [chr(c) for c in range(0x200B, 0x2010)]     # ZWSP, ZWNJ, ZWJ, LRM, RLM
+    + [chr(c) for c in range(0x2060, 0x2070)]   # WJ, function/application marks
+    + [chr(0xFEFF)]                              # zero-width no-break space
+)
+
+
+def strip_hidden_text(text: str) -> str:
+    """Remove zero-width / invisible Unicode characters."""
+    if not text:
+        return text
+    return text.translate(str.maketrans("", "", _HIDDEN_CHARS))
+
+
+# Instruction-like phrasing inside *data* (a tool result) is the classic
+# indirect-prompt-injection signal. Conservative keyword list: matching marks
+# the agent tainted for the rest of the turn.
+_TAINT_PATTERNS = [
+    r"ignore\s+(all\s+|any\s+|the\s+|your\s+)?(previous|prior)\s+instructions?",
+    r"disregard\s+(all\s+|any\s+|the\s+|your\s+)?(previous|prior)\s+instructions?",
+    r"forget\s+(all\s+|any\s+|the\s+|your\s+)?(previous|prior)\s+instructions?",
+    r"you\s+are\s+now\s+(a|an|the)\s+",
+    r"\bnew\s+system\s+instructions?[:\s]",
+    r"do\s+not\s+tell\s+the\s+user",
+    r"override\s+(your\s+|the\s+)?(safety|policy|system)",
+    r"execute\s+the\s+following\s+(command|instructions?)",
+]
+
+# "do not override the system" is ordinary manual/safety advice, not an
+# attack — strip negated overrides before matching.
+_NEGATED_OVERRIDE = re.compile(
+    r"\b(do\s+not|don't|never)\s+override\s+(your\s+|the\s+)?"
+    r"(safety|policy|system)")
+
+
+def detect_tainted(text: str) -> bool:
+    """True if the text looks like an injected instruction.
+
+    Evasion-resistant: hidden characters are checked both stripped and
+    replaced with spaces, so "Ignore\\u200bprevious\\u200cinstructions"
+    still matches after hygiene merges the words.
+    """
+    if not text:
+        return False
+
+    def _hit(t: str) -> bool:
+        t = _NEGATED_OVERRIDE.sub("", t)
+        lowered = t.lower()
+        return any(re.search(p, lowered) for p in _TAINT_PATTERNS)
+
+    if _hit(text):
+        return True
+    spaced = re.sub(f"[{_HIDDEN_CHARS}]", " ", text)
+    return _hit(spaced) if spaced != text else False
+
+
+# ---------------------------------------------------------------------------
 # Destructive-action classification
 # ---------------------------------------------------------------------------
 
@@ -196,5 +278,13 @@ def check_tool_call(tool_name: str, args: Dict[str, Any]) -> Verdict:
             return (CONFIRM, "clearing all notes is irreversible")
         return (ALLOW, "notes action permitted")
 
-    # open_application, open_website, web_search, download_media: no policy yet.
+    if tool_name == "open_website":
+        # Task 1.5.3: scheme allowlist — named sites resolve to https URLs
+        # in the executor, but a raw URL argument goes through here.
+        url = args.get("url_or_name", "")
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*:", (url or "").strip()):
+            return validate_url(url)
+        return (ALLOW, "website name permitted")
+
+    # open_application, web_search, download_media: no policy yet.
     return (ALLOW, "no policy rule for this tool — permitted")

@@ -37,6 +37,9 @@ class ToolSpec:
     handler: Callable[[Dict[str, Any], Any, str], str]
     timeout_s: float = 15.0
     scopes: frozenset = field(default_factory=frozenset)
+    # Task 1.5.1: results from this tool enter the LLM prompt as *data* and
+    # are wrapped in <untrusted_data> tags + taint-checked.
+    carries_external_data: bool = False
 
 
 REGISTRY: Dict[str, ToolSpec] = {}
