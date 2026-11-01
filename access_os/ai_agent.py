@@ -94,6 +94,15 @@ class AIAgent:
         self.tainted = False
         # Task 1.8: set to True by the rate limiter when over budget.
         self.rate_limited = False
+        # Task 1.8: rate limiter + circuit breaker for the tool loop.
+        from .safety import CircuitBreaker, RateLimiter
+        try:
+            from .config import get_settings as _gs
+            _rpm = _gs().safety.max_tool_calls_per_minute
+        except Exception:
+            _rpm = 20
+        self._rate_limiter = RateLimiter(max_calls=_rpm)
+        self._breaker = CircuitBreaker()
         # Task 1.7: structured audit log (audit/YYYY-MM-DD.jsonl).
         from .audit import AuditLogger
         self._audit_logger = AuditLogger()
@@ -225,6 +234,29 @@ class AIAgent:
         """
         from .policy import PolicyContext
         args = args or {}
+
+        # Task 1.8: rate limiter — over budget => rate_limited flag, and the
+        # policy engine (1.3) then DENYs non-READ calls until the window
+        # slides. The flag also survives into later turns via PolicyContext.
+        if self.rate_limited and not self._rate_limiter.over_budget():
+            self.rate_limited = False
+            logger.info("rate-limit window slid — rate_limited=False")
+        if not self._rate_limiter.allow():
+            if not self.rate_limited:
+                logger.warning("tool rate limit exceeded — rate_limited=True")
+            self.rate_limited = True
+            self._audit(function_name, args, "deny",
+                         reason="rate limit exceeded")
+            return ("Rate limit exceeded — please wait a moment before "
+                    "asking for more actions.")
+
+        # Task 1.8: circuit breaker — the tool layer keeps failing.
+        if not self._breaker.allow():
+            self._audit(function_name, args, "deny",
+                         reason="circuit breaker open")
+            return ("The action system is temporarily paused after repeated "
+                    "failures. Please try again in a minute.")
+
         # A-01 follow-up: taint flows from the agent's conversation state
         # (set by Task 1.5 when untrusted content enters the context).
         ctx = PolicyContext(tainted=getattr(self, "tainted", False),
@@ -241,7 +273,17 @@ class AIAgent:
             return self.request_confirmation(function_name, args)
 
         _t0 = time.time()
-        result = self._execute_tool(function_name, args)
+        try:
+            result = self._execute_tool(function_name, args)
+        except Exception as e:
+            self._breaker.record_failure()
+            logger.exception(f"tool execution crashed: {function_name}")
+            result = f"Action failed: {e}"
+        else:
+            if result.startswith(("Action failed:", "Command failed:")):
+                self._breaker.record_failure()
+            else:
+                self._breaker.record_success()
         latency_ms = (time.time() - _t0) * 1000.0
         self._audit(function_name, args, ALLOW, reason=reason,
                      latency_ms=latency_ms)
@@ -439,7 +481,16 @@ class AIAgent:
             if lowered in self.confirm_words:
                 self._notify_status("Confirmed — executing...")
                 _t0 = time.time()
-                result = self._execute_tool(tool_name, c_args)
+                try:
+                    result = self._execute_tool(tool_name, c_args)
+                except Exception as e:
+                    self._breaker.record_failure()
+                    result = f"Action failed: {e}"
+                else:
+                    if result.startswith(("Action failed:", "Command failed:")):
+                        self._breaker.record_failure()
+                    else:
+                        self._breaker.record_success()
                 latency_ms = (time.time() - _t0) * 1000.0
                 self._audit(tool_name, c_args, "confirmed",
                             reason="user confirmed", latency_ms=latency_ms)

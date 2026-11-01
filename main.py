@@ -195,6 +195,15 @@ def main():
         except (OSError, ValueError) as e:
             logger.warning(f"Could not install handler for {_sig}: {e}")
 
+    # Task 1.8: kill switch — Ctrl+Alt+Shift+J stops everything, now.
+    try:
+        from access_os.safety import KillSwitch
+        _kill = KillSwitch()
+        _kill.on_trigger(lambda: assistant.stop())
+        _kill.install_hotkey()  # best-effort; False on Linux / no package
+    except Exception as e:
+        logger.warning(f"Kill switch unavailable: {e}")
+
     assistant.start()
 
 

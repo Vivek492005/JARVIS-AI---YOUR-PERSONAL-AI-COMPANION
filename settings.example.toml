@@ -37,8 +37,10 @@ fallback_to_local = true
 [safety]
 autonomy_level = 1            # 0=ask everything … 3=auto incl. destructive (SYSTEM always confirms)
 confirm_timeout_s = 10.0      # unanswered confirmation -> DENY
-max_tool_calls_per_minute = 20
+max_tool_calls_per_minute = 20  # Task 1.8: over budget -> rate_limited, tool calls DENY
 max_steps_per_task = 12
+# Task 1.8: kill switch hotkey (Ctrl+Alt+Shift+J) — stops everything now.
+# Bound best-effort on Windows via the `keyboard` package.
 
 [privacy]
 privacy_mode = false          # true = local-only chain, no cloud calls at all

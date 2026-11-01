@@ -1858,6 +1858,17 @@ class VoiceInterface:
             logger.warning(f"Neural TTS failed, falling back to local TTS: {e}")
             return False
 
+    def stop_speaking(self) -> None:
+        """Task 1.8: best-effort stop of in-progress TTS (stop words)."""
+        try:
+            if self.engine:
+                self.engine.stop()
+        except Exception:
+            pass
+        # Note: winsound.PlaySound is synchronous — a Rumik clip already
+        # playing finishes; the lock prevents a new one starting until the
+        # stop word is handled.
+
     def speak(self, text: str, wait: bool = False):
         """Speak output text using Rumik AI Silk TTS (primary) with fallback to Neural and pyttsx3."""
         print(f"\n[JARVIS]: {text}")
@@ -1910,6 +1921,12 @@ class VoiceInterface:
         clean_text = raw_text.strip()
         if not clean_text:
             return ""
+
+        # Task 1.8: typed stop words behave like spoken ones.
+        from .safety import is_stop_command
+        if is_stop_command(clean_text):
+            self.stop_speaking()
+            return "Stopped."
 
         # Check for assistant-specific voice settings commands
         lowered = clean_text.lower()
@@ -2085,6 +2102,18 @@ class VoiceInterface:
                     try:
                         text = self.recognizer.recognize_google(audio).strip()
                         if not text:
+                            continue
+
+                        # Task 1.8: spoken stop words — halt TTS and skip
+                        # dispatch entirely, before any tool can run.
+                        from .safety import is_stop_command
+                        if is_stop_command(text):
+                            self.stop_speaking()
+                            print("\n[You]: (stop word)")
+                            if self.command_callback:
+                                self.command_callback(
+                                    VoiceCommand(text=text,
+                                                 response="Stopped."))
                             continue
 
                         print(f"\n[You]: {text}")
