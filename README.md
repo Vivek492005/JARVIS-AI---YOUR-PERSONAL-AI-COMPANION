@@ -385,6 +385,7 @@ Run these first whenever something doesn't behave as expected — they'll usuall
 - **Media downloads:** `download_media` uses `yt-dlp`. Downloading copyrighted content may violate your country's laws or a platform's Terms of Service — use it only for content you own or that is explicitly permitted. This is your responsibility.
 - **Name:** "JARVIS" is famously a Marvel/Disney character name. Fine for a personal project; pick an original name before any public release or branding.
 - *We are not lawyers; get proper legal advice if you need it.*
+Full text: [docs/LEGAL_NOTES.md](docs/LEGAL_NOTES.md).
 
 ---
 
