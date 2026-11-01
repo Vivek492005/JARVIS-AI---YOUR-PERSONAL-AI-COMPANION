@@ -174,10 +174,43 @@ def _screen_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.4 VLM fallback (set-of-marks)
+# ---------------------------------------------------------------------------
+
+class VlmClickParams(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=500,
+                        description="What to click, e.g. 'the Save button'.")
+    handle: Optional[int] = Field(default=None, description="Window handle; default = active.")
+
+
+def _h_vlm_click(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    from jarvis.perception.vlm import HandoffRequired, VLMClicker
+    from jarvis.perception.privacy import SensitiveWindowError
+    try:
+        return VLMClicker().click_target(args["prompt"],
+                                         handle=args.get("handle"))
+    except HandoffRequired as e:
+        return str(e)
+    except SensitiveWindowError as e:
+        return f"Blocked: {e}"
+
+
+def _vlm_specs() -> List[ToolSpec]:
+    return [
+        # DESTRUCTIVE: least reliable rung (1-star); always confirms at L1.
+        ToolSpec(name="vlm_click", risk=Risk.DESTRUCTIVE,
+                 description="Last-resort visual click: numbered boxes on "
+                             "screenshot, VLM picks one. Hands off on "
+                             "login/CAPTCHA/payment/2FA/UAC.",
+                 params=VlmClickParams, handler=_h_vlm_click),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
 def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
-    for spec in _uia_specs() + _screen_specs():
+    for spec in _uia_specs() + _screen_specs() + _vlm_specs():
         _reg(spec)
