@@ -1,14 +1,57 @@
-"""Tool package: registry framework (Task 1.2) + specs.
+"""Deprecated compatibility shim (Phase 2, v0.4.0).
 
-Importing this package wires every tool spec: the framework lives in
-:mod:`access_os.tools.registry`, the specs are registered by
-:mod:`access_os.actions` (the single home for handlers), which is imported
-below for its registration side effect.
+``access_os.tools`` moved to ``jarvis.tools``. Import from ``jarvis.tools`` instead —
+this shim will be removed in v1.0.0.
+
+The shim is a transparent proxy: the real module's public attributes are
+mirrored into this module's ``__dict__`` at import time, and every later
+read/write/delete is forwarded to the real module. That keeps
+``mock.patch("access_os.tools....")`` and ``monkeypatch.setattr`` working
+exactly as before the move (including pytest's ``__dict__``-based undo).
 """
+import sys as _sys
+import warnings as _warnings
+import importlib as _importlib
 
-from .registry import REGISTRY, Risk, ToolSpec, function_schemas, resolve, tool
 
-# Registers all ToolSpecs (imports actions for its _register_tools() call).
-from access_os import actions as _actions  # noqa: E402,F401
+class _ShimProxy(_sys.modules[__name__].__class__):
+    """Module subclass forwarding attribute access to the real module."""
 
-__all__ = ["REGISTRY", "Risk", "ToolSpec", "function_schemas", "resolve", "tool"]
+    def __getattr__(self, name):
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        return getattr(self.__dict__["_target"], name)
+
+    def __setattr__(self, name, value):
+        if name == "_target" or (name.startswith("__") and name.endswith("__")):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self.__dict__["_target"], name, value)
+
+    def __delattr__(self, name):
+        if name == "_target" or (name.startswith("__") and name.endswith("__")):
+            object.__delattr__(self, name)
+        else:
+            delattr(self.__dict__["_target"], name)
+
+    def __dir__(self):
+        return sorted(set(super().__dir__()) | set(dir(self.__dict__["_target"])))
+
+
+_warnings.warn(
+    "access_os.tools is deprecated; use jarvis.tools instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+_mod = _sys.modules[__name__]
+_target = _importlib.import_module("jarvis.tools")
+object.__setattr__(_mod, "_target", _target)
+# Mirror public attributes so `target.__dict__` lookups (pytest's undo,
+# mock's create detection) see the same state as the real module.
+for _name in dir(_target):
+    if _name.startswith("__") and _name.endswith("__"):
+        continue
+    _mod.__dict__[_name] = getattr(_target, _name)
+del _name
+_mod.__class__ = _ShimProxy

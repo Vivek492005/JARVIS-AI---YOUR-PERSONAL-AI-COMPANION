@@ -52,18 +52,21 @@ dev = [
 ]
 
 [project.scripts]
-# Legacy standalone CLI (experimental). The real `jarvis` CLI arrives with
-# the Phase 2 runtime refactor; the desktop entry point stays main.py.
-jarvis-legacy = "access_os.main:main"
+# Phase 2: the real `jarvis` CLI (serve/ui/doctor/reflex). The desktop entry
+# point stays main.py; jarvis-legacy is the old ACCESS-OS demo app.
+jarvis = "jarvis.cli:main"
+jarvis-legacy = "jarvis.legacy.access_os_main:main"
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["access_os*"]
+where = ["src"]
+include = ["jarvis*"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 markers = [
     "hardware: needs camera/microphone hardware (skipped in CI)",
     "live: needs network access to real APIs (skipped in CI)",

@@ -1,118 +1,57 @@
+"""Deprecated compatibility shim (Phase 2, v0.4.0).
+
+``access_os.first_run`` moved to ``jarvis.legacy.first_run``. Import from ``jarvis.legacy.first_run`` instead —
+this shim will be removed in v1.0.0.
+
+The shim is a transparent proxy: the real module's public attributes are
+mirrored into this module's ``__dict__`` at import time, and every later
+read/write/delete is forwarded to the real module. That keeps
+``mock.patch("access_os.first_run....")`` and ``monkeypatch.setattr`` working
+exactly as before the move (including pytest's ``__dict__``-based undo).
 """
-first_run.py — One-time API key setup for non-technical users.
-
-The packaged installer (Plan 03) must not ask users to hand-edit a `.env`
-file. On launch, main.py calls ensure_api_keys() BEFORE the voice engine is
-constructed:
-
-* If any LLM key is already present (environment or .env), return silently.
-* Otherwise show a small GUI dialog: paste up to 3 keys -> writes .env ->
-  sets os.environ so this process picks them up immediately.
-* If the user skips/closes, JARVIS still starts — the offline fallback
-  engine keeps basic commands working.
-
-Only stdlib (tkinter) is used so this works inside the PyInstaller bundle.
-"""
-
-import os
-
-# NOTE: tkinter is imported lazily inside ensure_api_keys() so that importing
-# this module never fails on machines without a Tk build. Only stdlib is used.
-
-# (env var, label shown in the dialog, free-tier hint)
-KEY_FIELDS = [
-    ("HUGGINGFACE_API_KEY",
-     "Hugging Face token",
-     "free at huggingface.co/settings/tokens — main AI brain"),
-    ("DEEPSEEK_API_KEY",
-     "DeepSeek key (optional)",
-     "backup brain if Hugging Face is down"),
-    ("RUMIK_API_KEY",
-     "Rumik key (optional)",
-     "premium human-like voice (falls back to free voices)"),
-]
-
-ENV_FILE = ".env"
+import sys as _sys
+import warnings as _warnings
+import importlib as _importlib
 
 
-def _any_key_present() -> bool:
-    return any(os.getenv(name) for name, _, _ in KEY_FIELDS)
+class _ShimProxy(_sys.modules[__name__].__class__):
+    """Module subclass forwarding attribute access to the real module."""
+
+    def __getattr__(self, name):
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        return getattr(self.__dict__["_target"], name)
+
+    def __setattr__(self, name, value):
+        if name == "_target" or (name.startswith("__") and name.endswith("__")):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self.__dict__["_target"], name, value)
+
+    def __delattr__(self, name):
+        if name == "_target" or (name.startswith("__") and name.endswith("__")):
+            object.__delattr__(self, name)
+        else:
+            delattr(self.__dict__["_target"], name)
+
+    def __dir__(self):
+        return sorted(set(super().__dir__()) | set(dir(self.__dict__["_target"])))
 
 
-def _write_env_file(values: dict):
-    """Merge new keys into .env (create it if missing), preserving the rest."""
-    existing = []
-    if os.path.exists(ENV_FILE):
-        with open(ENV_FILE, "r", encoding="utf-8") as f:
-            existing = f.readlines()
-    existing = [ln for ln in existing
-                if not any(ln.startswith(f"{k}=") for k in values)]
-    with open(ENV_FILE, "w", encoding="utf-8") as f:
-        f.writelines(existing)
-        if existing and not existing[-1].endswith("\n"):
-            f.write("\n")
-        for key, val in values.items():
-            if val:
-                f.write(f"{key}={val}\n")
-                os.environ[key] = val  # pick up immediately in this process
+_warnings.warn(
+    "access_os.first_run is deprecated; use jarvis.legacy.first_run instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-
-def ensure_api_keys() -> bool:
-    """Show the first-run dialog if no LLM key is configured.
-
-    Returns True if keys are now available (or were already), False if the
-    user skipped. Never raises — JARVIS must start regardless.
-    """
-    if _any_key_present():
-        return True
-    try:
-        import tkinter as tk
-        root = tk.Tk()
-    except Exception:
-        return False  # headless / no display server / no Tk build
-
-    root.title("Welcome to JARVIS — one-time setup")
-    root.resizable(False, False)
-    saved = {"ok": False}
-
-    tk.Label(root, text="Paste your API keys to unlock the full AI brain.\n"
-                        "All three services have a free tier. You can skip —\n"
-                        "basic voice commands still work offline.",
-             justify="left", padx=16, pady=12).pack()
-
-    entries = {}
-    for name, label, hint in KEY_FIELDS:
-        frame = tk.Frame(root, padx=16, pady=4)
-        frame.pack(fill="x")
-        tk.Label(frame, text=label, width=24, anchor="w").pack(side="top", anchor="w")
-        entry = tk.Entry(frame, show="•", width=52)
-        entry.pack(side="top", fill="x")
-        tk.Label(frame, text=hint, fg="gray", anchor="w").pack(side="top", anchor="w")
-        entries[name] = entry
-
-    btn_frame = tk.Frame(root, pady=12)
-    btn_frame.pack()
-
-    def _save():
-        values = {name: entry.get().strip() for name, entry in entries.items()}
-        try:
-            _write_env_file(values)
-        except Exception:
-            pass
-        saved["ok"] = _any_key_present()
-        root.destroy()
-
-    def _skip():
-        root.destroy()
-
-    tk.Button(btn_frame, text="Save & Start JARVIS", command=_save,
-              padx=12, pady=4).pack(side="left", padx=8)
-    tk.Button(btn_frame, text="Skip for now", command=_skip,
-              padx=12, pady=4).pack(side="left", padx=8)
-
-    # Center on screen
-    root.update_idletasks()
-    w, h = root.winfo_width(), root.winfo_height()
-    root.geometry(f"+{(root.winfo_screenwidth() - w) // 2}+{(root.winfo_screenheight() - h) // 2}")
-    root.mainloop()
-    return saved["ok"]
+_mod = _sys.modules[__name__]
+_target = _importlib.import_module("jarvis.legacy.first_run")
+object.__setattr__(_mod, "_target", _target)
+# Mirror public attributes so `target.__dict__` lookups (pytest's undo,
+# mock's create detection) see the same state as the real module.
+for _name in dir(_target):
+    if _name.startswith("__") and _name.endswith("__"):
+        continue
+    _mod.__dict__[_name] = getattr(_target, _name)
+del _name
+_mod.__class__ = _ShimProxy

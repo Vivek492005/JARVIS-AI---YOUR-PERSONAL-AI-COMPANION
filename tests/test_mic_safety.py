@@ -147,7 +147,9 @@ def test_no_mic_audio_written_to_disk():
     in-memory only.
     """
     import pathlib
-    src = pathlib.Path("access_os/voice_interface.py").read_text(
+    # Phase 2: the voice module moved to src/jarvis/voice/interface.py
+    # (access_os/voice_interface.py is now a deprecation shim).
+    src = pathlib.Path("src/jarvis/voice/interface.py").read_text(
         encoding="utf-8")
     # No persistence of recognizer audio: get_wav_data/get_raw_data must
     # never flow into open()/write().
