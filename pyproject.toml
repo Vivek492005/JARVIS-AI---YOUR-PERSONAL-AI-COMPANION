@@ -65,6 +65,7 @@ markers = [
     "hardware: needs camera/microphone hardware (skipped in CI)",
     "live: needs network access to real APIs (skipped in CI)",
     "slow: long-running tests",
+    "security: security test-suite (tests/security/)",
 ]
 testpaths = ["tests"]
 

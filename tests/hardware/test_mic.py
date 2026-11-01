@@ -1,4 +1,9 @@
-import speech_recognition as sr
+"""Hardware test — needs real camera/microphone. Skipped in CI (marker: hardware)."""
+import pytest
+
+pytestmark = pytest.mark.hardware
+
+sr = pytest.importorskip("speech_recognition")
 import time
 
 def test_microphone():

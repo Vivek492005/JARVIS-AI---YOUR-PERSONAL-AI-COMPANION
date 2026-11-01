@@ -1,5 +1,10 @@
-import cv2
-import mediapipe as mp
+"""Hardware test — needs real camera/microphone. Skipped in CI (marker: hardware)."""
+import pytest
+
+pytestmark = pytest.mark.hardware
+
+cv2 = pytest.importorskip("cv2")
+mp = pytest.importorskip("mediapipe")
 import numpy as np
 import logging
 

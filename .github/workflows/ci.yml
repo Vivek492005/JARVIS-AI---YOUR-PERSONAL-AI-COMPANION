@@ -1,0 +1,35 @@
+# CI v1 (Master Plan Task 0.6).
+# - unit-tests: Windows, lint (ruff) + unit tests (hardware/live excluded)
+# - security:   the tests/security/ suite (Task 1.11) — required check
+# - secrets:    gitleaks over full history
+
+name: ci
+on: [push, pull_request]
+
+jobs:
+  unit-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -m "not hardware and not live" --cov=access_os --cov-report=term-missing
+
+  security:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e ".[dev]"
+      - run: pytest tests/security -m "not hardware and not live" -v
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
