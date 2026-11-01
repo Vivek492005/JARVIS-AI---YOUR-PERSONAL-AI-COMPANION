@@ -25,9 +25,10 @@ class Router:
     """Routes utterances to the reflex layer or the LLM agent."""
 
     def __init__(self, reflex: Optional[ReflexMatcher] = None,
-                 agent=None) -> None:
+                 agent=None, metrics=None) -> None:
         self.reflex = reflex or ReflexMatcher()
         self._agent = agent  # lazy: reflex-only turns never init the LLM
+        self._metrics = metrics  # None -> default MetricsRecorder
 
     def _get_agent(self):
         if self._agent is None:
@@ -35,15 +36,49 @@ class Router:
             self._agent = AIAgent()
         return self._agent
 
+    def _get_metrics(self):
+        if self._metrics is None:
+            from jarvis.core.metrics import MetricsRecorder
+            self._metrics = MetricsRecorder()
+        return self._metrics
+
     def handle(self, text: str) -> str:
-        hit = self.reflex.match(text)
-        taken = hit is not None and hit.confidence >= REFLEX_CONFIDENCE
-        self.reflex.stats.record(hit.rule_id if taken else None)
-        if taken:
-            logger.debug("reflex hit: %s (conf %.2f)",
-                         hit.rule_id, hit.confidence)
-            return self._run_reflex(hit)
-        return self._get_agent().process(text)
+        """Route one utterance; trace it and record stage timings."""
+        from jarvis.core.logging import StageTimer, new_trace_id, set_trace_id
+
+        trace = new_trace_id()
+        set_trace_id(trace)
+        path, provider, degraded, error = "llm", "", False, ""
+        st = StageTimer()
+        try:
+            with st:
+                with st.stage("reflex_match"):
+                    hit = self.reflex.match(text)
+                taken = hit is not None and hit.confidence >= REFLEX_CONFIDENCE
+                self.reflex.stats.record(hit.rule_id if taken else None)
+                with st.stage("run"):
+                    if taken:
+                        path = "reflex"
+                        provider = "reflex"
+                        logger.debug("reflex hit: %s (conf %.2f)",
+                                     hit.rule_id, hit.confidence)
+                        return self._run_reflex(hit)
+                    out = self._get_agent().process(text)
+                    res = getattr(self._get_agent(), "last_chain_result", None)
+                    if res is not None:
+                        provider = res.provider_name
+                        degraded = res.degraded
+                    return out
+        except Exception as e:
+            error = str(e)
+            raise
+        finally:
+            try:
+                self._get_metrics().record(trace, path, st.timings,
+                                           provider=provider,
+                                           degraded=degraded, error=error)
+            except Exception:
+                logger.exception("metrics record failed")
 
     def _run_reflex(self, hit: ReflexHit) -> str:
         # Pure compute / reply-only rules: no tool call at all.

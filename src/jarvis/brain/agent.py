@@ -111,6 +111,9 @@ class AIAgent:
 
         self.client = None
         self.backup_client = None
+        # Task 2.7: last ChainResult, for metrics/debugging (None until the
+        # first chain round-trip).
+        self.last_chain_result = None
         self._init_clients()
         self._init_tools()
 
@@ -481,8 +484,11 @@ class AIAgent:
 
     def _chain_complete(self, messages, tools=None):
         """One resilient round-trip through the provider chain (Task 2.5)."""
-        return self.chain.complete(messages, tools=tools,
-                                   temperature=self.temperature).completion
+        result = self.chain.complete(messages, tools=tools,
+                                     temperature=self.temperature)
+        # Task 2.7: expose the last result for metrics (provider/degraded).
+        self.last_chain_result = result
+        return result.completion
 
     def _call_llm_flow(self, clean_input: str) -> Optional[str]:
         """Execute the LLM tool loop over the provider chain.
