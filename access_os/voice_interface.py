@@ -61,6 +61,16 @@ class CommandType(Enum):
     CUSTOM = auto()
 
 
+class MicState(Enum):
+    """Mic state indicator (Task 1.6.3). The GUI badge and `jarvis mic`
+    read this; the listen loop sets it every iteration."""
+    IDLE = auto()        # thread alive, waiting (PTT released / starting)
+    LISTENING = auto()   # capturing audio now
+    PROCESSING = auto()  # captured audio being recognized / handled
+    MUTED = auto()       # user muted the mic (toggle)
+    PRIVACY = auto()     # Privacy Mode — mic off entirely, no capture
+
+
 @dataclass
 class VoiceCommand:
     """Represents a recognized voice command."""
@@ -1694,6 +1704,17 @@ class VoiceInterface:
         self.config = self._load_config()
         self.wake_word = self.config.get("wake_word", "JARVIS").lower()
         self.require_wake_word = self.config.get("require_wake_word", False)
+
+        # Task 1.6: mic-safety state. privacy_mode = mic off entirely;
+        # _mic_enabled = user mute toggle; push_to_talk gates capture on the
+        # hotkey being held (signalled via ptt_press()/ptt_release()).
+        self.mic_state = MicState.IDLE
+        self.privacy_mode = bool(self.config.get("privacy_mode", False))
+        self._mic_enabled = True
+        self.push_to_talk = bool(self.config.get("push_to_talk", False))
+        self.push_to_talk_hotkey = self.config.get("push_to_talk_hotkey",
+                                                   "ctrl+alt+j")
+        self._ptt_held = threading.Event()
         
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = self.config.get("energy_threshold", 300)
@@ -1952,9 +1973,78 @@ class VoiceInterface:
             self.speak(response)
         return response
 
+    # ------------------------------------------------------------------
+    # Task 1.6: mic safety
+    # ------------------------------------------------------------------
+
+    def set_privacy_mode(self, on: bool) -> str:
+        """Privacy Mode: mic off entirely. No capture, no wake-word scan.
+
+        Persists to settings.toml. Turning it on stops the listen loop;
+        turning it off does not auto-resume listening.
+        """
+        from .config import get_settings, save_legacy_voice_dict
+        self.privacy_mode = bool(on)
+        self.mic_state = MicState.PRIVACY if on else MicState.IDLE
+        d = dict(self.config)
+        d["privacy_mode"] = self.privacy_mode
+        self.config = d
+        try:
+            s = get_settings()
+            s.voice.privacy_mode = self.privacy_mode
+            save_legacy_voice_dict(s.legacy_voice_dict())
+        except Exception as e:
+            logger.error(f"Could not persist privacy_mode: {e}")
+        if on:
+            self.stop_listening()
+            logger.info("Privacy Mode ON — microphone disabled")
+            return "Privacy Mode on. Microphone is off."
+        logger.info("Privacy Mode OFF")
+        return "Privacy Mode off."
+
+    def set_mic_enabled(self, on: bool) -> None:
+        """User mute toggle — the loop keeps running but never captures."""
+        self._mic_enabled = bool(on)
+        if not on:
+            self.mic_state = MicState.MUTED
+
+    def ptt_press(self) -> None:
+        """Push-to-talk hotkey pressed (called by the platform hotkey layer)."""
+        self._ptt_held.set()
+
+    def ptt_release(self) -> None:
+        """Push-to-talk hotkey released."""
+        self._ptt_held.clear()
+
+    def mic_state_snapshot(self) -> str:
+        """Current MicState name — for the GUI badge and `jarvis mic`."""
+        return self.mic_state.name
+
+    def _capture_allowed(self) -> tuple:
+        """Task 1.6: one iteration's mic-safety gate.
+
+        Returns (allowed, sleep_s). Sets mic_state as a side effect so the
+        GUI badge always reflects reality.
+        """
+        if self.privacy_mode:
+            self.mic_state = MicState.PRIVACY
+            return (False, 0.5)
+        if not self._mic_enabled:
+            self.mic_state = MicState.MUTED
+            return (False, 0.5)
+        if self.push_to_talk and not self._ptt_held.is_set():
+            self.mic_state = MicState.IDLE
+            return (False, 0.1)
+        self.mic_state = MicState.LISTENING
+        return (True, 0.0)
+
     def start_listening(self, callback: Optional[Callable[[VoiceCommand], None]] = None):
         """Begin listening continuously in background thread."""
         if self.is_listening:
+            return
+
+        if self.privacy_mode:
+            logger.warning("start_listening() refused: Privacy Mode is on")
             return
 
         if not self.microphone:
@@ -1983,9 +2073,15 @@ class VoiceInterface:
                 logger.error(f"Microphone adjustment error: {e}")
 
             while self.is_listening and not self._stop_event.is_set():
+                # Task 1.6: mic-safety gates — checked before every capture.
+                allowed, sleep_s = self._capture_allowed()
+                if not allowed:
+                    time.sleep(sleep_s)
+                    continue
                 try:
                     audio = self.recognizer.listen(source, timeout=2.0,
                                                        phrase_time_limit=self.config.get("max_utterance_s", 30.0))
+                    self.mic_state = MicState.PROCESSING
                     try:
                         text = self.recognizer.recognize_google(audio).strip()
                         if not text:

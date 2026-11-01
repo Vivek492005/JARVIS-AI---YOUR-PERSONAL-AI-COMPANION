@@ -37,6 +37,16 @@ class JARVISGUI:
         self._load_avatar()
         self._build_widgets()
         self._setup_dragging()
+        # Task 1.6.3: reflect a persisted Privacy Mode on startup.
+        try:
+            voice = getattr(getattr(self, "assistant", None), "voice", None)
+            if voice is not None and getattr(voice, "privacy_mode", False):
+                self.privacy_btn.config(text="🔓  Privacy Off",
+                                        fg=self.accent_pink)
+                self.is_listening = False
+                self.mic_btn.config(text="🔇  Mic Off", fg=self.accent_pink)
+        except Exception:
+            pass
         self._start_queue_poller()
 
     # ── Window Setup ─────────────────────────────────────────────────────────
@@ -63,6 +73,7 @@ class JARVISGUI:
         self.text_secondary = "#BAC2DE" # Subtle grey-blue
         self.accent_green = "#A6E3A1"   # Mint green (active)
         self.accent_pink = "#F38BA8"    # Soft coral/red (danger/mute)
+        self.accent_yellow = "#F9E2AF"  # Warm amber (processing)
         self.btn_bg = "#313244"         # Elevated surface
 
         self.root.configure(bg=self.card_border)
@@ -200,6 +211,25 @@ class JARVISGUI:
         )
         self.mic_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
 
+        # Task 1.6.3: Privacy Mode toggle — mic off entirely.
+        self.privacy_btn = tk.Button(
+            self.controls_frame,
+            text="🔒  Privacy",
+            font=("Segoe UI", 10, "bold"),
+            bg=self.btn_bg,
+            fg=self.text_primary,
+            activebackground="#45475A",
+            activeforeground=self.text_primary,
+            relief=tk.FLAT,
+            bd=0,
+            padx=12,
+            pady=6,
+            cursor="hand2",
+            command=self.toggle_privacy
+        )
+        self.privacy_btn.pack(side=tk.LEFT, expand=True, fill=tk.X,
+                              padx=(0, 6))
+
         # Close button
         self.close_btn = tk.Button(
             self.controls_frame,
@@ -266,6 +296,14 @@ class JARVISGUI:
         except Exception as e:
             logger.error(f"Error in queue poller: {e}")
 
+        # Task 1.6.3: reflect the live mic state on the badge.
+        try:
+            voice = getattr(getattr(self, "assistant", None), "voice", None)
+            if voice is not None:
+                self.set_mic_state(voice.mic_state_snapshot())
+        except Exception:
+            pass
+
         # Poll again in 40ms
         self.root.after(40, self._start_queue_poller)
 
@@ -280,8 +318,44 @@ class JARVISGUI:
 
     # ── Button Handlers ──────────────────────────────────────────────────────
 
+    def toggle_privacy(self):
+        """Task 1.6.3: Privacy Mode — mic off entirely, persisted."""
+        voice = getattr(getattr(self, "assistant", None), "voice", None)
+        if voice is None:
+            return
+        new_state = not getattr(voice, "privacy_mode", False)
+        msg = voice.set_privacy_mode(new_state)
+        self.set_assistant_text(msg)
+        if new_state:
+            self.privacy_btn.config(text="🔓  Privacy Off",
+                                    fg=self.accent_pink)
+            self.is_listening = False
+            self.mic_btn.config(text="🔇  Mic Off", fg=self.accent_pink)
+        else:
+            self.privacy_btn.config(text="🔒  Privacy",
+                                    fg=self.text_primary)
+
+    # Mic-state badge (Task 1.6.3): LISTENING / PROCESSING / MUTED / PRIVACY.
+    _MIC_BADGE = {
+        "LISTENING": ("● Listening...", "accent_green"),
+        "PROCESSING": ("◌ Processing...", "accent_yellow"),
+        "IDLE": ("○ Idle", "text_primary"),
+        "MUTED": ("○ Muted", "accent_pink"),
+        "PRIVACY": ("🔒 Privacy — mic off", "accent_pink"),
+    }
+
+    def set_mic_state(self, state_name: str):
+        text, color_attr = self._MIC_BADGE.get(
+            state_name, ("● Listening...", "accent_green"))
+        self.status_label.config(text=text, fg=getattr(self, color_attr))
+
     def toggle_mic(self):
         """Toggle speech listening state."""
+        voice = getattr(getattr(self, "assistant", None), "voice", None)
+        if voice is not None and getattr(voice, "privacy_mode", False):
+            self.set_assistant_text(
+                "Privacy Mode is on — turn it off before enabling the mic.")
+            return
         if self.is_listening:
             self.is_listening = False
             self.mic_btn.config(text="🔇  Mic Off", fg=self.accent_pink)
@@ -297,6 +371,7 @@ class JARVISGUI:
             self.set_status("● Listening...")
             if self.assistant:
                 try:
+                    self.assistant.voice.set_mic_enabled(True)
                     self.assistant.voice.start_listening(callback=self.assistant.on_voice_command)
                 except Exception as e:
                     logger.error(f"Error resuming voice: {e}")

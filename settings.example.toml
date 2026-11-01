@@ -18,6 +18,12 @@ voice_rate = 160
 voice_volume = 1.0
 energy_threshold = 300
 pause_threshold = 0.8
+# Task 1.6.2: push-to-talk (hold-to-talk). Off by default; when on, the mic
+# only captures while the hotkey is held.
+push_to_talk = false
+push_to_talk_hotkey = "ctrl+alt+j"
+# Task 1.6.3: Privacy Mode — mic off entirely. No capture, no wake-word scan.
+privacy_mode = false
 
 [brain]
 ai_provider = "huggingface"

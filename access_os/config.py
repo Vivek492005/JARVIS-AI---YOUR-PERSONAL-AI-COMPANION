@@ -42,6 +42,14 @@ class VoiceCfg(BaseModel):
     # F-07 fix: wake word REQUIRED by default. The mic must not act on
     # ambient audio without it.
     require_wake_word: bool = True
+    # Task 1.6.2: push-to-talk (hold-to-talk). Off by default; when on, the
+    # mic only captures while the hotkey is held. The hotkey itself is bound
+    # by the platform layer (Windows) via ptt_press()/ptt_release().
+    push_to_talk: bool = False
+    push_to_talk_hotkey: str = "ctrl+alt+j"
+    # Task 1.6.3: Privacy Mode — mic off entirely. No capture, no wake-word
+    # scanning. Persisted; toggled from the GUI or `jarvis` CLI.
+    privacy_mode: bool = False
     # F-18 fix: was a hardcoded 6.0s phrase_time_limit cutting long commands.
     max_utterance_s: float = 30.0
     tts_chain: List[str] = Field(default_factory=lambda: ["rumik", "edge", "pyttsx3"])
@@ -155,6 +163,9 @@ class Settings(BaseSettings):
             "language": v.language,
             "wake_word": v.wake_word,
             "require_wake_word": v.require_wake_word,
+            "push_to_talk": v.push_to_talk,
+            "push_to_talk_hotkey": v.push_to_talk_hotkey,
+            "privacy_mode": v.privacy_mode,
             "max_utterance_s": v.max_utterance_s,
             "phrase_time_limit": v.max_utterance_s,  # legacy alias
             "energy_threshold": v.energy_threshold,
@@ -194,6 +205,9 @@ _LEGACY_MAP = {
     "language": ("voice", "language"),
     "wake_word": ("voice", "wake_word"),
     "require_wake_word": ("voice", "require_wake_word"),
+    "push_to_talk": ("voice", "push_to_talk"),
+    "push_to_talk_hotkey": ("voice", "push_to_talk_hotkey"),
+    "privacy_mode": ("voice", "privacy_mode"),
     "phrase_time_limit": ("voice", "max_utterance_s"),
     "energy_threshold": ("voice", "energy_threshold"),
     "pause_threshold": ("voice", "pause_threshold"),
