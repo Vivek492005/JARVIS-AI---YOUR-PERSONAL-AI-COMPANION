@@ -24,30 +24,40 @@ REFLEX_CONFIDENCE = 0.85
 class Router:
     """Routes utterances to the reflex layer or the LLM agent."""
 
-    def __init__(self, reflex: Optional[ReflexMatcher] = None,
-                 agent=None, metrics=None) -> None:
+    def __init__(
+        self, reflex: Optional[ReflexMatcher] = None, agent=None, metrics=None, bus=None
+    ) -> None:
         self.reflex = reflex or ReflexMatcher()
         self._agent = agent  # lazy: reflex-only turns never init the LLM
         self._metrics = metrics  # None -> default MetricsRecorder
+        if bus is None:
+            from jarvis.core.events import get_bus
+
+            bus = get_bus()
+        self.bus = bus
 
     def _get_agent(self):
         if self._agent is None:
             from jarvis.brain.agent import AIAgent
+
             self._agent = AIAgent()
         return self._agent
 
     def _get_metrics(self):
         if self._metrics is None:
             from jarvis.core.metrics import MetricsRecorder
+
             self._metrics = MetricsRecorder()
         return self._metrics
 
     def handle(self, text: str) -> str:
         """Route one utterance; trace it and record stage timings."""
+        from jarvis.core.events import UtteranceFinal
         from jarvis.core.logging import StageTimer, new_trace_id, set_trace_id
 
         trace = new_trace_id()
         set_trace_id(trace)
+        self.bus.emit(UtteranceFinal(trace=trace, text=text))
         path, provider, degraded, error = "llm", "", False, ""
         st = StageTimer()
         try:
@@ -60,8 +70,7 @@ class Router:
                     if taken:
                         path = "reflex"
                         provider = "reflex"
-                        logger.debug("reflex hit: %s (conf %.2f)",
-                                     hit.rule_id, hit.confidence)
+                        logger.debug("reflex hit: %s (conf %.2f)", hit.rule_id, hit.confidence)
                         return self._run_reflex(hit)
                     out = self._get_agent().process(text)
                     res = getattr(self._get_agent(), "last_chain_result", None)
@@ -74,9 +83,9 @@ class Router:
             raise
         finally:
             try:
-                self._get_metrics().record(trace, path, st.timings,
-                                           provider=provider,
-                                           degraded=degraded, error=error)
+                self._get_metrics().record(
+                    trace, path, st.timings, provider=provider, degraded=degraded, error=error
+                )
             except Exception:
                 logger.exception("metrics record failed")
 
@@ -85,16 +94,27 @@ class Router:
         if hit.compute or not hit.tool:
             return hit.render_reply(self.reflex._rng)
 
+        from jarvis.core.events import ToolFinished, ToolRequested
+        from jarvis.core.logging import get_trace_id
         from jarvis.policy.command_policy import CONFIRM, DENY
         from jarvis.tools.actions import run_action
 
         args = hit.render_args()
+        trace = get_trace_id()
+        self.bus.emit(ToolRequested(trace=trace, tool=hit.tool, args=args))
         verdict, result = run_action(hit.tool, args)
         if verdict == CONFIRM:
             # The agent owns the confirmation state machine.
+            self.bus.emit(
+                ToolFinished(trace=trace, tool=hit.tool, ok=False, result="confirmation requested")
+            )
             return self._get_agent().request_confirmation(hit.tool, args)
         if verdict == DENY:
+            self.bus.emit(ToolFinished(trace=trace, tool=hit.tool, ok=False, result=result))
             return result  # the block reason
         # ALLOW: prefer the rule's reply template, else the tool's output.
         reply = hit.render_reply(self.reflex._rng)
+        self.bus.emit(
+            ToolFinished(trace=trace, tool=hit.tool, ok=True, result=reply if reply else result)
+        )
         return reply if reply else result

@@ -16,7 +16,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: ruff format --check .
-      - run: pytest -m "not hardware and not live" --cov=access_os --cov-report=term-missing
+      - run: pytest -m "not hardware and not live" --cov=jarvis --cov-report=term-missing
 
   security:
     runs-on: windows-latest

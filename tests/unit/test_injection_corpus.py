@@ -20,7 +20,7 @@ from access_os.command_policy import (  # noqa: E402
     check_tool_call, detect_tainted, strip_hidden_text,
 )
 
-CORPUS = pathlib.Path(__file__).parent.parent / "evals" / "cases" \
+CORPUS = pathlib.Path(__file__).parent.parent.parent / "evals" / "cases" \
     / "injection.jsonl"
 
 

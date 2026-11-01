@@ -24,7 +24,6 @@ ai_code (clipboard+LLM flows), repeat_last (needs conversational state).
 
 import ast
 import os
-import re
 
 SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    "src", "jarvis", "voice", "interface.py")
@@ -144,13 +143,20 @@ COMPUTE_IDS = {"_action_get_time": "time", "_action_get_date": "date",
                "_action_calculate": "calc"}
 
 SIMPLE_GATED = {
-    "_action_lock_pc": ("system_control", {"action": "lock_pc"}, "Locking the workstation"),
-    "_action_take_screenshot": ("system_control", {"action": "take_screenshot"}, "Screenshot captured."),
-    "_action_empty_recycle_bin": ("system_control", {"action": "empty_recycle_bin"}, "Recycle Bin emptied"),
-    "_action_check_battery": ("system_control", {"action": "check_battery"}, None),
+    "_action_lock_pc": ("system_control", {"action": "lock_pc"},
+                        "Locking the workstation"),
+    "_action_take_screenshot": ("system_control", {"action": "take_screenshot"},
+                                "Screenshot captured."),
+    "_action_empty_recycle_bin": ("system_control",
+                                  {"action": "empty_recycle_bin"},
+                                  "Recycle Bin emptied"),
+    "_action_check_battery": ("system_control", {"action": "check_battery"},
+                              None),
     "_action_read_notes": ("manage_notes", {"action": "read"}, None),
-    "_action_clear_notes": ("manage_notes", {"action": "clear"}, "Your notes have been cleared."),
-    "_action_weather_general": ("web_search", {"query": "weather"}, "Showing the current weather forecast"),
+    "_action_clear_notes": ("manage_notes", {"action": "clear"},
+                            "Your notes have been cleared."),
+    "_action_weather_general": ("web_search", {"query": "weather"},
+                                "Showing the current weather forecast"),
 }
 
 
@@ -175,7 +181,8 @@ def main():
             if not (isinstance(t, ast.Attribute) and t.attr == "commands"):
                 continue
             for elt in node.value.elts:
-                d = {k.value: v for k, v in zip(elt.keys, elt.values)}
+                d = {k.value: v
+                     for k, v in zip(elt.keys, elt.values, strict=True)}
                 rid = d["id"].value
                 patterns = str_list(d["patterns"])
                 act = d["action"]
@@ -241,7 +248,8 @@ def main():
                         elif meth == "_gated":
                             tool_name = const(a[0])
                             args = {const(k): const(v)
-                                    for k, v in zip(a[1].keys, a[1].values)}
+                                    for k, v in zip(a[1].keys, a[1].values,
+                                                    strict=True)}
                             ok = const(a[2]) if len(a) > 2 else None
                             rule.update(tool=tool_name, args=args, reply=ok)
                         elif meth == "_action_scroll":
@@ -268,7 +276,8 @@ def main():
                 rules.append(rule)
 
     # ---- emit ----
-    lines = ['"""Reflex rule data — AST-extracted from the legacy voice command table.',
+    lines = ['# ruff: noqa: E501  (generated file — long string constants are data)',
+             '"""Reflex rule data — AST-extracted from the legacy voice command table.',
              '',
              'DO NOT EDIT BY HAND. Regenerate with scripts/extract_reflex_rules.py',
              'after changing src/jarvis/voice/interface.py.',

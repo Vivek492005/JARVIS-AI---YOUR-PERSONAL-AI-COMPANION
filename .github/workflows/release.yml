@@ -32,9 +32,9 @@ jobs:
 
       - name: Quality gate — pure-python tests
         run: >
-          python -m pytest tests/test_command_policy.py
-          tests/test_agent_safety.py tests/test_actions_unified.py
-          tests/test_ai_agent.py -q
+          python -m pytest tests/unit/test_command_policy.py
+          tests/integration/test_agent_safety.py tests/integration/test_actions_unified.py
+          tests/integration/test_ai_agent.py -q
 
       - name: Build with PyInstaller
         run: |

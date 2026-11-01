@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (generated file — long string constants are data)
 """Reflex rule data — AST-extracted from the legacy voice command table.
 
 DO NOT EDIT BY HAND. Regenerate with scripts/extract_reflex_rules.py

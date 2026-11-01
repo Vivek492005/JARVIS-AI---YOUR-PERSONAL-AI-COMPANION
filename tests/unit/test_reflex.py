@@ -1,49 +1,14 @@
 """Tests for Task 2.6: reflex layer (System-1) + router."""
 
 import random
-import sys
 from unittest import mock
-from unittest.mock import MagicMock
 
-# Stub Windows-only modules so voice.interface imports headless.
-for _mod in ("pyautogui",):
-    sys.modules.setdefault(_mod, MagicMock(name=_mod))
-
+# Windows-only stubs + the real-fuzzywuzzy fixture live in tests/conftest.py.
 import pytest  # noqa: E402
 
-
-@pytest.fixture(autouse=True)
-def _real_fuzzywuzzy():
-    """Other test modules install a MagicMock for ``fuzzywuzzy`` (whole
-    package or just the ``fuzz`` attribute) for dependency isolation, and
-    some import ``voice.interface`` while the mock is in place — binding
-    the mock at import time. The reflex tests need the real scorer, so
-    restore it here at test time (after all collection imports)."""
-    import importlib
-    import types
-
-    real_fuzz = None
-    try:
-        if not isinstance(sys.modules.get("fuzzywuzzy"), types.ModuleType):
-            # Whole-package mock: evict it so the real package imports.
-            sys.modules.pop("fuzzywuzzy", None)
-            sys.modules.pop("fuzzywuzzy.fuzz", None)
-        real_fuzz = importlib.import_module("fuzzywuzzy.fuzz")
-        pkg = sys.modules.get("fuzzywuzzy")
-        if isinstance(pkg, types.ModuleType) and isinstance(
-                getattr(pkg, "fuzz", None), MagicMock):
-            pkg.fuzz = real_fuzz
-    except ImportError:
-        pass
-
-    if real_fuzz is not None:
-        # Rebind module globals that captured the mock at import time.
-        for modname in ("jarvis.voice.interface",):
-            mod = sys.modules.get(modname)
-            if mod is not None and isinstance(
-                    getattr(mod, "fuzz", None), MagicMock):
-                mod.fuzz = real_fuzz
-    yield
+# The reflex tests need the real fuzzywuzzy scorer (other test modules mock
+# it for dependency isolation); restored by tests/conftest.py.
+pytestmark = pytest.mark.usefixtures("real_fuzzywuzzy")
 
 from jarvis.brain.reflex import (ReflexHit, ReflexMatcher, ReflexStats,  # noqa: E402
                                  normalize, print_stats, render_template)
