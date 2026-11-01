@@ -188,6 +188,14 @@ class Verifier:
     """
 
     def verify(self, tool_name: str, args: Dict[str, Any], result: str) -> Tuple[bool, str]:
+        # Phase 5.9: perception postconditions first (covers all Phase-5
+        # tools + the verifiable/unverifiable distinction).
+        try:
+            from jarvis.perception import postconditions as _pc
+            if _pc.has_check(tool_name):
+                return _pc.verify(tool_name, args, result)
+        except Exception:
+            logger.exception("perception postcondition error for %s", tool_name)
         check = getattr(self, f"_verify_{tool_name}", None)
         if check is None:
             return True, f"no postcondition for {tool_name}; result: {result[:200]}"

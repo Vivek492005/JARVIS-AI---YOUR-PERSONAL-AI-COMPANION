@@ -86,6 +86,8 @@ class FakeUIA(B.UIABackend):
         return True
 
     def get_text(self, element_id: str) -> str:
+        if element_id in self.text_set:
+            return self.text_set[element_id]
         el = self.by_id.get(element_id)
         return el.name if el else ""
 
