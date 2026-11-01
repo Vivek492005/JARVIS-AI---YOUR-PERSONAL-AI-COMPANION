@@ -74,7 +74,11 @@ def open_application(app_name: str, status_callback: Optional[Callable[[str], No
         "cmd": ["cmd.exe"],
         "powershell": ["powershell.exe"],
         "task manager": ["taskmgr.exe"],
+        "taskmgr": ["taskmgr.exe"],
         "paint": ["mspaint.exe"],
+        "mspaint": ["mspaint.exe"],
+        "control panel": ["control.exe"],
+        "control": ["control.exe"],
         "settings": ["start", "ms-settings:"],
         "spotify": ["start", "spotify:"],
         "word": ["start", "winword"],
@@ -496,10 +500,30 @@ def _audit_log(tool_name: str, args: Dict[str, Any], verdict: str, result: str,
         pass
 
 
+def _engine_decision(tool_name: str, args: Dict[str, Any],
+                   ctx=None) -> Tuple[str, str]:
+    """Task 1.3: the single decision point — registry risk tier × arg rules.
+
+    Returns ("allow"/"confirm"/"deny", reason). The level comes from
+    Settings (safety.autonomy_level); ctx carries taint/rate-limit state.
+    """
+    from .policy import decide_tool_call, PolicyContext, Decision
+    try:
+        from .config import get_settings
+        level = get_settings().safety.autonomy_level
+    except Exception:
+        level = 1
+    decision, reason = decide_tool_call(tool_name, args, ctx or PolicyContext(),
+                                        level)
+    return ({"ALLOW": ALLOW, "CONFIRM": CONFIRM, "DENY": DENY}[decision.name],
+            reason)
+
+
 def run_action(tool_name: str, args: Dict[str, Any],
                status_callback: Optional[Callable[[str], None]] = None,
                notes_file: str = "notes.txt",
-               audit_file: str = "jarvis_audit.log") -> Tuple[str, str]:
+               audit_file: str = "jarvis_audit.log",
+               ctx=None) -> Tuple[str, str]:
     """Policy-gated execution for the legacy regex engine (and any other
     non-LLM caller). Returns (verdict, result) where verdict is one of
     "allow" / "confirm" / "deny".
@@ -510,7 +534,7 @@ def run_action(tool_name: str, args: Dict[str, Any],
     confirmation state.
     """
     args = args or {}
-    verdict, reason = check_tool_call(tool_name, args)
+    verdict, reason = _engine_decision(tool_name, args, ctx)
     if verdict == DENY:
         logger.warning(f"Blocked tool call: {tool_name} ({reason})")
         result = f"Blocked for safety: {reason}"

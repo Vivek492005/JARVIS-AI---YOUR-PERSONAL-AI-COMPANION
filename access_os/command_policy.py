@@ -83,6 +83,10 @@ _PS_BLOCKLIST = [
     # chaining / redirection / escapes — checked as literals
     r";", r"\|", r"&", r">", r"<",
     r"\$\(", r"`",
+    # A-03: CR/LF are statement separators in PowerShell too — a second
+    # statement after a newline must never slip past the blocklist.
+    # (Dangerous cmdlet names are covered above; this is defense in depth.)
+    r"\r", r"\n", "\u0085", "\u2028", "\u2029", "\x0b", "\x0c",
 ]
 
 
@@ -156,7 +160,7 @@ def confirmation_prompt(tool_name: str, args: Dict[str, Any]) -> str:
         return f"This will {what}. Say 'yes' to confirm, anything else to cancel."
     if tool_name == "manage_notes" and args.get("action") == "clear":
         return f"This will {_CONFIRM_DESCRIPTIONS['clear_notes']}. Say 'yes' to confirm, anything else to cancel."
-    return "This action is destructive. Say 'yes' to confirm, anything else to cancel."
+    return "This action needs your confirmation. Say 'yes' to confirm, anything else to cancel."
 
 
 # ---------------------------------------------------------------------------

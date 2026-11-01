@@ -526,7 +526,12 @@ class VoiceCommandProcessor:
             {
                 "id": "close_window",
                 "patterns": [r"^(close window|close app|close this|close application|exit window)$"],
-                "action": lambda m: self._hotkey(["alt", "f4"], "Closing active window"),
+                # A-04: fixed phrase or not, alt+f4 goes through the policy
+                # gate like every other hotkey — the gate denies it, so a
+                # misheard phrase can never close the active window.
+                "action": lambda m: self._gated(
+                    "keyboard_mouse_action",
+                    {"action": "press_hotkey", "value": "alt+f4"}),
                 "type": CommandType.APPLICATION
             },
 
@@ -1188,12 +1193,24 @@ class VoiceCommandProcessor:
         return msg
 
     def _launch_app(self, command: str, msg: str) -> str:
-        try:
-            subprocess.Popen(command, shell=True)
-            return msg
-        except Exception as e:
-            logger.error(f"Failed to launch app: {e}")
-            return f"Sorry, could not open application."
+        """Launch an app via the policy-gated open_application tool.
+
+        A-04/A-10: the old implementation ran
+        ``subprocess.Popen(command, shell=True)`` with no policy gate.
+        Now every launch goes through _gated(); the legacy "start X"
+        spellings used by the fixed voice commands are normalized to
+        open_application mapping keys first.
+        """
+        normalized = {
+            "start ms-settings:": "settings",
+            "start chrome": "chrome",
+            "start msedge": "edge",
+            "start winword": "word",
+            "start excel": "excel",
+            "start powerpnt": "powerpoint",
+        }.get((command or "").strip().lower(), command)
+        return self._gated("open_application", {"app_name": normalized},
+                           ok_msg=msg)
 
     def _change_volume(self, up: bool = True, steps: int = 5, msg: Optional[str] = None) -> str:
         key = "volumeup" if up else "volumedown"

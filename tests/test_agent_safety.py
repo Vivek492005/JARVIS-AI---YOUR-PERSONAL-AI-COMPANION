@@ -122,13 +122,24 @@ def test_confirm_audit_trail(agent, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_allow_executes_and_audits(agent, tmp_path):
-    # volume_up needs pyautogui (absent here) — the executor catches that and
-    # returns an error string; the gate + audit path is what we verify.
-    resp = agent._dispatch_tool_call("system_control", {"action": "volume_up"})
+    # READ tools auto-execute at the default autonomy level (L1).
+    # _execute_tool is mocked: no OS side effects, gate + audit is what's verified.
+    with mock.patch.object(agent, "_execute_tool", return_value="ok") as m:
+        resp = agent._dispatch_tool_call("web_search", {"query": "test query"})
     assert "Blocked" not in resp
     assert "ACTION_REQUIRES_CONFIRMATION" not in resp
+    m.assert_called_once()
     entries = _audit_entries(tmp_path)
     assert entries[-1]["verdict"] == "allow"
+
+
+def test_l1_reversible_needs_confirmation(agent):
+    # L1 (default): REVERSIBLE tools confirm instead of auto-executing.
+    with mock.patch.object(agent, "_execute_tool") as m:
+        resp = agent._dispatch_tool_call(
+            "system_control", {"action": "volume_up"})
+    assert "ACTION_REQUIRES_CONFIRMATION" in resp
+    m.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

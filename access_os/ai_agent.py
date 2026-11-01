@@ -81,11 +81,19 @@ class AIAgent:
         # Safety: confirmation slot for destructive actions + audit trail.
         # pending_confirmation = (tool_name, args, timestamp) or None
         self.pending_confirmation: Optional[Tuple[str, Dict[str, Any], float]] = None
-        self.confirm_timeout = 60  # seconds before a pending confirmation expires
-        self.confirm_words = {
-            "yes", "yeah", "yep", "confirm", "confirmed",
-            "haan", "ha", "ok", "okay", "do it", "go ahead", "sure",
-        }
+        # Task 1.3.3: unanswered confirmations fail closed after 10 s.
+        try:
+            from .config import get_settings
+            self.confirm_timeout = get_settings().safety.confirm_timeout_s
+        except Exception:
+            self.confirm_timeout = 10.0
+        # Task 1.3.3: shared confirmation vocabulary (user's own turn only).
+        from .policy import CONFIRM_YES
+        self.confirm_words = set(CONFIRM_YES)
+        # Task 1.5: set to True when untrusted content enters the context.
+        self.tainted = False
+        # Task 1.8: set to True by the rate limiter when over budget.
+        self.rate_limited = False
         self.audit_log_file = "jarvis_audit.log"
 
         self.client = None
@@ -209,7 +217,9 @@ class AIAgent:
     def _dispatch_tool_call(self, function_name: str, args: Dict[str, Any]) -> str:
         """Policy-gated dispatch — the ONLY entry point for LLM tool calls.
 
-        Every call passes through command_policy.check_tool_call() first:
+        Task 1.3: every call goes through the policy engine
+        (registry risk tier × autonomy level × taint, plus the arg-level
+        rules); the stricter verdict wins.
           DENY    -> blocked, reason returned to the LLM (it can explain / offer
                      a safe alternative).
           CONFIRM -> not executed; the confirmation question is returned to the
@@ -218,8 +228,13 @@ class AIAgent:
                      message confirms (see process()).
           ALLOW   -> executed via _execute_tool().
         """
+        from .policy import PolicyContext
         args = args or {}
-        verdict, reason = check_tool_call(function_name, args)
+        # A-01 follow-up: taint flows from the agent's conversation state
+        # (set by Task 1.5 when untrusted content enters the context).
+        ctx = PolicyContext(tainted=getattr(self, "tainted", False),
+                            rate_limited=getattr(self, "rate_limited", False))
+        verdict, reason = self._decide(function_name, args, ctx)
 
         if verdict == DENY:
             logger.warning(f"Blocked tool call: {function_name} ({reason})")
@@ -233,6 +248,11 @@ class AIAgent:
         result = self._execute_tool(function_name, args)
         self._audit(function_name, args, ALLOW, result)
         return result
+
+    def _decide(self, tool_name: str, args: Dict[str, Any], ctx=None):
+        """Single decision point shared with run_action() (Task 1.3)."""
+        from .actions import _engine_decision
+        return _engine_decision(tool_name, args, ctx)
 
     # =========================================================================
     # INTENT PROCESSING & FALLBACK REASONING
