@@ -126,6 +126,7 @@ class Bus:
 
     def __init__(self) -> None:
         self._subs: DefaultDict[Type[Event], List[Subscriber]] = defaultdict(list)
+        self._all: List[Subscriber] = []
         self._lock = threading.RLock()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -142,6 +143,17 @@ class Bus:
                 self._subs[etype].remove(fn)
             except ValueError:
                 pass
+        with self._lock:
+            try:
+                self._all.remove(fn)
+            except ValueError:
+                pass
+
+    def on_all(self, fn: Subscriber) -> Subscriber:
+        """Subscribe ``fn`` to every event type (e.g. the WS event stream)."""
+        with self._lock:
+            self._all.append(fn)
+        return fn
 
     def attach_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Attach an asyncio loop used to schedule coroutine subscribers."""
@@ -157,7 +169,7 @@ class Bus:
         Coroutine subscribers are scheduled on the attached loop (if any).
         """
         with self._lock:
-            subs = list(self._subs.get(type(ev), []))
+            subs = list(self._subs.get(type(ev), [])) + list(self._all)
             loop = self._loop
         for fn in subs:
             try:
@@ -174,7 +186,7 @@ class Bus:
     async def aemit(self, ev: Event) -> None:
         """Async variant: awaits coroutine subscribers inline."""
         with self._lock:
-            subs = list(self._subs.get(type(ev), []))
+            subs = list(self._subs.get(type(ev), [])) + list(self._all)
         for fn in subs:
             try:
                 res = fn(ev)
