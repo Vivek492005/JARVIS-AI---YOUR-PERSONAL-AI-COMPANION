@@ -436,6 +436,8 @@ def run_command(command_key: str,
 
 
 def _register_tools():
+    # Idempotent: skills loaded first win; this fills any gaps.
+    from jarvis.tools.registry import REGISTRY as _REG
     from jarvis.tools.registry import (
         DownloadMediaParams,
         KeyboardMouseParams,
@@ -451,14 +453,19 @@ def _register_tools():
         ToolSpec,
     )
 
+    def _reg(spec):
+        if spec.name in _REG:
+            return _REG.get(spec.name)
+        return tool(spec)
+
     def _sub(name, risk, description, params):
         # Sub-action specs share the base tool's handler; resolve() picks the
         # right risk tier from the `action` argument.
         base = _BASE_HANDLERS[name.split(".")[0]]
-        tool(ToolSpec(name=name, description=description, params=params,
+        _reg(ToolSpec(name=name, description=description, params=params,
                       risk=risk, handler=base))
 
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="open_application", risk=Risk.REVERSIBLE,
         description="Opens or launches an application or program installed on "
                     "the Windows PC (e.g. Chrome, Notepad, VS Code, "
@@ -466,20 +473,20 @@ def _register_tools():
                     "Explorer, Command Prompt, etc.).",
         params=OpenApplicationParams,
         handler=_BASE_HANDLERS["open_application"]))
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="open_website", risk=Risk.REVERSIBLE,
         description="Opens a specific website or web portal in the user's "
                     "default browser.",
         params=OpenWebsiteParams,
         handler=_BASE_HANDLERS["open_website"]))
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="web_search", risk=Risk.READ,
         description="Searches Google or the web for real-time information, "
                     "answers, queries, or news requested by the user.",
         params=WebSearchParams,
         handler=_BASE_HANDLERS["web_search"],
         carries_external_data=True))
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="download_media", risk=Risk.REVERSIBLE,
         description="Downloads video or audio from YouTube or any media URL, "
                     "or searches and downloads the requested song or video "
@@ -487,7 +494,7 @@ def _register_tools():
         params=DownloadMediaParams,
         handler=_BASE_HANDLERS["download_media"]))
     # system_control: per-action risk tiers; base is SYSTEM (fail-closed).
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="system_control", risk=Risk.SYSTEM,
         description="Controls Windows OS system functions: volume "
                     "adjustments, mute, screenshot capture, lock workstation, "
@@ -505,7 +512,7 @@ def _register_tools():
          "Permanently empty the Recycle Bin.", SystemControlParams)
     _sub("system_control.lock_pc", Risk.SYSTEM,
          "Lock the workstation.", SystemControlParams)
-    tool(ToolSpec(
+    _reg(ToolSpec(
         # SYSTEM until the Task 1.4 foreground-window guard lands.
         name="keyboard_mouse_action", risk=Risk.SYSTEM,
         description="Types text or fires a hotkey. Blocked hotkeys "
@@ -527,7 +534,7 @@ def _register_tools():
     _sub("keyboard_mouse_action.press_hotkey_other", Risk.SYSTEM,
          "Press a non-allowlisted hotkey (always confirmed; blocked ones "
          "are denied outright).", KeyboardMouseParams)
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="manage_notes", risk=Risk.REVERSIBLE,
         description="Save, read, or clear the user's persistent notes.",
         params=ManageNotesParams,
@@ -535,14 +542,14 @@ def _register_tools():
         carries_external_data=True))
     _sub("manage_notes.clear", Risk.DESTRUCTIVE,
          "Permanently clear all notes.", ManageNotesParams)
-    tool(ToolSpec(
+    _reg(ToolSpec(
         name="run_powershell_command", risk=Risk.SYSTEM,
         description="Runs a read-only PowerShell command (validated against "
                     "the allowlist; destructive cmdlets are denied).",
         params=RunPowershellParams,
         handler=_BASE_HANDLERS["run_powershell_command"],
         carries_external_data=True))
-    tool(ToolSpec(
+    _reg(ToolSpec(
         # Task 1.4.3: fixed read-only templates; the LLM picks only a key.
         name="run_command", risk=Risk.READ,
         description="Runs one allowlisted read-only diagnostic template "
@@ -550,6 +557,10 @@ def _register_tools():
         params=RunCommandParams,
         handler=_BASE_HANDLERS["run_command"],
         carries_external_data=True))
+
+    # Phase 5: perception/control tools register through the same gate.
+    from jarvis.perception.tools import register_perception_tools
+    register_perception_tools()
 
 
 _BASE_HANDLERS = {

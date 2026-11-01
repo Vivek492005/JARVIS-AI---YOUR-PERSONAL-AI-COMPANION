@@ -28,7 +28,7 @@ class FakeUIA(B.UIABackend):
         self.by_id: Dict[str, ElementNode] = {}
         self.invoked: List[str] = []
         self.text_set: Dict[str, str] = {}
-        self._next = 1000
+        self._next = 1  # matches FakeContext's default active-window handle
 
     def add_window(self, title: str, process: str = "app.exe",
                    children: Optional[List[ElementNode]] = None) -> int:

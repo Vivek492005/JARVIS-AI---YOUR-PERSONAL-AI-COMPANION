@@ -65,6 +65,12 @@ def resolve(tool_name: str, args: Optional[Dict[str, Any]] = None) -> Optional[T
     ``press_hotkey`` is special: hotkeys on SAFE_HOTKEYS resolve to the
     REVERSIBLE sub-spec, everything else stays at the SYSTEM base tier
     (and the command_policy blocklist still denies the dangerous ones).
+
+    ``uia_invoke`` is special: the button label decides the tier —
+    labels like Delete/Send/Pay/Install resolve to the DESTRUCTIVE
+    sub-spec, everything else to REVERSIBLE. The label is looked up
+    from the UIA backend; if the backend is unavailable we fail closed
+    to DESTRUCTIVE.
     """
     from jarvis.policy.command_policy import _normalize_hotkey
 
@@ -78,11 +84,52 @@ def resolve(tool_name: str, args: Optional[Dict[str, Any]] = None) -> Optional[T
         spec = REGISTRY.get(sub)
         if spec is not None:
             return spec
+    if tool_name == "uia_invoke":
+        sub = _uia_invoke_subspec(args)
+        spec = REGISTRY.get(sub)
+        if spec is not None:
+            return spec
     if isinstance(action, str) and action:
         sub = REGISTRY.get(f"{tool_name}.{action}")
         if sub is not None:
             return sub
     return REGISTRY.get(tool_name)
+
+
+def _uia_invoke_subspec(args: Dict[str, Any]) -> str:
+    """Pick the uia_invoke sub-spec from the button label.
+
+    Fail-closed: unknown element or missing backend -> destructive tier.
+    """
+    from jarvis.perception import backends as _backends
+    from jarvis.perception.uia import invoke_risk_for_label
+    from jarvis.tools.registry import Risk
+    element_id = args.get("element_id", "")
+    try:
+        backend = _backends.get_backend("uia")
+    except Exception:
+        return "uia_invoke.destructive"
+    # Find the element's label without knowing its window: scan the
+    # backend's element index when available, else fail closed.
+    label = ""
+    find = getattr(backend, "find", None)
+    get_text = getattr(backend, "get_text", None)
+    if get_text is not None:
+        try:
+            label = get_text(element_id) or ""
+        except Exception:
+            label = ""
+    if not label and find is not None:
+        # FakeUIA.by_id fallback for tests; real backends use get_text.
+        by_id = getattr(backend, "by_id", {})
+        el = by_id.get(element_id)
+        if el is not None:
+            label = el.name or ""
+    if not label:
+        return "uia_invoke.destructive"
+    risk = invoke_risk_for_label(label)
+    return ("uia_invoke.destructive"
+            if risk == Risk.DESTRUCTIVE else "uia_invoke.normal")
 
 
 def function_schemas() -> List[Dict[str, Any]]:
