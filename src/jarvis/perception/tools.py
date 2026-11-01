@@ -207,10 +207,84 @@ def _vlm_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.5 Browser automation
+# ---------------------------------------------------------------------------
+
+class BrowserOpenParams(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2000)
+
+
+class BrowserRefParams(BaseModel):
+    ref: str = Field(..., min_length=1, description="Element ref from browser_read.")
+
+
+class BrowserFillParams(BaseModel):
+    ref: str = Field(..., min_length=1)
+    value: str = Field(..., max_length=10000)
+
+
+class BrowserSubmitParams(BaseModel):
+    ref: Optional[str] = Field(default=None, description="Form/submit-button ref.")
+
+
+def _browser_ctl() -> Any:
+    from jarvis.perception.browser import BrowserController
+    return BrowserController()
+
+
+def _h_browser_open(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    from jarvis.perception.browser import BrowserBlocked
+    try:
+        return _browser_ctl().open(args["url"])
+    except BrowserBlocked as e:
+        return f"Blocked: {e}"
+
+
+def _h_browser_read(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    return _browser_ctl().read()
+
+
+def _h_browser_click(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    return _browser_ctl().click(args["ref"])
+
+
+def _h_browser_fill(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    return _browser_ctl().fill(args["ref"], args["value"])
+
+
+def _h_browser_submit(args: Dict[str, Any], _cb: Any, _nf: str) -> str:
+    return _browser_ctl().submit(args.get("ref"))
+
+
+def _browser_specs() -> List[ToolSpec]:
+    return [
+        ToolSpec(name="browser_open", risk=Risk.REVERSIBLE,
+                 description="Open a URL in the dedicated jarvis browser "
+                             "profile. file:// and chrome:// blocked.",
+                 params=BrowserOpenParams, handler=_h_browser_open),
+        ToolSpec(name="browser_read", risk=Risk.READ,
+                 description="Accessibility snapshot of the current page "
+                             "(untrusted).",
+                 params=BaseModel, handler=_h_browser_read,
+                 carries_external_data=True),
+        ToolSpec(name="browser_click", risk=Risk.REVERSIBLE,
+                 description="Click an element ref from browser_read.",
+                 params=BrowserRefParams, handler=_h_browser_click),
+        ToolSpec(name="browser_fill", risk=Risk.REVERSIBLE,
+                 description="Fill a field ref from browser_read.",
+                 params=BrowserFillParams, handler=_h_browser_fill),
+        ToolSpec(name="browser_submit", risk=Risk.DESTRUCTIVE,
+                 description="Submit a form. Hands off on login/payment pages.",
+                 params=BrowserSubmitParams, handler=_h_browser_submit),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
 def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
-    for spec in _uia_specs() + _screen_specs() + _vlm_specs():
+    for spec in (_uia_specs() + _screen_specs() + _vlm_specs()
+                 + _browser_specs()):
         _reg(spec)
