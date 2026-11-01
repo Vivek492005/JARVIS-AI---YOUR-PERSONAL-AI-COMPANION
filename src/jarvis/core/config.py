@@ -52,14 +52,47 @@ class VoiceCfg(BaseModel):
     privacy_mode: bool = False
     # F-18 fix: was a hardcoded 6.0s phrase_time_limit cutting long commands.
     max_utterance_s: float = 30.0
-    tts_chain: List[str] = Field(default_factory=lambda: ["rumik", "edge", "pyttsx3"])
+    tts_chain: List[str] = Field(default_factory=lambda: ["neural", "rumik", "pyttsx3"])
     tts_engine: str = "neural"
     rumik_model: str = "muga"
     neural_voice: str = "en-IN-NeerjaNeural"
+    neural_voice_hi: str = "hi-IN-SwaraNeural"
     voice_rate: int = 160
     voice_volume: float = 1.0
-    energy_threshold: int = 300
-    pause_threshold: float = 0.8
+    energy_threshold: int = 300  # legacy; VAD now uses a dynamic floor (3.3)
+    pause_threshold: float = 0.8  # legacy; VAD hangover replaces this (3.3)
+    # --- Phase 3: Voice 2.0 ---
+    # 3.1 audio capture
+    sample_rate: int = 16000
+    frame_ms: int = 20
+    preroll_s: float = 1.5
+    input_device: Optional[int] = None  # None = system default
+    aec_mode: str = "ducking"  # headset | ducking | webrtc
+    noise_suppression: bool = False
+    # 3.2 wake word
+    wakeword_backend: str = "openwakeword"  # openwakeword | porcupine | dummy
+    wakeword_threshold: float = 0.5
+    followup_s: float = 7.0
+    # 3.3 VAD
+    vad_backend: str = "energy"  # energy | webrtc | silero
+    vad_hangover_ms: int = 500
+    # 3.4/3.5 STT
+    stt_engine: str = "google"  # google | faster-whisper[:model] | sarvam | deepgram | scribe
+    stt_language: str = "hi-en"
+    # 3.6 streaming TTS
+    tts_streaming: bool = True
+    # 3.6 extra: XTTS v2 local neural voice (optional extra, see docs/XTTS_SETUP.md)
+    xtts_speaker_wav: str = ""
+    xtts_language: str = "en"
+    xtts_device: str = "auto"
+    # 3.7 barge-in
+    barge_in_enabled: bool = True
+    barge_in_min_ms: int = 300
+    barge_in_stop_ms: int = 250
+    # 3.9 input modes: wakeword | ptt | typed | quiet
+    input_mode: str = "wakeword"
+    quiet_hours_start: str = ""  # "23:00" -> mic auto-off; empty = disabled
+    quiet_hours_end: str = ""
 
 
 class BrainCfg(BaseModel):
@@ -264,6 +297,8 @@ def _write_settings_toml(settings: Settings, path: str = SETTINGS_FILE) -> None:
     for section in ("voice", "brain", "safety", "privacy"):
         lines.append(f"[{section}]")
         for k, v in settings.model_dump()[section].items():
+            if v is None:
+                continue  # unset optionals stay at their default on read
             lines.append(f"{k} = {_toml_value(v)}")
         lines.append("")
     Path(path).write_text("\n".join(lines), encoding="utf-8")

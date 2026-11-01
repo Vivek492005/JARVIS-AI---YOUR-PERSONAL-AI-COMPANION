@@ -39,6 +39,11 @@ dependencies = [
 [project.optional-dependencies]
 vision = ["opencv-python>=4.7.0", "mediapipe>=0.10.0"]
 voice-local = ["faster-whisper", "openwakeword", "silero-vad"]
+audio = ["sounddevice>=0.4.6", "webrtcvad>=2.0.10"]
+wakeword = ["openwakeword>=0.6.0"]
+# Task 3.6 extra: local neural voice cloning (Coqui XTTS v2). Heavy
+# (~2 GB model); lazy-imported so the base install stays light.
+xtts = ["TTS>=0.22.0"]
 browser = ["playwright"]
 server = ["fastapi", "uvicorn[standard]"]
 # Task 1.9: OS keyring for secrets (Windows Credential Manager etc.).
