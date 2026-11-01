@@ -129,26 +129,83 @@ class AIAgent:
             bus.emit(ev)
 
     def _init_clients(self):
-        """Initialize primary (Hugging Face Qwen) and secondary (DeepSeek) clients."""
-        from openai import OpenAI
+        """Build the provider chain (Task 2.5).
 
-        # 1. Initialize Hugging Face Client
+        Replaces the old primary/backup ``openai.OpenAI`` pair with an
+        ordered :py:class:`ProviderChain`: HuggingFace → DeepSeek → Ollama
+        (local, when available) → local heuristic engine. Cloud providers
+        are still gated by API keys + the Task 1.10 egress switches.
+
+        ``self.client`` / ``self.backup_client`` are kept as back-compat
+        aliases to the underlying OpenAI clients (or None).
+        """
+        from jarvis.brain.providers import (DeepSeek, HuggingFaceRouter,
+                                            LocalHeuristicProvider, Ollama,
+                                            ProviderChain)
+
+        providers = []
+
+        # 1. Primary: Hugging Face (Qwen 2.5 72B Instruct)
         if self.hf_api_key and self._egress("huggingface"):
             try:
-                self.client = OpenAI(api_key=self.hf_api_key, base_url=self.hf_base_url)
-                logger.info(f"Primary AI client initialized (Hugging Face: {self.hf_model})")
+                self._hf = HuggingFaceRouter(api_key=self.hf_api_key,
+                                             model=self.hf_model,
+                                             base_url=self.hf_base_url)
+                providers.append(self._hf)
+                self.client = self._hf.raw_client
+                logger.info(f"Provider chain: huggingface ({self.hf_model})")
             except Exception as e:
-                logger.error(f"Failed to initialize Hugging Face client: {e}")
-                self.client = None
+                logger.error(f"Failed to initialize Hugging Face provider: {e}")
 
-        # 2. Initialize DeepSeek Backup Client
+        # 2. Backup: DeepSeek
         if self.ds_api_key and self._egress("deepseek"):
             try:
-                self.backup_client = OpenAI(api_key=self.ds_api_key, base_url=self.ds_base_url)
-                logger.info(f"Secondary AI client initialized (DeepSeek: {self.ds_model})")
+                self._ds = DeepSeek(api_key=self.ds_api_key,
+                                    model=self.ds_model,
+                                    base_url=self.ds_base_url)
+                providers.append(self._ds)
+                self.backup_client = self._ds.raw_client
+                logger.info(f"Provider chain: deepseek ({self.ds_model})")
             except Exception as e:
-                logger.error(f"Failed to initialize DeepSeek backup client: {e}")
-                self.backup_client = None
+                logger.error(f"Failed to initialize DeepSeek provider: {e}")
+
+        # 3. Local: Ollama, when explicitly enabled or reachable.
+        if self._ollama_wanted():
+            try:
+                self._ollama = Ollama()
+                providers.append(self._ollama)
+                logger.info("Provider chain: ollama (local)")
+            except Exception as e:
+                logger.error(f"Failed to initialize Ollama provider: {e}")
+
+        # 4. Terminal fallback: heuristic engine (Task 2.5.5 — NOT an LLM).
+        local = LocalHeuristicProvider(handler=self._local_fallback_process)
+        self.chain = ProviderChain(providers, local_provider=local,
+                                   on_degraded=self._on_provider_degraded)
+
+    @staticmethod
+    def _ollama_wanted() -> bool:
+        """Is Ollama wanted? Explicit env opt-in, or a live local daemon."""
+        env = os.getenv("OLLAMA_ENABLED", "").lower()
+        if env in ("1", "true", "yes"):
+            return True
+        if os.getenv("OLLAMA_MODEL") or os.getenv("OLLAMA_BASE_URL"):
+            return True
+        # Fast probe: connection-refused on localhost is near-instant.
+        try:
+            import urllib.request
+            urllib.request.urlopen("http://localhost:11434/api/tags",
+                                   timeout=1)
+            return True
+        except Exception:
+            return False
+
+    def _on_provider_degraded(self, notice: str) -> None:
+        """Honest degradation (Task 2.5.4): tell the user, don't go quiet."""
+        self._notify_status(notice)
+        from jarvis.core.events import StatusChanged
+        self._emit(StatusChanged(
+            trace=getattr(self, "session_id", ""), status=notice))
 
     def _privacy_on(self) -> bool:
         """Privacy Mode master switch (Task 1.10)."""
@@ -422,33 +479,37 @@ class AIAgent:
         # Default fallback: search query
         return self._fallback_exec("web_search", {"query": user_input})
 
-    def _call_llm_flow(self, client, model_name: str, clean_input: str) -> Optional[str]:
-        """Execute LLM chat completion with autonomous tool dispatch."""
+    def _chain_complete(self, messages, tools=None):
+        """One resilient round-trip through the provider chain (Task 2.5)."""
+        return self.chain.complete(messages, tools=tools,
+                                   temperature=self.temperature).completion
+
+    def _call_llm_flow(self, clean_input: str) -> Optional[str]:
+        """Execute the LLM tool loop over the provider chain.
+
+        Each round-trip goes through :py:meth:`ProviderChain.complete`, so
+        retry / fallback / circuit-breaking applies per round, not just
+        per command. Tool dispatch, policy gating, taint tracking and
+        audit are unchanged (agent concerns, not provider concerns).
+        """
         messages = [{"role": "system", "content": self._get_system_prompt()}]
         for item in self.conversation_history[-self.max_history:]:
             messages.append(item)
         messages.append({"role": "user", "content": clean_input})
 
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            tools=self.tool_definitions,
-            tool_choice="auto",
-            temperature=self.temperature,
-        )
-
-        choice = response.choices[0]
-        message = choice.message
+        completion = self._chain_complete(messages, tools=self.tool_definitions)
 
         # Case 1: Model called one or more tools
-        if message.tool_calls:
-            messages.append(message)
-            for tool_call in message.tool_calls:
-                func_name = tool_call.function.name
-                try:
-                    func_args = json.loads(tool_call.function.arguments)
-                except Exception:
-                    func_args = {}
+        if completion.tool_calls:
+            messages.append({"role": "assistant", "content": completion.text,
+                             "tool_calls": [
+                                 {"id": tc.id, "type": "function",
+                                  "function": {"name": tc.name,
+                                               "arguments": json.dumps(tc.args)}}
+                                 for tc in completion.tool_calls]})
+            for tool_call in completion.tool_calls:
+                func_name = tool_call.name
+                func_args = tool_call.args or {}
 
                 result_str = self._dispatch_tool_call(func_name, func_args)
                 messages.append({
@@ -458,17 +519,13 @@ class AIAgent:
                                                          result_str)
                 })
 
-            # Synthesize final spoken response
-            final_response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                temperature=self.temperature,
-            )
-            reply = final_response.choices[0].message.content.strip()
+            # Synthesize final spoken response (also via the chain).
+            final = self._chain_complete(messages)
+            reply = final.text.strip()
             return reply
 
         # Case 2: Direct conversational answer
-        return message.content.strip() if message.content else "I have completed your request."
+        return completion.text.strip() if completion.text else "I have completed your request."
 
     def _sanitize_for_prompt(self, func_name: str, args: Dict[str, Any],
                              result: str) -> str:
@@ -498,7 +555,12 @@ class AIAgent:
         return clean
 
     def process(self, user_input: str) -> str:
-        """Process user input through Qwen 72B (primary), falling back to DeepSeek and then local engine."""
+        """Process user input through the provider chain (Task 2.5).
+
+        HuggingFace → DeepSeek → Ollama (when available) → local heuristic
+        engine, with per-provider retry, circuit breakers and honest
+        degradation notices. Privacy Mode short-circuits to local only.
+        """
         # Task 1.5.2: taint is per-turn — a fresh user message starts clean.
         self.tainted = False
         clean_input = user_input.strip()
@@ -546,30 +608,20 @@ class AIAgent:
             logger.info("Privacy Mode: using local fallback engine only")
             return self._local_fallback_process(clean_input)
 
-        # 1. Attempt Primary Client (Hugging Face: Qwen 2.5 72B Instruct)
-        if self.client:
-            try:
-                reply = self._call_llm_flow(self.client, self.model, clean_input)
-                if reply:
-                    self.conversation_history.append({"role": "user", "content": clean_input})
-                    self.conversation_history.append({"role": "assistant", "content": reply})
-                    return reply
-            except Exception as e:
-                logger.warning(f"Primary model ({self.model}) error: {e}. Trying backup client...")
+        # Task 2.5: one resilient pass through the provider chain
+        # (HuggingFace → DeepSeek → Ollama → local heuristic), with
+        # per-provider retry, circuit breakers and honest degradation.
+        try:
+            reply = self._call_llm_flow(clean_input)
+        except Exception as e:
+            logger.warning(f"Provider chain exhausted unexpectedly: {e}")
+            reply = None
+        if reply:
+            self.conversation_history.append({"role": "user", "content": clean_input})
+            self.conversation_history.append({"role": "assistant", "content": reply})
+            return reply
 
-        # 2. Attempt Backup Client (DeepSeek)
-        if self.backup_client:
-            try:
-                reply = self._call_llm_flow(self.backup_client, self.ds_model, clean_input)
-                if reply:
-                    self.conversation_history.append({"role": "user", "content": clean_input})
-                    self.conversation_history.append({"role": "assistant", "content": reply})
-                    return reply
-            except Exception as e:
-                logger.warning(f"Backup model ({self.ds_model}) error: {e}. Switching to intelligent local fallback.")
-
-        # 3. Seamless intelligent local fallback
-        reply = self._local_fallback_process(clean_input)
-        self.conversation_history.append({"role": "user", "content": clean_input})
-        self.conversation_history.append({"role": "assistant", "content": reply})
-        return reply
+        # Should not happen (the chain ends in the local heuristic engine),
+        # but never crash the turn.
+        logger.error("Provider chain returned no reply")
+        return "Sorry — something went wrong processing that."
