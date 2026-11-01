@@ -1891,7 +1891,9 @@ class VoiceInterface:
         # stop word is handled.
 
     def speak(self, text: str, wait: bool = False):
-        """Speak output text using Rumik AI Silk TTS (primary) with fallback to Neural and pyttsx3."""
+        """Speak output text. Default chain: Neural (Edge-TTS, free, no key)
+        -> Rumik AI Silk TTS -> offline pyttsx3. Set tts_engine="rumik" to
+        prefer Rumik first."""
         print(f"\n[JARVIS]: {text}")
 
         def _speak_thread():
@@ -1903,18 +1905,19 @@ class VoiceInterface:
                 with self._tts_lock:
                     # Task 1.10: Privacy Mode => offline engine only.
                     local_only = self._privacy_tts_only_local()
-                    # 1. Primary: Rumik AI Silk TTS
-                    tts_engine = self.config.get("tts_engine", "rumik")
-                    if tts_engine == "rumik" and not local_only:
-                        if self._speak_rumik(text):
-                            return
+                    # Primary order: Neural first (free, no API key, no quota),
+                    # Rumik second. tts_engine="rumik" keeps the legacy order.
+                    tts_engine = self.config.get("tts_engine", "neural")
+                    chain = ["neural", "rumik"] if tts_engine == "neural" \
+                        else ["rumik", "neural"]
+                    if not local_only:
+                        for engine in chain:
+                            if engine == "neural" and self._speak_neural(text):
+                                return
+                            if engine == "rumik" and self._speak_rumik(text):
+                                return
 
-                    # 2. Secondary Fallback: Microsoft Natural Neural Voice
-                    if tts_engine in ["rumik", "neural"] and not local_only:
-                        if self._speak_neural(text):
-                            return
-
-                    # 3. Tertiary Fallback: Offline pyttsx3
+                    # Tertiary Fallback: Offline pyttsx3
                     if self.engine:
                         try:
                             self.engine.say(text)

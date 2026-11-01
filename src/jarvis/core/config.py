@@ -53,7 +53,7 @@ class VoiceCfg(BaseModel):
     # F-18 fix: was a hardcoded 6.0s phrase_time_limit cutting long commands.
     max_utterance_s: float = 30.0
     tts_chain: List[str] = Field(default_factory=lambda: ["rumik", "edge", "pyttsx3"])
-    tts_engine: str = "rumik"
+    tts_engine: str = "neural"
     rumik_model: str = "muga"
     neural_voice: str = "en-IN-NeerjaNeural"
     voice_rate: int = 160
