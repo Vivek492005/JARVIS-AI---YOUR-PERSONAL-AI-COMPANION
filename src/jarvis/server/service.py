@@ -33,6 +33,7 @@ class JarvisService:
         self.commands_processed = 0
         self.last_error: Optional[str] = None
         self._agent = None
+        self._router = None
         self._lock = threading.Lock()
 
     # -- lifecycle -----------------------------------------------------
@@ -106,5 +107,13 @@ class JarvisService:
 
     def _agent_handler(self, text: str, token: CancelToken,
                        service: "JarvisService") -> str:
-        """Default handler: the AIAgent (LLM cascade → gated fallback)."""
-        return self._get_agent().process(text)
+        """Default handler: reflex router (System-1) + LLM agent (System-2).
+
+        Built lazily so a service that never receives a command never pays
+        for the imports; reflex-only turns never initialize the LLM
+        providers at all.
+        """
+        if self._router is None:
+            from jarvis.brain.router import Router
+            self._router = Router()
+        return self._router.handle(text)

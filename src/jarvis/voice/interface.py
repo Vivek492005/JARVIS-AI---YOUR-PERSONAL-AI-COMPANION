@@ -1677,12 +1677,17 @@ class VoiceCommandProcessor:
             except Exception as e:
                 logger.error(f"AI Agent processing error: {e}")
 
-        # 4. Final Fallback: Google Search
-        response = f"I didn't recognize that command directly, searching Google for {text}"
-        webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote_plus(text)}")
+        # 4. Final fallback: honest "didn't understand" (Task 2.6).
+        # The implicit Google-search fallback was removed: silently
+        # shipping every unrecognized utterance to Google is a privacy
+        # leak. Explicit "search google for X" commands still work via the
+        # web_search tool; everything else now goes to the LLM above or
+        # admits it didn't understand.
+        response = (f"Sorry, I didn't understand '{text}'. "
+                    f"Try 'help' to see what I can do.")
         self.last_response = response
         return {
-            "id": "search_fallback",
+            "id": "not_understood",
             "type": CommandType.WEB,
             "response": response,
             "confidence": 0.5
