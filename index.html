@@ -60,7 +60,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow-x:hi
 .brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--ink);font-family:var(--disp);font-weight:700;letter-spacing:.14em;font-size:14px}
 .brand img{width:30px;height:30px;border-radius:8px;box-shadow:0 0 18px var(--acc-soft)}
 .nav-links{display:flex;gap:34px;align-items:center}
-.nav-links a{color:var(--muted);text-decoration:none;font-size:12.5px;font-weight:600;letter-spacing:.06em;transition:color .2s}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:12.5px;font-weight:600;letter-spacing:.06em;transition:color .2s;position:relative}
+.nav-links a:not(.btn):after{content:"";position:absolute;left:0;bottom:-5px;height:1px;width:100%;background:var(--acc);transform:scaleX(0);transform-origin:right;transition:transform .3s cubic-bezier(.2,.7,.2,1)}
+.nav-links a:not(.btn):hover:after{transform:scaleX(1);transform-origin:left}
 .nav-links a:hover{color:var(--acc)}
 .btn{display:inline-flex;align-items:center;gap:9px;padding:13px 22px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;transition:transform .2s,box-shadow .2s,background .2s,border-color .2s;letter-spacing:.02em}
 .btn.acc{background:var(--acc);color:#04110c;box-shadow:0 8px 34px rgba(95,242,200,.25)}
@@ -87,6 +89,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow-x:hi
 .hstat .l{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim);margin-top:4px}
 .hero-vis{position:relative;display:flex;justify-content:center}
 .core-wrap{position:relative;width:min(480px,100%);aspect-ratio:1}
+/* orb stage: dims the fluid behind the orb + feathered dissolve into the bg */
+.core-halo{position:absolute;inset:-14%;pointer-events:none;
+  background:radial-gradient(circle,rgba(2,7,9,.74) 0%,rgba(2,7,9,.46) 42%,transparent 68%);
+  animation:halopulse 6s ease-in-out infinite}
+@keyframes halopulse{50%{opacity:.72}}
+.core-halo:after{content:"";position:absolute;inset:16%;border-radius:50%;
+  background:radial-gradient(circle,rgba(95,242,200,.15) 0%,transparent 62%)}
+#core3d,.core-img.fallback{-webkit-mask-image:radial-gradient(circle,#000 52%,transparent 76%);mask-image:radial-gradient(circle,#000 52%,transparent 76%)}
 .core-img{width:100%;height:100%;object-fit:cover;mix-blend-mode:screen;animation:corefloat 7s ease-in-out infinite}
 @keyframes corefloat{50%{transform:translateY(-14px) scale(1.015)}}
 .core-ring{position:absolute;inset:-4%;border:1px dashed var(--acc-line);border-radius:50%;animation:spin 40s linear infinite;pointer-events:none}
@@ -102,12 +112,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow-x:hi
 /* hero entrance */
 .hero .eyebrow,.hero h1,.hero-copy,.hero-cta,.hero-stats,.hero-vis{opacity:0;transform:translateY(28px)}
 body.ready .hero .eyebrow{animation:rise .8s .1s cubic-bezier(.2,.7,.2,1) forwards}
-body.ready .hero h1{animation:rise .8s .22s cubic-bezier(.2,.7,.2,1) forwards}
+body.ready .hero h1{opacity:1;transform:none;filter:none}
+.hero h1 .chw{display:inline-block;overflow:hidden;vertical-align:bottom}
+.hero h1 .ch{display:inline-block;transform:translateY(110%);opacity:0;transition:transform .7s cubic-bezier(.2,.7,.2,1),opacity .45s ease}
+.hero h1.chars-in .ch{transform:none;opacity:1}
 body.ready .hero-copy{animation:rise .8s .36s cubic-bezier(.2,.7,.2,1) forwards}
 body.ready .hero-cta{animation:rise .8s .48s cubic-bezier(.2,.7,.2,1) forwards}
 body.ready .hero-stats{animation:rise .8s .6s cubic-bezier(.2,.7,.2,1) forwards}
 body.ready .hero-vis{animation:rise 1s .4s cubic-bezier(.2,.7,.2,1) forwards}
-@keyframes rise{to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(28px);filter:blur(8px)}to{opacity:1;transform:none;filter:blur(0)}}
 
 /* ---------- section scaffolding ---------- */
 .sec{padding:130px 0;position:relative}
@@ -116,8 +129,8 @@ body.ready .hero-vis{animation:rise 1s .4s cubic-bezier(.2,.7,.2,1) forwards}
 .sec-head h2{font-family:var(--disp);font-weight:700;font-size:clamp(36px,4.4vw,64px);line-height:1.02;letter-spacing:-.04em}
 .sec-head h2 .a{color:var(--acc)}
 .sec-head p{color:var(--muted);font-size:16px;max-width:520px;margin-top:18px;line-height:1.7}
-.rv{opacity:0;transform:translateY(30px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
-.rv.in{opacity:1;transform:none}
+.rv{opacity:0;transform:translateY(30px);filter:blur(10px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1),filter .8s ease}
+.rv.in{opacity:1;transform:none;filter:blur(0)}
 
 /* ---------- terminal / live demo ---------- */
 .term{max-width:880px;margin:0 auto;background:rgba(6,11,15,.92);border:1px solid var(--acc-line);border-radius:12px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.55),0 0 60px rgba(95,242,200,.06);backdrop-filter:blur(10px)}
@@ -332,7 +345,7 @@ body.no-webgl .core-img.fallback{display:block}
   <div class="shell hero-in">
     <div>
       <div class="eyebrow"><i></i>VOICE-FIRST DESKTOP AI · WINDOWS · OPEN SOURCE</div>
-      <h1><span data-scramble>Talk.</span><br><span class="l2" data-scramble>It acts.</span></h1>
+      <h1><span data-split>Talk.</span><br><span class="l2" data-split>It acts.</span></h1>
       <p class="hero-copy">JARVIS is a voice-first AI companion for Windows. Speak naturally — in <b>English, Hindi, or Hinglish</b> — and it reasons across your apps, the web, and your system, then quietly gets it done. <b>Destructive commands always ask first.</b></p>
       <div class="hero-cta">
         <a class="btn acc" href="#setup">Initialize JARVIS <span>↗</span></a>
@@ -347,6 +360,7 @@ body.no-webgl .core-img.fallback{display:block}
     </div>
     <div class="hero-vis">
       <div class="core-wrap">
+        <div class="core-halo" aria-hidden="true"></div>
         <canvas id="core3d" aria-label="Interactive 3D JARVIS core — move your cursor to steer it"></canvas>
         <img class="core-img fallback" src="assets/jarvis-core.jpg" alt="JARVIS neural core visualization">
         <div class="core-ring"></div><div class="core-ring r2"></div>
@@ -539,20 +553,43 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 var BOOT_ROWS=['NEURAL CORE','VOICE LINK','TOOL BUS ×8','SAFETY POLICY'];
 var bootRows=$('#boot-rows'),bootFill=$('#boot-fill'),boot=$('#boot');
 BOOT_ROWS.forEach(function(r){var d=document.createElement('div');d.className='boot-row';d.innerHTML='<span>'+r+'</span><span class="st">···</span>';bootRows.appendChild(d);});
-function scramble(el){
-  var orig=el.textContent,GL='!<>-_\\/[]{}=+*^?#______',f=0;
-  var iv=setInterval(function(){f++;
-    el.textContent=orig.split('').map(function(c,i){return (c===' '||i<f)?c:GL[Math.floor(Math.random()*GL.length)];}).join('');
-    if(f>=orig.length+4){el.textContent=orig;clearInterval(iv);}
-  },36);
+/* hero title: per-character rise */
+function splitChars(){
+  $$('.hero h1 [data-split]').forEach(function(el){
+    var txt=el.textContent;el.textContent='';el.setAttribute('aria-label',txt);
+    var frag=document.createDocumentFragment(),n=0;
+    txt.split('').forEach(function(c){
+      var w=document.createElement('span');w.className='chw';w.setAttribute('aria-hidden','true');
+      var s=document.createElement('span');s.className='ch';
+      s.textContent=(c===' ')?' ':c;
+      s.style.transitionDelay=(n*26)+'ms';n++;
+      w.appendChild(s);frag.appendChild(w);
+    });
+    el.appendChild(frag);
+  });
+}
+/* hero stats: count-up */
+function countUps(){
+  $$('.hstat .n').forEach(function(el,i){
+    var orig=el.innerHTML,m=orig.match(/\d+/);if(!m)return;
+    var target=parseInt(m[0],10),t0=null,D=1100,pad=m[0].length;
+    function fr(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/D),e=1-Math.pow(1-p,3);
+      el.textContent=String(Math.round(target*e)).padStart(pad,'0');
+      if(p<1)raf(fr);else el.innerHTML=orig;}
+    setTimeout(function(){raf(fr);},650+i*120);
+  });
 }
 async function runBoot(){
   $$('.boot-row').forEach(function(d,i){
     setTimeout(function(){d.classList.add('on');d.querySelector('.st').textContent='✓';bootFill.style.width=((i+1)/BOOT_ROWS.length*100)+'%';},RM?0:230*(i+1));
   });
   await wait(RM?60:230*BOOT_ROWS.length+450);
+  if(!RM)splitChars();
   boot.classList.add('done');document.body.classList.add('ready');
-  $$('[data-scramble]').forEach(function(el,i){setTimeout(function(){scramble(el);},RM?0:750+i*240);});
+  if(!RM){
+    countUps();
+    raf(function(){raf(function(){var h1=$('.hero h1');if(h1)h1.classList.add('chars-in');});});
+  }
   setTimeout(function(){if(boot.parentNode)boot.parentNode.removeChild(boot);},1100);
 }
 
@@ -717,7 +754,7 @@ var FLUID_FRAG=[
 ' for(int i=0;i<4;i++){v+=a*noise(p);p=r*p*2.03+vec2(1.7,9.2);a*=0.5;}return v;}',
 'void main(){',
 ' vec2 uv=(gl_FragCoord.xy-0.5*u_res)/u_res.y;',
-' float t=mix(u_time*0.045,7.3,u_still);',
+' float t=mix(u_time*0.04,7.3,u_still);',
 ' vec2 m=u_mouse;m.x*=u_res.x/u_res.y;',
 ' vec2 p=uv*1.7;',
 ' vec2 q=vec2(fbm(p+t*0.9),fbm(p+vec2(5.2,1.3)-t*0.7));',
@@ -729,10 +766,10 @@ var FLUID_FRAG=[
 ' col=mix(col,vec3(0.03,0.10,0.10),clamp(f2*f2*2.4,0.,1.)*0.7);',
 ' float veins=1.0-abs(2.0*f-1.0);',
 ' veins=pow(smoothstep(0.45,1.0,veins),3.0);',
-' col+=vec3(0.24,0.95,0.78)*veins*0.5;',
+' col+=vec3(0.24,0.95,0.78)*veins*0.38;',
 ' float veins2=1.0-abs(2.0*f2-1.0);',
 ' veins2=pow(smoothstep(0.6,1.0,veins2),4.0);',
-' col+=vec3(0.35,1.0,0.85)*veins2*0.28;',
+' col+=vec3(0.35,1.0,0.85)*veins2*0.22;',
 ' float md=length(uv-m);',
 ' col+=vec3(0.25,0.95,0.78)*exp(-md*md*22.0)*0.30;',
 ' float vig=smoothstep(1.3,0.3,length(uv*vec2(0.85,1.0)));',
@@ -825,11 +862,22 @@ if(!startPlasma()){if(!startFluid()){startNeural();}}
       metalness:.7,roughness:.25,wireframe:true,transparent:true,opacity:.85}));
   g.add(core);
   var inn=new THREE.Mesh(new THREE.IcosahedronGeometry(.72,2),
-    new THREE.MeshBasicMaterial({color:0xd8fff4,wireframe:true,transparent:true,opacity:.5}));
+    new THREE.MeshBasicMaterial({color:0xd8fff4,wireframe:true,transparent:true,opacity:.62}));
   g.add(inn);
   var nuc=new THREE.Mesh(new THREE.SphereGeometry(.3,24,24),
     new THREE.MeshBasicMaterial({color:0xeafff9,transparent:true,opacity:.95}));
   g.add(nuc);
+  /* additive glow sprite so the core reads through the fluid bg */
+  var glowTex=(function(){var gc=document.createElement('canvas');gc.width=gc.height=128;
+    var gx=gc.getContext('2d');if(!gx)return null;
+    var grd=gx.createRadialGradient(64,64,0,64,64,64);
+    grd.addColorStop(0,'rgba(95,242,200,0.55)');grd.addColorStop(0.4,'rgba(95,242,200,0.18)');
+    grd.addColorStop(1,'rgba(95,242,200,0)');
+    gx.fillStyle=grd;gx.fillRect(0,0,128,128);return new THREE.CanvasTexture(gc);})();
+  var glow=null;
+  if(glowTex){glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,
+    opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));
+    glow.scale.set(5.4,5.4,1);g.add(glow);}
   var h1=new THREE.Mesh(new THREE.TorusGeometry(1.9,.014,8,120),
     new THREE.MeshBasicMaterial({color:ACC,transparent:true,opacity:.5}));
   h1.rotation.x=1.15;g.add(h1);
@@ -860,6 +908,7 @@ if(!startPlasma()){if(!startFluid()){startNeural();}}
     if(!RM){g.rotation.y+=.0022+(mx*.9-g.rotation.y)*.02;g.rotation.x+=(my*.7-g.rotation.x)*.02;
       core.rotation.x=t*.1;core.rotation.y=t*.07;inn.rotation.y=-t*.16;inn.rotation.x=t*.05;
       nuc.scale.setScalar(1+Math.sin(t*2.4)*.08);
+      if(glow)glow.material.opacity=.68+Math.sin(t*1.8)*.14;
       h1.rotation.z=t*.09;h2.rotation.z=-t*.12;
       for(k=0;k<sats.length;k++){o=sats[k];o.a+=o.s;
         o.d.position.x=Math.cos(o.a)*o.rad;o.d.position.y=Math.sin(o.a)*o.rad;
@@ -873,7 +922,12 @@ if(!startPlasma()){if(!startFluid()){startNeural();}}
   var els=$$('.rv');
   if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in');});return;}
   var io=new IntersectionObserver(function(es){es.forEach(function(e){
-    if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.15});
+    if(e.isIntersecting){var t=e.target;
+      /* auto-stagger sibling .rv blocks (feat rows, setup steps, demo blocks) */
+      var sibs=Array.prototype.filter.call(t.parentNode.children,function(c){return c.classList&&c.classList.contains('rv');});
+      var idx=sibs.indexOf(t);
+      if(idx>0&&!RM)t.style.transitionDelay=(idx*90)+'ms';
+      t.classList.add('in');io.unobserve(e.target);}});},{threshold:.15});
   els.forEach(function(e){io.observe(e);});
 })();
 
