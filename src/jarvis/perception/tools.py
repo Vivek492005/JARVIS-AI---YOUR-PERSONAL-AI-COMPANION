@@ -402,11 +402,108 @@ def _file_specs() -> List[ToolSpec]:
 
 
 # ---------------------------------------------------------------------------
+# 5.7 App adapters
+# ---------------------------------------------------------------------------
+
+class VSCodeOpenParams(BaseModel):
+    path: str = Field(..., min_length=1, max_length=500,
+                      description="Folder or file to open in VS Code.")
+
+
+class VSCodeTaskParams(BaseModel):
+    task: str = Field(..., min_length=1, max_length=200)
+    folder: str = Field(default="", max_length=500)
+
+
+class OfficeOpenParams(BaseModel):
+    path: str = Field(..., min_length=1, max_length=500)
+
+
+class OfficeReadParams(BaseModel):
+    path: str = Field(..., min_length=1, max_length=500)
+    sheet: str = Field(default="", max_length=100)
+    cell_range: str = Field(default="", max_length=50)
+
+
+class SpotifyParams(BaseModel):
+    action: str = Field(..., description="play|pause|skip|previous|queue")
+    query: str = Field(default="", max_length=300)
+
+
+class SettingsParams(BaseModel):
+    name: str = Field(..., description="Allowlisted setting name.")
+
+
+def _h_vscode_open(args, _cb, _nf):
+    from jarvis.perception.apps import VSCodeAdapter
+    return VSCodeAdapter().open_path(args["path"])
+
+
+def _h_vscode_task(args, _cb, _nf):
+    from jarvis.perception.apps import VSCodeAdapter
+    return VSCodeAdapter().run_task(args["task"], args.get("folder", ""))
+
+
+def _h_office_open(args, _cb, _nf):
+    from jarvis.perception.apps import OfficeAdapter
+    return OfficeAdapter().open_document(args["path"])
+
+
+def _h_office_read(args, _cb, _nf):
+    from jarvis.perception.apps import OfficeAdapter
+    return OfficeAdapter().read(args["path"], args.get("sheet", ""),
+                                args.get("cell_range", ""))
+
+
+def _h_office_save(args, _cb, _nf):
+    from jarvis.perception.apps import OfficeAdapter
+    return OfficeAdapter().save(args["path"])
+
+
+def _h_spotify(args, _cb, _nf):
+    from jarvis.perception.apps import SpotifyAdapter
+    return SpotifyAdapter().control(args["action"], args.get("query", ""))
+
+
+def _h_system_settings(args, _cb, _nf):
+    from jarvis.perception.apps import apply_setting
+    return apply_setting(args["name"])
+
+
+def _app_specs() -> List[ToolSpec]:
+    return [
+        ToolSpec(name="vscode_open", risk=Risk.REVERSIBLE,
+                 description="Open a folder/file in VS Code.",
+                 params=VSCodeOpenParams, handler=_h_vscode_open),
+        ToolSpec(name="vscode_task", risk=Risk.REVERSIBLE,
+                 description="Run a VS Code task in a folder.",
+                 params=VSCodeTaskParams, handler=_h_vscode_task),
+        ToolSpec(name="office_open", risk=Risk.REVERSIBLE,
+                 description="Open a Word/Excel/PowerPoint document.",
+                 params=OfficeOpenParams, handler=_h_office_open),
+        ToolSpec(name="office_read", risk=Risk.READ,
+                 description="Read cells/text from an Office document. Untrusted.",
+                 params=OfficeReadParams, handler=_h_office_read,
+                 carries_external_data=True),
+        ToolSpec(name="office_save", risk=Risk.REVERSIBLE,
+                 description="Save the open Office document.",
+                 params=OfficeOpenParams, handler=_h_office_save),
+        ToolSpec(name="spotify", risk=Risk.REVERSIBLE,
+                 description="Spotify: play|pause|skip|previous|queue.",
+                 params=SpotifyParams, handler=_h_spotify),
+        ToolSpec(name="system_settings", risk=Risk.REVERSIBLE,
+                 description="Allowlisted system settings only "
+                             "(volume/brightness/wifi).",
+                 params=SettingsParams, handler=_h_system_settings),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregator
 # ---------------------------------------------------------------------------
 
 def register_perception_tools() -> None:
     """Idempotent registration of all Phase-5 tool specs."""
     for spec in (_uia_specs() + _screen_specs() + _vlm_specs()
-                 + _browser_specs() + _file_specs()):
+                 + _browser_specs() + _file_specs() + _app_specs()):
         _reg(spec)
