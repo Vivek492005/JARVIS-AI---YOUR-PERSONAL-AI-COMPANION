@@ -44,3 +44,8 @@ max_steps_per_task = 12
 
 [privacy]
 privacy_mode = false          # true = local-only chain, no cloud calls at all
+# Task 1.10: per-provider egress toggles (privacy_mode forces all off).
+allow_huggingface = true      # chat text -> Hugging Face router (Qwen)
+allow_deepseek = true         # chat text -> DeepSeek
+allow_rumik_tts = true        # TTS text -> Rumik API
+allow_google_stt = true       # mic audio -> Google Speech Recognition

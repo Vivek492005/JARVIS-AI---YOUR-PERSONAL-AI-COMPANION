@@ -126,7 +126,7 @@ class AIAgent:
         from openai import OpenAI
 
         # 1. Initialize Hugging Face Client
-        if self.hf_api_key:
+        if self.hf_api_key and self._egress("huggingface"):
             try:
                 self.client = OpenAI(api_key=self.hf_api_key, base_url=self.hf_base_url)
                 logger.info(f"Primary AI client initialized (Hugging Face: {self.hf_model})")
@@ -135,13 +135,32 @@ class AIAgent:
                 self.client = None
 
         # 2. Initialize DeepSeek Backup Client
-        if self.ds_api_key:
+        if self.ds_api_key and self._egress("deepseek"):
             try:
                 self.backup_client = OpenAI(api_key=self.ds_api_key, base_url=self.ds_base_url)
                 logger.info(f"Secondary AI client initialized (DeepSeek: {self.ds_model})")
             except Exception as e:
                 logger.error(f"Failed to initialize DeepSeek backup client: {e}")
                 self.backup_client = None
+
+    def _privacy_on(self) -> bool:
+        """Privacy Mode master switch (Task 1.10)."""
+        try:
+            from .config import get_settings
+            return bool(get_settings().privacy.privacy_mode)
+        except Exception:
+            return False
+
+    def _egress(self, provider: str) -> bool:
+        """Is this cloud provider allowed to receive data? (Task 1.10)."""
+        try:
+            from .config import get_settings
+            p = get_settings().privacy
+            if p.privacy_mode:
+                return False
+            return bool(getattr(p, f"allow_{provider}", True))
+        except Exception:
+            return True
 
     def _init_tools(self):
         """Define OpenAI-compatible tool specifications."""
@@ -501,6 +520,11 @@ class AIAgent:
             return "Cancelled — I won't do that."
 
         self._notify_status("Thinking...")
+
+        # Task 1.10: Privacy Mode — local-only chain, no cloud LLM calls.
+        if self._privacy_on():
+            logger.info("Privacy Mode: using local fallback engine only")
+            return self._local_fallback_process(clean_input)
 
         # 1. Attempt Primary Client (Hugging Face: Qwen 2.5 72B Instruct)
         if self.client:

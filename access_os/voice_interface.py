@@ -1777,8 +1777,23 @@ class VoiceInterface:
             logger.error(f"Failed to initialize TTS engine: {e}")
             self.engine = None
 
+    def _privacy_tts_only_local(self) -> bool:
+        """Task 1.10: Privacy Mode (or toggles off) => no cloud TTS."""
+        try:
+            from .config import get_settings
+            p = get_settings().privacy
+            if p.privacy_mode:
+                return True
+            if self.config.get("tts_engine") == "rumik" and not p.allow_rumik_tts:
+                return True
+        except Exception:
+            pass
+        return False
+
     def _speak_rumik(self, text: str) -> bool:
         """Synthesize and play speech using Rumik AI Silk TTS."""
+        if self._privacy_tts_only_local():
+            return False
         from .secrets import get_secret
         api_key = get_secret("RUMIK_API_KEY")
         if not api_key:
@@ -1828,6 +1843,8 @@ class VoiceInterface:
 
     def _speak_neural(self, text: str) -> bool:
         """Synthesize and play speech with human-sounding Neural voice."""
+        if self._privacy_tts_only_local():
+            return False
         try:
             import edge_tts
             voice = self.config.get("neural_voice", "en-IN-NeerjaNeural")
@@ -1876,14 +1893,16 @@ class VoiceInterface:
 
         def _speak_thread():
             with self._tts_lock:
+                # Task 1.10: Privacy Mode => offline engine only.
+                local_only = self._privacy_tts_only_local()
                 # 1. Primary: Rumik AI Silk TTS
                 tts_engine = self.config.get("tts_engine", "rumik")
-                if tts_engine == "rumik":
+                if tts_engine == "rumik" and not local_only:
                     if self._speak_rumik(text):
                         return
 
                 # 2. Secondary Fallback: Microsoft Natural Neural Voice
-                if tts_engine in ["rumik", "neural"]:
+                if tts_engine in ["rumik", "neural"] and not local_only:
                     if self._speak_neural(text):
                         return
 
@@ -2010,6 +2029,9 @@ class VoiceInterface:
         try:
             s = get_settings()
             s.voice.privacy_mode = self.privacy_mode
+            # Task 1.10: the GUI toggle is the master switch — the brain's
+            # local-only chain follows the mic.
+            s.privacy.privacy_mode = self.privacy_mode
             save_legacy_voice_dict(s.legacy_voice_dict())
         except Exception as e:
             logger.error(f"Could not persist privacy_mode: {e}")
@@ -2101,6 +2123,17 @@ class VoiceInterface:
                                                        phrase_time_limit=self.config.get("max_utterance_s", 30.0))
                     self.mic_state = MicState.PROCESSING
                     try:
+                        # Task 1.10: Google STT toggle. Off => no cloud
+                        # transcription (no local STT engine ships yet, so
+                        # voice input pauses with a one-time warning).
+                        from .config import get_settings as _gs
+                        if not _gs().privacy.allow_google_stt:
+                            if not getattr(self, "_stt_warned", False):
+                                logger.warning(
+                                    "Google STT disabled by privacy toggle — "
+                                    "voice input paused (no local STT yet)")
+                                self._stt_warned = True
+                            continue
                         text = self.recognizer.recognize_google(audio).strip()
                         if not text:
                             continue

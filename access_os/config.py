@@ -92,6 +92,12 @@ class SafetyCfg(BaseModel):
 class PrivacyCfg(BaseModel):
     # Privacy Mode = local-only chain: no mic/cloud STT, no cloud LLM/TTS.
     privacy_mode: bool = False
+    # Task 1.10: per-provider egress toggles. Privacy Mode forces every
+    # cloud call off regardless of these.
+    allow_huggingface: bool = True   # chat text -> HF router (Qwen)
+    allow_deepseek: bool = True      # chat text -> DeepSeek
+    allow_rumik_tts: bool = True     # TTS text -> Rumik API
+    allow_google_stt: bool = True    # mic audio -> Google Speech Recognition
 
 
 class Settings(BaseSettings):
