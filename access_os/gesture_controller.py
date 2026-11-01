@@ -44,8 +44,8 @@ class GestureType(Enum):
 class GestureEvent:
     """Represents a recognized gesture event with enhanced properties."""
     name: str
-    gesture_type: GestureType
-    confidence: float
+    gesture_type: GestureType = GestureType.CUSTOM
+    confidence: float = 0.0
     hand_landmarks: Optional[np.ndarray] = None
     face_landmarks: Optional[np.ndarray] = None
     hand_landmarks_world: Optional[np.ndarray] = None
@@ -472,7 +472,10 @@ class GestureController:
                     time.sleep(0.1)
                     continue
                     
-                # Reset error counter on successful frame capture
+                # Reset the error counter only after the FULL frame pipeline
+                # succeeded. (Previously it reset right after cap.read(), so
+                # persistent per-frame processing errors never tripped the
+                # circuit breaker and the loop could spin forever.)
                 consecutive_errors = 0
                 
                 # Convert BGR to RGB
