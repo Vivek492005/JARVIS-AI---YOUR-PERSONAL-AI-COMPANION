@@ -40,15 +40,19 @@ class JARVISAssistant:
     def __init__(self):
         self.running = False
         self.gui: JARVISGUI | None = None
-        # F-11: single command queue — one action at a time, never parallel
-        # pyautogui streams from two threads.
-        self._cmd_q: "queue.Queue[str | None]" = queue.Queue()
+        # Task 2.3: the 0.8 single command queue is now a LaneQueue —
+        # serial execution with priorities and interrupt support.
+        from jarvis.core.lanes import LaneQueue, Priority
+        self._lanes = LaneQueue()
+        self._Priority = Priority
 
         logger.info("Initializing JARVIS Voice Companion…")
         self.voice = VoiceInterface(
             config_file="voice_config.json",
             status_callback=self._on_ai_status
         )
+        # Task 2.3: interrupt stops in-flight TTS too.
+        self._lanes.on_interrupt(self.voice.stop_speaking)
 
         # Task 2.2 (F-14): no more monkey-patching voice.speak — the GUI
         # subscribes to SpeechStarted events on the bus instead.
@@ -75,30 +79,27 @@ class JARVISAssistant:
             self.gui.set_status("⚡ Thinking...")
 
     def send_text_command(self, text: str):
-        """Enqueue a typed command; the _cmd_loop worker runs it serially."""
+        """Enqueue a typed command; the lane runs it serially."""
         if not text.strip():
             return
         if self.gui is not None:
             self.gui.set_user_text(text)
-        self._cmd_q.put(text)
+        self._lanes.submit(lambda token: self._run_command(text),
+                           priority=self._Priority.TASK, name=text[:40])
 
-    def _cmd_loop(self):
-        """Single worker: one command at a time, status always restored."""
-        while self.running:
-            text = self._cmd_q.get()
-            if text is None:  # shutdown sentinel from stop()
-                break
-            try:
-                if self.gui is not None:
-                    self.gui.set_status("⚡ Thinking...")
-                # F-12: no unused `resp`; exceptions must not wedge the status.
-                self.voice.execute_text_command(text)
-            except Exception:
-                logger.exception("command failed: %r", text)
-            finally:
-                # F-12: status returns to Ready even when the command raised.
-                if self.gui is not None:
-                    self.gui.set_status("● Ready")
+    def _run_command(self, text: str):
+        """One command, run on the lane worker; status always restored."""
+        try:
+            if self.gui is not None:
+                self.gui.set_status("⚡ Thinking...")
+            # F-12: no unused `resp`; exceptions must not wedge the status.
+            self.voice.execute_text_command(text)
+        except Exception:
+            logger.exception("command failed: %r", text)
+        finally:
+            # F-12: status returns to Ready even when the command raised.
+            if self.gui is not None:
+                self.gui.set_status("● Ready")
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -106,9 +107,8 @@ class JARVISAssistant:
         """Create the companion GUI and start voice listening."""
         self.running = True
 
-        # F-11: start the single command worker before anything can enqueue.
-        threading.Thread(target=self._cmd_loop, daemon=True,
-                         name="JARVIS-cmd-loop").start()
+        # Task 2.3: start the lane worker before anything can enqueue.
+        self._lanes.start()
 
         # Build companion widget
         self.gui = JARVISGUI(self)
@@ -129,8 +129,7 @@ class JARVISAssistant:
         if not self.running:
             return
         self.running = False
-        # Unblock the _cmd_loop worker if it is waiting on the queue.
-        self._cmd_q.put(None)
+        self._lanes.stop()
         logger.info("JARVIS shutting down…")
         try:
             self.voice.stop_listening()
