@@ -10,7 +10,6 @@ from unittest.mock import MagicMock
 for _mod in ("speech_recognition", "pyttsx3"):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 
-import pytest  # noqa: E402
 
 from access_os.policy import (  # noqa: E402
     Decision, PolicyContext, decide, decide_tool_call,

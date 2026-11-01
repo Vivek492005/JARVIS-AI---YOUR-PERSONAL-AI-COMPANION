@@ -4,11 +4,9 @@ Keyring priority/degradation, log redaction filter, no hardcoded secrets.
 """
 
 import logging
-import os
 import sys
 from unittest import mock
 
-import pytest
 
 from access_os import secrets as S
 

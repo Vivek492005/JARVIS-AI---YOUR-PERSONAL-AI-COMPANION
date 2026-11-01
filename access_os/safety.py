@@ -79,7 +79,7 @@ class KillSwitch:
             import keyboard  # type: ignore
             keyboard.remove_hotkey(self._hotkey_handle)
         except Exception:
-            pass
+            logger.debug("kill-switch hotkey uninstall failed (non-fatal)")
         self._hotkey_handle = None
 
 

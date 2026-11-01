@@ -17,7 +17,7 @@ from access_os.policy import (
     decide_tool_call,
     describe_action,
 )
-from access_os.tools.registry import Risk, ToolSpec, resolve
+from access_os.tools.registry import Risk, ToolSpec
 from access_os.tools.registry import WebSearchParams
 
 

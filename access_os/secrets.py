@@ -84,6 +84,7 @@ def delete_secret(env_name: str) -> bool:
                                 SECRET_NAMES.get(env_name, env_name))
         return True
     except Exception:
+        logger.debug(f"keyring delete failed for {env_name} (non-fatal)")
         return False
 
 
@@ -123,7 +124,8 @@ class SecretRedactingFilter(logging.Filter):
             # Rebuild the record so the redacted text is what gets emitted.
             record.msg = msg
             record.args = ()
-        except Exception:
+        except Exception:  # noqa: S110 — a logging filter must never raise;
+            # nothing is safe to log from inside the logging pipeline itself.
             pass
         return True
 

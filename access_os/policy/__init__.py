@@ -102,7 +102,8 @@ def describe_action(tool_name: str, args: Dict[str, Any],
     if tool_name == "keyboard_mouse_action":
         return f"{args.get('action', '?')}: {str(args.get('value', ''))[:80]}"
     if tool_name == "download_media":
-        return f"download {args.get('media_type', 'audio')}: {str(args.get('url_or_query', ''))[:80]}"
+        media = str(args.get("url_or_query", ""))[:80]
+        return f"download {args.get('media_type', 'audio')}: {media}"
     if tool_name == "open_application":
         return f"open application: {args.get('app_name', '?')}"
     if tool_name == "open_website":

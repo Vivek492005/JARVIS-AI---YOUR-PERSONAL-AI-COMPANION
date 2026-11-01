@@ -5,7 +5,6 @@ Redaction, entry schema, daily jsonl layout, 90-day retention, query/CLI.
 
 import datetime
 import json
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -75,7 +74,7 @@ def test_entry_schema(log, tmp_path):
     log.log("open_website", {"url_or_name": "https://example.com"},
             "deny", reason="scheme blocked", latency_ms=1.25)
     day = datetime.date.today().isoformat()
-    entries = [json.loads(l) for l in
+    entries = [json.loads(line) for line in
                (tmp_path / "audit" / f"{day}.jsonl")
                .read_text(encoding="utf-8").splitlines()]
     assert len(entries) == 1
@@ -169,7 +168,7 @@ def test_agent_audit_uses_jsonl_with_decision(tmp_path, monkeypatch):
         agent._dispatch_tool_call("web_search", {"query": "test"})
     m.assert_called_once()
     day = datetime.date.today().isoformat()
-    entries = [json.loads(l) for l in
+    entries = [json.loads(line) for line in
                (tmp_path / "audit" / f"{day}.jsonl")
                .read_text(encoding="utf-8").splitlines()]
     assert entries[-1]["decision"] == "allow"

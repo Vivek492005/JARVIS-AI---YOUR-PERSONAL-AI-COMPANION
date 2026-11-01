@@ -47,7 +47,6 @@ def test_privacy_defaults():
 
 
 def test_egress_toggle_blocks_client_creation(clean, tmp_path, monkeypatch):
-    from access_os.config import get_settings
     monkeypatch.setenv("PRIVACY__ALLOW_HUGGINGFACE", "false")
     monkeypatch.setenv("HUGGINGFACE_API_KEY", "k")
     reset_settings_cache()
