@@ -8,7 +8,6 @@ import pytest
 sys.path.insert(0, "src")
 
 from jarvis.core.events import (
-    AgentThinking,
     ConfirmationAnswered,
     ConfirmationRequested,
     Error,

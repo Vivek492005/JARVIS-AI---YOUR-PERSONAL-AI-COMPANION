@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, "src")
 
-from jarvis.brain.persona import Persona, load_persona
+from jarvis.brain.persona import load_persona
 from jarvis.brain.prompts.builder import PROMPT_VERSION, PromptBuilder
 from jarvis.voice import identity as vid
 from jarvis.voice.earcons import (

@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 
 sys.path.insert(0, "src")
 
@@ -39,10 +38,21 @@ class FakeController:
 
 
 def test_gesture_available_reports_missing_deps(monkeypatch):
-    # mediapipe/cv2 aren't installed in this venv — expect a clean report.
+    # Hermetic: force ImportError regardless of what other test modules
+    # stuffed into sys.modules (integration/test_gesture_controller.py
+    # installs MagicMock stand-ins for mediapipe/cv2).
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name in ("mediapipe", "cv2", "numpy"):
+            raise ImportError(f"No module named {name!r}")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
     ok, reason = gesture_available()
     assert ok is False
-    assert "mediapipe" in reason or "cv2" in reason
+    assert "mediapipe" in reason and "cv2" in reason
 
 
 def test_await_gesture_unavailable_without_factory(monkeypatch):
@@ -94,7 +104,7 @@ def test_skill_tool_registers():
     # tool.py must exec without mediapipe installed (lazy import in gate).
     import importlib.util
     from jarvis.brain.skills.loader import load_manifest
-    m = load_manifest(Path("skills/gesture-confirm"))
+    load_manifest(Path("skills/gesture-confirm"))  # validates the manifest
     registered = []
     spec = importlib.util.spec_from_file_location(
         "jarvis_skill_gesture_confirm", "skills/gesture-confirm/tool.py")

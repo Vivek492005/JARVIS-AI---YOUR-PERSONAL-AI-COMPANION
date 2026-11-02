@@ -88,6 +88,6 @@ def await_gesture(timeout_s: float = CONFIRM_TIMEOUT_S,
             controller.unregister_gesture("thumbs_up")  # type: ignore[attr-defined]
             controller.unregister_gesture("thumbs_down")  # type: ignore[attr-defined]
             controller.stop()  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("gesture controller stop: %s", e)
     return result

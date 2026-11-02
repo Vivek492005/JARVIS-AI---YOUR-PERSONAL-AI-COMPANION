@@ -15,14 +15,23 @@ from jarvis.server.control import build_control_router, _redact_settings
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
+    # Isolate settings: control.py resolves `from jarvis.core.config import
+    # get_settings` at call time, so patching the module attribute gives the
+    # router a throwaway Settings instance. Tests never touch the real
+    # cached settings or settings.toml (leaking autonomy_level=2 broke
+    # unrelated gate tests in the full suite).
+    import jarvis.core.config as cfgmod
+    iso = cfgmod.Settings()
+    monkeypatch.setattr(cfgmod, "get_settings", lambda: iso)
+    monkeypatch.setattr(cfgmod, "_write_settings_toml",
+                        lambda settings, path="x": None)
+    monkeypatch.setattr(iso.brain, "memory_workspace", str(tmp_path))
     # service WITHOUT a pre-created MemoryStore: control._memory_store
     # creates one per request from memory_workspace, which keeps each
     # sqlite connection on its own request thread.
     svc = SimpleNamespace(
         agent=SimpleNamespace(model_router=None, cost_guard=None),
     )
-    import jarvis.core.config as cfgmod
-    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace", str(tmp_path))
     monkeypatch.setenv("JARVIS_TOKEN", "test-token")
 
     def verify():
@@ -127,7 +136,6 @@ def test_notify_push_no_config_returns_zero(tmp_path, monkeypatch):
 
 
 def test_skills_enable_disable(tmp_path, monkeypatch):
-    from jarvis.core.config import get_settings
     skills_dir = tmp_path / "skills"
     (skills_dir / "demo").mkdir(parents=True)
     (skills_dir / "demo" / "SKILL.md").write_text(
@@ -135,7 +143,6 @@ def test_skills_enable_disable(tmp_path, monkeypatch):
 
     # Point the settings at our fake skills dir.
     from jarvis.server import control as ctrl
-    orig_flag = ctrl._skill_flag
 
     def fake_flag(name, enable):
         flag = skills_dir / name / ".disabled"

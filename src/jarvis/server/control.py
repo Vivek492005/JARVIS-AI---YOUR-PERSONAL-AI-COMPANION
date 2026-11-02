@@ -64,8 +64,10 @@ def _redact_settings(settings) -> Dict[str, Any]:
     """
     import re
     from jarvis.policy.audit import _REDACT_VALUE_PATTERNS
-    cred_re = re.compile(r"(api_key|_secret|_token|password|passwd|auth|credential|private_key|access_key|bearer)$",
-                         re.IGNORECASE)
+    cred_re = re.compile(
+        r"(api_key|_secret|_token|password|passwd|auth|credential|"
+        r"private_key|access_key|bearer)$",
+        re.IGNORECASE)
     out = {}
     for section in ("voice", "brain", "safety", "privacy"):
         part = settings.model_dump().get(section, {})
@@ -144,7 +146,7 @@ def notify_push(title: str, body: str) -> int:
                     "skipping (%s)", len(subs), title)
         return 0
     try:
-        from pywebpush import webpush, WebPushException
+        from pywebpush import webpush
     except ImportError:
         logger.info("push: pywebpush not installed — skipping (%s)", title)
         return 0
@@ -197,7 +199,7 @@ def build_control_router(service, verify) -> APIRouter:
         try:
             _write_settings_toml(settings)
         except Exception as e:
-            raise HTTPException(500, f"persist failed: {e}")
+            raise HTTPException(500, f"persist failed: {e}") from e
         return {"applied": applied, "rejected": rejected}
 
     @r.get("/audit")

@@ -185,9 +185,8 @@ def _skills_dir():
 
 
 def _cmd_skill(args) -> int:
-    from jarvis.brain.skills import load_all, load_manifest
+    from jarvis.brain.skills import load_manifest
     from jarvis.brain.skills.scaffold import new_skill
-    from jarvis.brain.skills.trust import TrustLevel
 
     skills_dir = _skills_dir()
     cmd, arg = args.skill_cmd, args.skill_arg

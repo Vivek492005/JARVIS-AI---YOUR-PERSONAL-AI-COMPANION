@@ -132,8 +132,8 @@ def _step_autonomy(ctx: StepContext) -> StepResult:
     if hasattr(target, "autonomy_level"):
         try:
             target.autonomy_level = level
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("onboarding: autonomy_level not set: %s", e)
     return StepResult(ok=True, data={"autonomy_level": level},
                       detail=AUTONOMY_EXPLAIN[level])
 
