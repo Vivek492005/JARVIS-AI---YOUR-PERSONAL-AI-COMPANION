@@ -77,8 +77,26 @@ markers = [
     "live: needs network access to real APIs (skipped in CI)",
     "slow: long-running tests",
     "security: security test-suite (tests/security/)",
+    "perf: performance-budget tests (timing-sensitive)",
 ]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["jarvis"]
+omit = [
+    "*/tests/*",
+    "*/legacy/*",          # frozen legacy code, not part of the v1.0 surface
+    "*/jarvis/hud/static/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
 
 [tool.ruff]
 target-version = "py311"
