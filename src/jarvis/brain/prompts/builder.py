@@ -23,7 +23,7 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # Bump on every prompt-layer change. Eval reports pin this.
-PROMPT_VERSION = "4.3.0"
+PROMPT_VERSION = "7.3.0"
 
 _PROMPT_DIR = Path(__file__).resolve().parent
 
@@ -95,8 +95,14 @@ class PromptBuilder:
               memory_facts: Optional[List[str]] = None,
               live_extra: Optional[Dict[str, str]] = None) -> str:
         """Assemble all six layers into the system prompt."""
+        # Task 7.3: persona (workspace/PERSONA.md) is injected at layer 1,
+        # right after the built-in identity. The persona block always ends
+        # with a guard: safety (layer 3) overrides persona, never the reverse.
+        from jarvis.brain.persona import load_persona
+        persona_block = load_persona(self.workspace).render_prompt()
         sections = [
             _read_layer("identity"),
+            persona_block,
             self.user_profile(memory_facts),
             _read_layer("safety"),
             tool_catalog(),

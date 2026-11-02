@@ -85,6 +85,10 @@ class VoiceCfg(BaseModel):
     xtts_speaker_wav: str = ""
     xtts_language: str = "en"
     xtts_device: str = "auto"
+    # 7.4 voice identity: custom-voice consent gate. True means "this sample
+    # is my own voice or I have the speaker's explicit consent". The gate in
+    # voice/identity.py refuses any custom speaker_wav without this.
+    voice_custom_consent: bool = False
     # 3.7 barge-in
     barge_in_enabled: bool = True
     barge_in_min_ms: int = 300
