@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -164,8 +164,8 @@ class TelegramBot:
             try:
                 self.send_message(msg.chat_id,
                                   f"Something went wrong: {e}")
-            except Exception:
-                pass
+            except Exception as send_e:
+                logger.debug(f"telegram: error reply failed: {send_e}")
 
     def _handle_callback(self, msg: TgMessage) -> None:
         # Inline-button confirmations: "<confirm|deny>:<token>"

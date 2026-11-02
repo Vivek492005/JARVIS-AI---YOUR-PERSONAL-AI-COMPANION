@@ -60,7 +60,7 @@ def test_text_goes_to_command_with_lowered_autonomy():
 
 def test_remote_level_never_negative():
     bot = TelegramBot(token="t", allowed_users=[1], autonomy_level=0,
-                      on_command=lambda t, l: "x")
+                      on_command=lambda t, lvl: "x")
     assert bot.remote_level == 0
 
 
@@ -94,7 +94,7 @@ def test_voice_note_routes_to_stt_hook(monkeypatch):
                                   "chat": {"id": 99},
                                   "voice": {"file_id": "v1"}}}])
     bot = TelegramBot(token="t", allowed_users=[1],
-                      on_command=lambda t, l: "x",
+                      on_command=lambda t, lvl: "x",
                       on_voice=lambda data: f"heard {len(data)} bytes",
                       http=http)
     bot._handle_update(http.updates[0])
@@ -104,10 +104,10 @@ def test_voice_note_routes_to_stt_hook(monkeypatch):
 def test_from_config_requires_token_and_users(monkeypatch):
     import jarvis.core.secrets as sec
     monkeypatch.setattr(sec, "get_secret", lambda n: "")
-    assert from_config(lambda t, l: "x") is None
+    assert from_config(lambda t, lvl: "x") is None
     monkeypatch.setattr(sec, "get_secret",
                         lambda n: "tok" if n == "TELEGRAM_BOT_TOKEN" else "")
-    assert from_config(lambda t, l: "x") is None   # no allowed users
+    assert from_config(lambda t, lvl: "x") is None   # no allowed users
 
 
 def test_from_config_builds(monkeypatch):
@@ -115,7 +115,7 @@ def test_from_config_builds(monkeypatch):
     vals = {"TELEGRAM_BOT_TOKEN": "tok123",
             "TELEGRAM_ALLOWED_USERS": "111, 222"}
     monkeypatch.setattr(sec, "get_secret", lambda n: vals.get(n, ""))
-    bot = from_config(lambda t, l: "x", autonomy_level=3)
+    bot = from_config(lambda t, lvl: "x", autonomy_level=3)
     assert bot is not None and bot.allowed == {111, 222}
     assert bot.remote_level == 2
 

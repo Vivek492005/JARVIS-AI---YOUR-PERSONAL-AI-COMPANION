@@ -5,9 +5,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from jarvis.integrations.scheduler import (
-    CronSpec, Job, Notification, Scheduler, _cron_matches,
+    CronSpec, Job, Scheduler, _cron_matches,
 )
-from jarvis.tools.registry import Risk
 
 
 def dt(y=2026, mo=11, d=2, h=12, mi=0):
@@ -115,8 +114,6 @@ def test_file_watch_triggers_on_change(tmp_path):
     p = tmp_path / "watched.txt"
     p.write_text("v1")
     fired = []
-    import jarvis.integrations.scheduler as smod
-    orig_fire = Scheduler._fire
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(Scheduler, "_fire",
                         lambda self, job, now: fired.append(job.id))

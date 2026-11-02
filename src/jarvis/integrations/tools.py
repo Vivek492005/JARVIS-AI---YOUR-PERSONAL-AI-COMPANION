@@ -7,7 +7,7 @@ is idempotent and hooked into ``actions._register_tools()``.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -97,7 +97,7 @@ class _Empty(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _h_cal_list(args: Dict[str, Any], _c: Any = None, _r: str = "") -> str:
-    from jarvis.integrations.pim import get_calendar, _fmt_event
+    from jarvis.integrations.pim import get_calendar
     from datetime import datetime, timedelta
     now = datetime.now(timezone_utc())
     start = args.get("start") or now.isoformat()
@@ -114,7 +114,7 @@ def timezone_utc():  # tiny helper to keep imports local
 
 
 def _h_cal_create(args: Dict[str, Any], _c: Any = None, _r: str = "") -> str:
-    from jarvis.integrations.pim import get_calendar, _fmt_event
+    from jarvis.integrations.pim import get_calendar
     e = get_calendar().create_event(args["title"], args["start"], args["end"],
                                     args.get("location", ""),
                                     args.get("description", ""))
@@ -127,7 +127,7 @@ def _h_cal_delete(args: Dict[str, Any], _c: Any = None, _r: str = "") -> str:
 
 
 def _h_mail_list(args: Dict[str, Any], _c: Any = None, _r: str = "") -> str:
-    from jarvis.integrations.pim import get_mail, _fmt_mail
+    from jarvis.integrations.pim import get_mail
     msgs = get_mail().list_messages(args.get("query", ""),
                                     args.get("max_n", 10))
     if not msgs:

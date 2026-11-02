@@ -5,13 +5,13 @@ import sys
 
 import pytest
 
-REPO = "/home/hatch/workspace/jarvis-review"
-
 from jarvis.integrations.mcp import (
     MCPClient, MCPError, MCPServerConfig, discover_tools, load_server_configs,
     register_mcp_tools, sanitize_description,
 )
 from jarvis.tools.registry import REGISTRY, Risk
+
+REPO = "/home/hatch/workspace/jarvis-review"
 
 
 def _fake_cfg(**kw):
@@ -56,9 +56,9 @@ def test_discover_defaults_destructive_and_untrusted():
     assert spec.risk == Risk.DESTRUCTIVE          # deny-by-default
     assert spec.carries_external_data is True     # untrusted output
     assert spec.params.model_validate({"path": "/x"})
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         spec.params.model_validate({})            # required enforced
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         spec.params.model_validate({"path": "/x", "evil": 1})  # no extras
 
 
@@ -119,7 +119,8 @@ def test_register_mcp_tools_idempotent():
 
 def _run_server_session(script, token="secret"):
     """Drive mcp_server.main() over pipes with a script of messages."""
-    import subprocess, json
+    import subprocess
+    import json
     env = dict(os.environ, JARVIS_MCP_TOKEN=token,
                PYTHONPATH=os.path.join(REPO, "src"))
     proc = subprocess.Popen(

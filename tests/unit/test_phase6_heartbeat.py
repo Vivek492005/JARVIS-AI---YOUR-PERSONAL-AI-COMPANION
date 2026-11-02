@@ -5,7 +5,6 @@ from datetime import datetime
 from jarvis.integrations.heartbeat import (
     Heartbeat, HeartbeatConfig, in_quiet_hours,
 )
-from jarvis.integrations.scheduler import Notification
 
 
 def dt(h=12, mi=0):
@@ -86,7 +85,6 @@ def test_rate_limit_caps_proactive(monkeypatch):
 
 def test_non_read_check_tools_skipped(monkeypatch):
     # A heartbeat check whose tool is above READ must be skipped, never run.
-    from jarvis.integrations import heartbeat as hbmod
     from jarvis.tools import actions as actmod
     calls = []
     monkeypatch.setattr(actmod, "run_action",

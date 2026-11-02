@@ -60,7 +60,7 @@ class MCPServerConfig:
     url: str = ""                                        # remote (SSE/HTTP)
     default_risk: str = "DESTRUCTIVE"
     risk_overrides: Dict[str, str] = field(default_factory=dict)
-    version_pin: str = ""                                # e.g. "@modelcontextprotocol/server-filesystem@1.2.3"
+    version_pin: str = ""  # e.g. "@modelcontextprotocol/server-filesystem@1.2.3"
     enabled: bool = True
 
 
@@ -81,7 +81,9 @@ def load_server_configs(path: str) -> List[MCPServerConfig]:
                 command=list(command),
                 url=str(entry.get("url", "") or ""),
                 default_risk=str(entry.get("default_risk", "DESTRUCTIVE") or "DESTRUCTIVE").upper(),
-                risk_overrides={k: str(v).upper() for k, v in (entry.get("risk_overrides") or {}).items()},
+                risk_overrides={k: str(v).upper()
+                              for k, v in (entry.get("risk_overrides")
+                                            or {}).items()},
                 version_pin=str(entry.get("version_pin", "") or ""),
                 enabled=bool(entry.get("enabled", True)),
             ))
@@ -118,7 +120,9 @@ class MCPClient:
                            "bridge; configure a stdio command instead")
         if not self.config.command:
             raise MCPError(f"server {self.config.name!r} has no command")
-        self._proc = subprocess.Popen(
+        # S603: command comes from the admin-written allowlist config
+        # (mcp_servers.toml), never from user/LLM input.
+        self._proc = subprocess.Popen(  # noqa: S603
             self.config.command,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, text=True, bufsize=1,
@@ -144,8 +148,9 @@ class MCPClient:
             except Exception:
                 try:
                     proc.kill()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"mcp server {self.config.name!r} kill "
+                                 f"failed: {e}")
 
     def __enter__(self) -> "MCPClient":
         self.connect()

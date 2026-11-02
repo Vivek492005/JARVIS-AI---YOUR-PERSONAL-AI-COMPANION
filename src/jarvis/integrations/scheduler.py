@@ -14,14 +14,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import threading
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
-from jarvis.tools.registry import REGISTRY, Risk, resolve
+from jarvis.tools.registry import Risk, resolve
 
 logger = logging.getLogger(__name__)
 
