@@ -25,7 +25,6 @@ a = Analysis(
     datas=[
         ('../puppy.jpg', '.'),
         ('../voice_config.json', '.'),
-        ('../config.json', '.'),
         ('../env.example', '.'),
         ('../VOICE_COMMANDS.md', '.'),
         ('../GESTURE_COMMANDS.md', '.'),

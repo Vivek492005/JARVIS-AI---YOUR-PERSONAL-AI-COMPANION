@@ -19,3 +19,6 @@ sphinx-rtd-theme>=1.2.0
 # Build
 twine>=4.0.0
 build>=0.10.0
+
+# Packaging validation (scripts/lint_packaging.py)
+pyyaml>=6.0

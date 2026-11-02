@@ -57,6 +57,12 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
             "/DMyAppVersion=$ver" packaging\jarvis.iss
 
+      - name: Build portable zip + checksums
+        shell: pwsh
+        run: |
+          python scripts/build_portable.py --version "${{ github.ref_name }}".TrimStart("v") `
+            --extra dist-installer/JARVIS-Setup-${{ github.ref_name }}.exe
+
       - name: Create GitHub Release with installer
         shell: pwsh
         env:
@@ -82,4 +88,4 @@ jobs:
           gh release create "${{ github.ref_name }}" `
             --title "JARVIS ${{ github.ref_name }}" `
             --notes $notes `
-            dist-installer/*.exe
+            dist-installer/*.exe dist-installer/*.zip dist-installer/SHA256SUMS.txt
