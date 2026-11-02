@@ -51,8 +51,21 @@ Transition rules (enforced in `HUDStateMachine`, illegal transitions are ignored
 - [x] All 6 states reachable via events; illegal transitions rejected (unit-tested)
 - [x] WS event → UI message mapping is 1:1 with `event_to_dict` (contract test)
 - [x] Static assets served with correct MIME + auth on `/hud` (HTTP test)
+- [x] Tray + global hotkey summon behind injectable backends (unit-tested with fakes)
 - [ ] 60fps / <3% idle CPU — needs a real browser on the target machine
 - [ ] Visual check of orb/transcript/timeline — needs a human eye
+
+## Needs a real Windows desktop to verify
+
+- Tray icon actually appears and its menu works (`pip install pystray Pillow`;
+  `src/jarvis/hud/tray.py::TrayController` with the real backend).
+- Global hotkey summon fires while another app is focused
+  (`pip install keyboard`; default `ctrl+alt+j`).
+- PWA install flow, offline queue flush on a real network drop, background
+  Web Push delivery, small-screen layout (see `docs/PWA_SETUP.md`).
+- Earcon audibility/volume balance and quiet-hours behavior on real speakers.
+- Wake-word calibration + mic noise-floor steps of `jarvis onboard`.
+- Camera-based gesture confirm on real hardware (mediapipe + webcam).
 
 ## Files
 
