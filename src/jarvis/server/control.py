@@ -14,6 +14,7 @@ touches an explicit allowlist, secrets are never returned or accepted here.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -89,6 +90,76 @@ class FactCreate(BaseModel):
     value: str
     # MemoryStore only accepts 'user' | 'confirmed' sources (Phase 4).
     source: str = "user"
+
+
+# --- push notifications (Task 7.9) -----------------------------------------
+# Web Push delivery needs the optional `pywebpush` package + VAPID keys
+# (JARVIS_VAPID_PRIVATE_KEY / JARVIS_VAPID_PUBLIC_KEY env). Without them the
+# endpoints still store subscriptions and notify_push() logs instead of
+# sending — the in-page Notification API (app.js) covers the HUD-open case.
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: Dict[str, str] = {}
+
+
+def _push_store_path() -> Path:
+    from jarvis.core.config import get_settings
+    try:
+        base = Path(get_settings().brain.memory_workspace or "~/.jarvis")
+    except Exception:
+        base = Path("~/.jarvis")
+    return base.expanduser() / "push_subscriptions.json"
+
+
+def _load_subscriptions() -> List[Dict[str, Any]]:
+    p = _push_store_path()
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _save_subscriptions(subs: List[Dict[str, Any]]) -> None:
+    p = _push_store_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(subs, indent=2), encoding="utf-8")
+
+
+def notify_push(title: str, body: str) -> int:
+    """Best-effort Web Push to all stored subscriptions.
+
+    Returns the number of pushes accepted for delivery. 0 when pywebpush
+    or the VAPID keys aren't configured (logged, not raised).
+    """
+    import os
+    subs = _load_subscriptions()
+    if not subs:
+        return 0
+    priv = os.environ.get("JARVIS_VAPID_PRIVATE_KEY", "")
+    pub = os.environ.get("JARVIS_VAPID_PUBLIC_KEY", "")
+    if not (priv and pub):
+        logger.info("push: %d subscription(s) stored but no VAPID keys — "
+                    "skipping (%s)", len(subs), title)
+        return 0
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        logger.info("push: pywebpush not installed — skipping (%s)", title)
+        return 0
+    sent = 0
+    for sub in subs:
+        try:
+            webpush(subscription_info=sub,
+                    data=json.dumps({"title": title, "body": body}),
+                    vapid_private_key=priv,
+                    vapid_claims={"sub": "mailto:jarvis@localhost"})
+            sent += 1
+        except Exception as e:  # WebPushException and friends
+            logger.warning("push to %s failed: %s",
+                           str(sub.get("endpoint", ""))[:60], e)
+    return sent
 
 
 # --- router factory --------------------------------------------------------
@@ -228,6 +299,29 @@ def build_control_router(service, verify) -> APIRouter:
             "inr_budget": inr_budget,
             "breached": guard.breached,
         }
+
+    @r.get("/push/vapid-key")
+    def vapid_key():
+        import os
+        pub = os.environ.get("JARVIS_VAPID_PUBLIC_KEY", "")
+        if not pub:
+            raise HTTPException(404, "push not configured (no VAPID public key)")
+        return {"public_key": pub}
+
+    @r.post("/push/subscribe")
+    def push_subscribe(body: PushSubscription):
+        subs = _load_subscriptions()
+        subs = [s for s in subs if s.get("endpoint") != body.endpoint]
+        subs.append({"endpoint": body.endpoint, "keys": body.keys})
+        _save_subscriptions(subs)
+        return {"ok": True, "subscriptions": len(subs)}
+
+    @r.delete("/push/subscribe")
+    def push_unsubscribe(endpoint: str):
+        subs = [s for s in _load_subscriptions()
+                if s.get("endpoint") != endpoint]
+        _save_subscriptions(subs)
+        return {"ok": True, "subscriptions": len(subs)}
 
     return r
 

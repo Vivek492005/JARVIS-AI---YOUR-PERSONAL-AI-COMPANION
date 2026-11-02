@@ -81,6 +81,8 @@ def create_app(service: JarvisService, token: str):
         "app.js": "text/javascript",
         "manifest.json": "application/manifest+json",
         "sw.js": "text/javascript",
+        "icon-192.png": "image/png",
+        "icon-512.png": "image/png",
     }
 
     def _hud_file(name: str) -> "FileResponse":
@@ -181,7 +183,24 @@ def create_app(service: JarvisService, token: str):
             service.bus.off(Event, _on_event)  # off() also removes on_all subs
 
     # Task 7.7: control center (settings, audit, memory, skills, providers, costs)
-    from jarvis.server.control import build_control_router
+    from jarvis.server.control import build_control_router, notify_push
     app.include_router(build_control_router(service, verify))
+
+    # Task 7.9: push important events (confirmations, errors) to stored
+    # Web Push subscriptions. notify_push() degrades to a log line when
+    # pywebpush/VAPID aren't configured.
+    from jarvis.core.events import ConfirmationRequested, Error as ErrorEvent
+
+    def _on_important(ev) -> None:
+        try:
+            if isinstance(ev, ConfirmationRequested):
+                notify_push("JARVIS confirmation",
+                            ev.question or f"Allow {ev.tool}?")
+            elif isinstance(ev, ErrorEvent):
+                notify_push("JARVIS error", ev.message or "error")
+        except Exception:
+            logger.exception("push hook failed")
+
+    service.bus.on_all(_on_important)
 
     return app

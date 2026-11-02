@@ -96,6 +96,36 @@ def test_providers_and_costs_degrade_gracefully(client):
     assert costs["note"] == "cost tracking not attached"
 
 
+def test_push_subscribe_unsubscribe_cycle(client, tmp_path, monkeypatch):
+    import jarvis.core.config as cfgmod
+    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace",
+                        str(tmp_path))
+    sub = {"endpoint": "https://push.example/abc",
+           "keys": {"p256dh": "x", "auth": "y"}}
+    r = client.post("/api/push/subscribe", json=sub)
+    assert r.status_code == 200 and r.json()["subscriptions"] == 1
+    # re-subscribe same endpoint: no duplicate
+    assert client.post("/api/push/subscribe", json=sub).json()["subscriptions"] == 1
+    r = client.delete("/api/push/subscribe",
+                      params={"endpoint": "https://push.example/abc"})
+    assert r.json()["subscriptions"] == 0
+
+
+def test_push_vapid_key_missing(client, monkeypatch):
+    monkeypatch.delenv("JARVIS_VAPID_PUBLIC_KEY", raising=False)
+    assert client.get("/api/push/vapid-key").status_code == 404
+
+
+def test_notify_push_no_config_returns_zero(tmp_path, monkeypatch):
+    import jarvis.core.config as cfgmod
+    from jarvis.server.control import notify_push
+    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace",
+                        str(tmp_path))
+    monkeypatch.delenv("JARVIS_VAPID_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("JARVIS_VAPID_PRIVATE_KEY", raising=False)
+    assert notify_push("t", "b") == 0  # no subs, no keys: clean no-op
+
+
 def test_skills_enable_disable(tmp_path, monkeypatch):
     from jarvis.core.config import get_settings
     skills_dir = tmp_path / "skills"

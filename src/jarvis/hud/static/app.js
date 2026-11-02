@@ -107,12 +107,81 @@
   }
 
   /* --- commands back to jarvisd --- */
-  function sendCommand(text) {
-    fetch(api("/command"), {
+
+  /* Task 7.9: offline queue. When the PWA loses connectivity, commands are
+     stored in localStorage and flushed in order when 'online' fires. */
+  var QUEUE_KEY = "jarvis-pending-commands";
+  function loadQueue() {
+    try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); }
+    catch (e) { return []; }
+  }
+  function saveQueue(q) {
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+    catch (e) { /* storage full/blocked: drop */ }
+  }
+  function postCommand(text) {
+    return fetch(api("/command"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
       body: JSON.stringify({ text: text })
-    }).catch(function () { /* offline: nothing to do */ });
+    });
+  }
+  function flushQueue() {
+    var q = loadQueue();
+    if (!q.length || !navigator.onLine) return;
+    var next = q.shift();
+    saveQueue(q);
+    postCommand(next).then(flushQueue).catch(function () {
+      var r = loadQueue(); r.unshift(next); saveQueue(r);
+    });
+  }
+  window.addEventListener("online", function () {
+    connEl.textContent = "connected";
+    flushQueue();
+    connect();
+  });
+  window.addEventListener("offline", function () {
+    connEl.textContent = "offline — commands will queue";
+  });
+
+  function sendCommand(text) {
+    if (!navigator.onLine) {
+      var q = loadQueue(); q.push(text); saveQueue(q);
+      addTimeline("queued (offline): " + text, null);
+      return;
+    }
+    postCommand(text).catch(function () {
+      var q2 = loadQueue(); q2.push(text); saveQueue(q2);
+    });
+  }
+
+  /* Task 7.9: PWA install prompt. */
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById("btn-install").hidden = false;
+  });
+  document.getElementById("btn-install").addEventListener("click", function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function () {
+      deferredPrompt = null;
+      document.getElementById("btn-install").hidden = true;
+    });
+  });
+
+  /* Task 7.9: notifications for important events (opt-in, in-page).
+     True Web Push (VAPID) is documented in docs/PWA_SETUP.md; this covers
+     the HUD-open case with zero server crypto. */
+  function notifyImportant(title, body) {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      try { new Notification(title, { body: body, tag: "jarvis" }); }
+      catch (e) { /* ignore */ }
+    } else if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }
 
   document.getElementById("btn-haan").addEventListener("click", function () {
@@ -160,6 +229,7 @@
       setState("confirming");
       confirmQ.textContent = ev.question || ("Allow " + (ev.tool || "") + "?");
       confirmCard.hidden = false;
+      notifyImportant("JARVIS confirmation", confirmQ.textContent);
     }
     else if (type === "ConfirmationAnswered") { confirmCard.hidden = true; setState("thinking"); }
     else if (type === "SpeechStarted") { setState("speaking"); addTranscript("jarvis", ev.text || "", false); }
@@ -169,6 +239,7 @@
       setState("error");
       errorMsg.textContent = (ev.where ? ev.where + ": " : "") + (ev.message || "error");
       errorBanner.hidden = false;
+      notifyImportant("JARVIS error", errorMsg.textContent);
     }
     else if (type === "AudioLevel") { audioLevel = Math.max(0, Math.min(1, ev.level || 0)); }
   }
