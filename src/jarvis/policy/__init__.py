@@ -41,6 +41,8 @@ class PolicyContext:
     tainted: bool = False          # untrusted content in context (Task 1.5)
     rate_limited: bool = False     # set by the Task 1.8 rate limiter
     provenance: Dict[str, str] = field(default_factory=dict)  # arg -> source
+    remote: bool = False           # came from Telegram remote (Task 6.5)
+    remote_system_tools: bool = False  # explicit opt-in for SYSTEM remotely
 
 
 # --- Confirmation vocabulary (Task 1.3.3) -----------------------------------
@@ -64,6 +66,10 @@ CONFIRM_TIMEOUT_S = 10.0
 def decide(spec: ToolSpec, ctx: PolicyContext, level: int) -> Decision:
     """The autonomy matrix. Pure function — fully table-testable."""
     if spec.risk == Risk.SYSTEM:
+        # Task 6.5: SYSTEM tools are disabled on the remote channel by
+        # default (fail-closed); explicit opt-in restores CONFIRM.
+        if ctx.remote and not ctx.remote_system_tools:
+            return Decision.DENY
         return Decision.CONFIRM                       # always
     if ctx.tainted and spec.risk > Risk.READ:
         return Decision.CONFIRM                       # Task 1.5

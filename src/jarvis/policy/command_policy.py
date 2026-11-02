@@ -257,6 +257,14 @@ def confirmation_prompt(tool_name: str, args: Dict[str, Any]) -> str:
         return f"This will {what}. Say 'yes' to confirm, anything else to cancel."
     if tool_name == "manage_notes" and args.get("action") == "clear":
         return f"This will {_CONFIRM_DESCRIPTIONS['clear_notes']}. Say 'yes' to confirm, anything else to cancel."
+    if tool_name == "mail_send":
+        # Task 6.3: sending mail needs a full recipient+body preview.
+        body = str(args.get("body", ""))
+        preview = body[:300] + ("…" if len(body) > 300 else "")
+        return (f"Send email to {args.get('to', '?')} "
+                f"(subject: {args.get('subject', '(none)')})?\n"
+                f"Body preview:\n{preview}\n"
+                f"Say 'yes' to confirm, anything else to cancel.")
     return "This action needs your confirmation. Say 'yes' to confirm, anything else to cancel."
 
 
