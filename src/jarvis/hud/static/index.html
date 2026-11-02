@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0f14">
+<title>JARVIS HUD</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body data-state="idle" data-mode="panel">
+<div id="hud">
+  <header>
+    <div id="mode-toggle" role="tablist" aria-label="HUD mode">
+      <button data-setmode="orb" role="tab">Orb</button>
+      <button data-setmode="panel" role="tab" aria-selected="true">Panel</button>
+      <button data-setmode="full" role="tab">Full</button>
+    </div>
+    <div id="conn" aria-live="polite">connecting…</div>
+  </header>
+
+  <section id="orb-wrap" aria-label="Assistant state">
+    <canvas id="orb" width="240" height="240"></canvas>
+    <div id="state-label">idle</div>
+  </section>
+
+  <section id="confirm-card" hidden aria-live="assertive">
+    <h2>Confirm</h2>
+    <p id="confirm-q"></p>
+    <div>
+      <button id="btn-haan">Haan</button>
+      <button id="btn-nahi">Nahi</button>
+    </div>
+  </section>
+
+  <section id="error-banner" hidden aria-live="assertive">
+    <p id="error-msg"></p>
+    <button id="btn-dismiss">Dismiss</button>
+  </section>
+
+  <main id="streams">
+    <section id="transcript-sec" aria-label="Transcript">
+      <h2>Transcript</h2>
+      <ol id="transcript"></ol>
+    </section>
+    <section id="timeline-sec" aria-label="Action timeline">
+      <h2>Actions</h2>
+      <ol id="timeline"></ol>
+    </section>
+  </main>
+
+  <section id="telemetry" hidden aria-label="Telemetry">
+    <h2>System</h2>
+    <dl id="telemetry-dl"></dl>
+  </section>
+
+  <footer>
+    <button id="btn-telemetry" aria-pressed="false">Telemetry</button>
+    <button id="btn-contrast" aria-pressed="false">High contrast</button>
+    <form id="cmd-form" aria-label="Send command">
+      <input id="cmd-input" type="text" placeholder="Type a command…" autocomplete="off">
+      <button type="submit">Send</button>
+    </form>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

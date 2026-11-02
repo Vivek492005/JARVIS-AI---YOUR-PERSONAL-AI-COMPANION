@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 try:
     from fastapi import (Depends, FastAPI, Header, HTTPException, Query,
                          WebSocket, WebSocketDisconnect)
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import FileResponse, JSONResponse
     _FASTAPI_AVAILABLE = True
 except ImportError:  # the 'server' extra is optional
     _FASTAPI_AVAILABLE = False
@@ -66,6 +67,45 @@ def create_app(service: JarvisService, token: str):
     async def verify(authorization: Optional[str] = Header(default=None)):
         if not bearer_ok(authorization, token):
             raise HTTPException(status_code=401, detail="invalid token")
+
+    # --- HUD (Task 7.2): event-driven state machine + static web UI --------
+    from jarvis.hud.state import HUDStateMachine
+    hud = HUDStateMachine()
+    service.bus.on_all(hud.on_event)
+
+    _HUD_STATIC = Path(__file__).resolve().parent.parent / "hud" / "static"
+    _HUD_FILES = {
+        "index.html": "text/html",
+        "styles.css": "text/css",
+        "app.js": "text/javascript",
+        "manifest.json": "application/manifest+json",
+        "sw.js": "text/javascript",
+    }
+
+    def _hud_file(name: str) -> "FileResponse":
+        # No path traversal: only exact allowlisted names, joined under the
+        # package's static dir.
+        if name not in _HUD_FILES:
+            raise HTTPException(status_code=404, detail="not found")
+        path = _HUD_STATIC / name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="not found")
+        return FileResponse(path, media_type=_HUD_FILES[name])
+
+    @app.get("/hud", dependencies=[Depends(verify)], include_in_schema=False)
+    async def hud_index():
+        return _hud_file("index.html")
+
+    # NOTE: /hud/snapshot must be registered BEFORE /hud/{name},
+    # otherwise the path param swallows it.
+    @app.get("/hud/snapshot", dependencies=[Depends(verify)])
+    async def hud_snapshot():
+        return JSONResponse(hud.snapshot())
+
+    @app.get("/hud/{name}", dependencies=[Depends(verify)],
+             include_in_schema=False)
+    async def hud_static(name: str):
+        return _hud_file(name)
 
     class CommandIn(BaseModel):
         text: str
