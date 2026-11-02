@@ -7,6 +7,7 @@ or via :func:`server_command`.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from typing import Any, Dict, List
 
@@ -89,9 +90,18 @@ def main() -> None:
 
 
 def server_command() -> List[str]:
-    """argv to spawn this fake as a subprocess."""
+    """argv to spawn this fake as a subprocess.
+
+    Hermetic: the child gets the repo root AND src/ on sys.path explicitly,
+    so it works regardless of the parent's PYTHONPATH (pytest's
+    pythonpath=["src"] does not propagate to subprocesses).
+    """
+    fakes_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(os.path.dirname(fakes_dir))
+    src_dir = os.path.join(repo_root, "src")
     return [sys.executable, "-c",
-            "import sys; sys.path.insert(0, '.'); "
+            f"import sys; sys.path.insert(0, {src_dir!r}); "
+            f"sys.path.insert(0, {repo_root!r}); "
             "from tests.fakes.fake_mcp import main; main()"]
 
 
