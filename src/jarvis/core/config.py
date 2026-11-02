@@ -132,6 +132,10 @@ class SafetyCfg(BaseModel):
     confirm_timeout_s: float = 10.0
     max_tool_calls_per_minute: int = 20
     max_steps_per_task: int = 12
+    # Task 8.3: safe mode — only reflex + READ tools run; everything above
+    # READ is denied outright (fail-closed). Set via `jarvis --safe` or
+    # settings.toml [safety] safe_mode = true.
+    safe_mode: bool = False
 
     @field_validator("autonomy_level")
     @classmethod
@@ -144,6 +148,14 @@ class SafetyCfg(BaseModel):
 class PrivacyCfg(BaseModel):
     # Privacy Mode = local-only chain: no mic/cloud STT, no cloud LLM/TTS.
     privacy_mode: bool = False
+    # Task 8.3: offline mode — no network at all. Forces every cloud egress
+    # flag off (via cloud_egress_allowed), swaps PIM providers to fakes, and
+    # makes the policy gate deny tools with the "network" scope.
+    offline: bool = False
+    # Task 8.3: crash-report upload is OPT-IN only (default: local reports,
+    # nothing leaves the machine). Both must be set for an upload to happen.
+    crash_upload: bool = False
+    crash_upload_url: str = ""
     # Task 1.10: per-provider egress toggles. Privacy Mode forces every
     # cloud call off regardless of these.
     allow_huggingface: bool = True   # chat text -> HF router (Qwen)
@@ -265,6 +277,16 @@ def get_settings() -> Settings:
 def reset_settings_cache() -> None:
     """Drop the cached Settings (mainly for tests)."""
     get_settings.cache_clear()
+
+
+def cloud_egress_allowed(settings: "Settings") -> bool:
+    """True if any cloud network call (STT/TTS/LLM) may happen.
+
+    Task 8.3: offline mode forces this False regardless of the individual
+    allow_* toggles. Callers check this *in addition to* their specific
+    allow_* flag, so one switch kills all cloud egress.
+    """
+    return not (settings.privacy.offline or settings.privacy.privacy_mode)
 
 
 # ---------------------------------------------------------------------------

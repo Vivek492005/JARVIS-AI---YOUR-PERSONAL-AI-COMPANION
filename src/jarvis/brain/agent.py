@@ -346,8 +346,12 @@ class AIAgent:
 
         # A-01 follow-up: taint flows from the agent's conversation state
         # (set by Task 1.5 when untrusted content enters the context).
+        # Task 8.3: safe/offline modes ride along from settings.
+        from jarvis.policy import context_from_settings
+        base = context_from_settings()
         ctx = PolicyContext(tainted=getattr(self, "tainted", False),
-                            rate_limited=getattr(self, "rate_limited", False))
+                            rate_limited=getattr(self, "rate_limited", False),
+                            safe_mode=base.safe_mode, offline=base.offline)
         from jarvis.core.events import ToolRequested, ToolFinished
         self._emit(ToolRequested(trace=getattr(self, "session_id", ""), tool=function_name,
                                     args=dict(args)))

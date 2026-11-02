@@ -202,7 +202,8 @@ def _vlm_specs() -> List[ToolSpec]:
                  description="Last-resort visual click: numbered boxes on "
                              "screenshot, VLM picks one. Hands off on "
                              "login/CAPTCHA/payment/2FA/UAC.",
-                 params=VlmClickParams, handler=_h_vlm_click),
+                 params=VlmClickParams, handler=_h_vlm_click,
+                 scopes=frozenset({"network"})),
     ]
 
 
@@ -266,21 +267,26 @@ def _browser_specs() -> List[ToolSpec]:
         ToolSpec(name="browser_open", risk=Risk.REVERSIBLE,
                  description="Open a URL in the dedicated jarvis browser "
                              "profile. file:// and chrome:// blocked.",
-                 params=BrowserOpenParams, handler=_h_browser_open),
+                 params=BrowserOpenParams, handler=_h_browser_open,
+                 scopes=frozenset({"network"})),
         ToolSpec(name="browser_read", risk=Risk.READ,
                  description="Accessibility snapshot of the current page "
                              "(untrusted).",
                  params=BrowserReadParams, handler=_h_browser_read,
-                 carries_external_data=True),
+                 carries_external_data=True,
+                 scopes=frozenset({"network"})),
         ToolSpec(name="browser_click", risk=Risk.REVERSIBLE,
                  description="Click an element ref from browser_read.",
-                 params=BrowserRefParams, handler=_h_browser_click),
+                 params=BrowserRefParams, handler=_h_browser_click,
+                 scopes=frozenset({"network"})),
         ToolSpec(name="browser_fill", risk=Risk.REVERSIBLE,
                  description="Fill a field ref from browser_read.",
-                 params=BrowserFillParams, handler=_h_browser_fill),
+                 params=BrowserFillParams, handler=_h_browser_fill,
+                 scopes=frozenset({"network"})),
         ToolSpec(name="browser_submit", risk=Risk.DESTRUCTIVE,
                  description="Submit a form. Hands off on login/payment pages.",
-                 params=BrowserSubmitParams, handler=_h_browser_submit),
+                 params=BrowserSubmitParams, handler=_h_browser_submit,
+                 scopes=frozenset({"network"})),
     ]
 
 
@@ -495,7 +501,8 @@ def _app_specs() -> List[ToolSpec]:
                  params=OfficeOpenParams, handler=_h_office_save),
         ToolSpec(name="spotify", risk=Risk.REVERSIBLE,
                  description="Spotify: play|pause|skip|previous|queue.",
-                 params=SpotifyParams, handler=_h_spotify),
+                 params=SpotifyParams, handler=_h_spotify,
+                 scopes=frozenset({"network"})),
         ToolSpec(name="system_settings", risk=Risk.REVERSIBLE,
                  description="Allowlisted system settings only "
                              "(volume/brightness/wifi).",

@@ -268,6 +268,9 @@ def _cmd_memory(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jarvis", description="JARVIS AI companion")
+    # Task 8.3: global safe mode — only reflex + READ tools run.
+    p.add_argument("--safe", action="store_true",
+                   help="safe mode: only reflex + READ tools (fail-closed)")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("serve", help="run jarvisd (headless service)")
@@ -312,6 +315,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+    if args.safe:
+        # Task 8.3: safe mode via env so every downstream get_settings()
+        # (already lru-cached per process) picks it up before any command runs.
+        import os
+        os.environ["safety__safe_mode"] = "true"
+        from jarvis.core.config import reset_settings_cache
+        reset_settings_cache()
     return args.func(args)
 
 

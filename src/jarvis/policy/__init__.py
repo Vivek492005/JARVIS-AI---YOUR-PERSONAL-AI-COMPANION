@@ -43,6 +43,22 @@ class PolicyContext:
     provenance: Dict[str, str] = field(default_factory=dict)  # arg -> source
     remote: bool = False           # came from Telegram remote (Task 6.5)
     remote_system_tools: bool = False  # explicit opt-in for SYSTEM remotely
+    safe_mode: bool = False       # Task 8.3: `jarvis --safe` — READ only
+    offline: bool = False         # Task 8.3: deny tools with "network" scope
+
+
+def context_from_settings() -> "PolicyContext":
+    """Build a PolicyContext from the effective Settings (safe/offline modes).
+
+    Never raises: falls back to a default context if settings can't load.
+    """
+    try:
+        from jarvis.core.config import get_settings
+        s = get_settings()
+        return PolicyContext(safe_mode=s.safety.safe_mode,
+                             offline=s.privacy.offline)
+    except Exception:
+        return PolicyContext()
 
 
 # --- Confirmation vocabulary (Task 1.3.3) -----------------------------------
@@ -65,6 +81,14 @@ CONFIRM_TIMEOUT_S = 10.0
 
 def decide(spec: ToolSpec, ctx: PolicyContext, level: int) -> Decision:
     """The autonomy matrix. Pure function — fully table-testable."""
+    # Task 8.3: safe mode — only READ tools run; everything above READ is
+    # denied outright (not even confirmed). Reflex matching is outside the
+    # policy gate, so reflexes keep working in safe mode.
+    if ctx.safe_mode and spec.risk > Risk.READ:
+        return Decision.DENY
+    # Task 8.3: offline mode — tools that need the network are denied.
+    if ctx.offline and "network" in spec.scopes:
+        return Decision.DENY
     if spec.risk == Risk.SYSTEM:
         # Task 6.5: SYSTEM tools are disabled on the remote channel by
         # default (fail-closed); explicit opt-in restores CONFIRM.

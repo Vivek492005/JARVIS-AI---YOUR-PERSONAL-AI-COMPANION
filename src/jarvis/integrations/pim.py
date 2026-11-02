@@ -176,7 +176,16 @@ _tasks: Optional[TaskProvider] = None
 
 
 def _provider_kind() -> str:
+    """'google' only with explicit opt-in AND not offline; else 'fake'."""
     from jarvis.core.secrets import get_secret
+    # Task 8.3: offline mode forces the fake providers even if the user
+    # opted into Google — no network calls, fail-closed.
+    try:
+        from jarvis.core.config import get_settings
+        if get_settings().privacy.offline:
+            return "fake"
+    except Exception:  # noqa: S110 — settings unreadable: stay on fakes
+        pass
     # Explicit opt-in only: a real account is never used by accident.
     if get_secret("JARVIS_PIM_PROVIDER") == "google":
         return "google"

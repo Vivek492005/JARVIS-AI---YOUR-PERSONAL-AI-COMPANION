@@ -1781,12 +1781,16 @@ class VoiceInterface:
             self.engine = None
 
     def _privacy_tts_only_local(self) -> bool:
-        """Task 1.10: Privacy Mode (or toggles off) => no cloud TTS."""
+        """Task 1.10: Privacy Mode (or toggles off) => no cloud TTS.
+
+        Task 8.3: offline mode also forces local-only TTS.
+        """
         try:
-            from jarvis.core.config import get_settings
-            p = get_settings().privacy
-            if p.privacy_mode:
+            from jarvis.core.config import get_settings, cloud_egress_allowed
+            s = get_settings()
+            if not cloud_egress_allowed(s):
                 return True
+            p = s.privacy
             if self.config.get("tts_engine") == "rumik" and not p.allow_rumik_tts:
                 return True
         except Exception:
@@ -2139,8 +2143,11 @@ class VoiceInterface:
                         # Task 1.10: Google STT toggle. Off => no cloud
                         # transcription (no local STT engine ships yet, so
                         # voice input pauses with a one-time warning).
-                        from jarvis.core.config import get_settings as _gs
-                        if not _gs().privacy.allow_google_stt:
+                        # Task 8.3: offline mode forces the same path.
+                        from jarvis.core.config import get_settings as _gs, \
+                            cloud_egress_allowed as _egress_ok
+                        _s = _gs()
+                        if not _egress_ok(_s) or not _s.privacy.allow_google_stt:
                             if not getattr(self, "_stt_warned", False):
                                 logger.warning(
                                     "Google STT disabled by privacy toggle — "

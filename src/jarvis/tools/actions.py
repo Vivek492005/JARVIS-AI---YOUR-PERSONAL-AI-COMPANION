@@ -478,21 +478,24 @@ def _register_tools():
         description="Opens a specific website or web portal in the user's "
                     "default browser.",
         params=OpenWebsiteParams,
-        handler=_BASE_HANDLERS["open_website"]))
+        handler=_BASE_HANDLERS["open_website"],
+        scopes=frozenset({"network"})))
     _reg(ToolSpec(
         name="web_search", risk=Risk.READ,
         description="Searches Google or the web for real-time information, "
                     "answers, queries, or news requested by the user.",
         params=WebSearchParams,
         handler=_BASE_HANDLERS["web_search"],
-        carries_external_data=True))
+        carries_external_data=True,
+        scopes=frozenset({"network"})))
     _reg(ToolSpec(
         name="download_media", risk=Risk.REVERSIBLE,
         description="Downloads video or audio from YouTube or any media URL, "
                     "or searches and downloads the requested song or video "
                     "using yt-dlp.",
         params=DownloadMediaParams,
-        handler=_BASE_HANDLERS["download_media"]))
+        handler=_BASE_HANDLERS["download_media"],
+        scopes=frozenset({"network"})))
     # system_control: per-action risk tiers; base is SYSTEM (fail-closed).
     _reg(ToolSpec(
         name="system_control", risk=Risk.SYSTEM,
@@ -639,13 +642,18 @@ def _engine_decision(tool_name: str, args: Dict[str, Any],
     Returns ("allow"/"confirm"/"deny", reason). The level comes from
     Settings (safety.autonomy_level); ctx carries taint/rate-limit state.
     """
-    from jarvis.policy import decide_tool_call, PolicyContext, Decision
+    from jarvis.policy import decide_tool_call
     try:
         from jarvis.core.config import get_settings
         level = get_settings().safety.autonomy_level
     except Exception:
         level = 1
-    decision, reason = decide_tool_call(tool_name, args, ctx or PolicyContext(),
+    # Task 8.3: when the caller didn't supply a context, build one from the
+    # effective settings so --safe / offline mode apply to every entry point.
+    if ctx is None:
+        from jarvis.policy import context_from_settings
+        ctx = context_from_settings()
+    decision, reason = decide_tool_call(tool_name, args, ctx,
                                         level)
     return ({"ALLOW": ALLOW, "CONFIRM": CONFIRM, "DENY": DENY}[decision.name],
             reason)
