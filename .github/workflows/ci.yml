@@ -11,7 +11,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11" }
       - run: pip install -e ".[dev]"
       - run: ruff check .
@@ -22,7 +22,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11" }
       - run: pip install -e ".[dev]"
       - run: pytest tests/security -m "not hardware and not live" -v
