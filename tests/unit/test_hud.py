@@ -180,6 +180,7 @@ def test_hud_serves_index_and_assets(monkeypatch):
     assert r.headers["content-type"].startswith("text/html")
     for name, ctype in [("styles.css", "text/css"),
                         ("app.js", "text/javascript"),
+                        ("control.html", "text/html"),
                         ("manifest.json", "application/manifest+json"),
                         ("sw.js", "text/javascript")]:
         r = c.get(f"/hud/{name}", headers=h)

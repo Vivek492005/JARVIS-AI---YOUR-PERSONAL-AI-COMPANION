@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS — Control Center</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .ctl { max-width: 900px; margin: 0 auto; padding: 1rem; color: #eee; }
+  .card { background: #16181d; border: 1px solid #2a2e37; border-radius: 12px;
+          padding: 1rem; margin-bottom: 1rem; }
+  .card h2 { margin: 0 0 .6rem; font-size: 1.05rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  td, th { padding: .35rem .5rem; border-bottom: 1px solid #24272e; text-align: left; }
+  input[type=text], input[type=number], select { background:#0e1013; color:#eee;
+      border:1px solid #2a2e37; border-radius:6px; padding:.3rem .5rem; }
+  button { background:#2f6fed; color:#fff; border:0; border-radius:8px;
+      padding:.4rem .9rem; cursor:pointer; }
+  button.danger { background:#b3261e; }
+  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .muted { color:#8a8f9a; font-size:.8rem; }
+  nav.top { display:flex; gap:1rem; margin-bottom:1rem; }
+  nav.top a { color:#9db8ff; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="ctl">
+  <nav class="top"><a href="index.html">← HUD</a><h1 style="font-size:1.2rem;margin:0">Control Center</h1></nav>
+
+  <div class="card" id="settings-card">
+    <h2>Settings</h2>
+    <table id="settings-table"></table>
+    <div class="row" style="margin-top:.6rem">
+      <button id="save-settings">Save</button>
+      <span class="muted" id="settings-msg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Audit log</h2>
+    <div class="row" style="margin-bottom:.5rem">
+      <input type="text" id="audit-q" placeholder="tool filter">
+      <button id="audit-load">Load</button>
+      <button id="audit-stats">Stats</button>
+    </div>
+    <div id="audit-out" class="muted">—</div>
+  </div>
+
+  <div class="card">
+    <h2>Memory facts</h2>
+    <div id="facts-list" class="muted">—</div>
+    <div class="row" style="margin-top:.5rem">
+      <input type="text" id="fact-key" placeholder="key">
+      <input type="text" id="fact-val" placeholder="value">
+      <button id="fact-add">Remember</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Skills</h2>
+    <div id="skills-list" class="muted">—</div>
+  </div>
+
+  <div class="card">
+    <h2>Providers &amp; costs</h2>
+    <div class="row" style="margin-bottom:.5rem">
+      <button id="prov-load">Refresh</button>
+    </div>
+    <div id="prov-out" class="muted">—</div>
+    <div id="costs-out" class="muted" style="margin-top:.5rem">—</div>
+  </div>
+</div>
+<script>
+const token = new URLSearchParams(location.search).get('token') || '';
+const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+
+async function loadSettings() {
+  const r = await fetch('/api/settings', { headers: H });
+  const s = await r.json();
+  const t = $('settings-table');
+  t.innerHTML = '';
+  window._draft = {};
+  for (const [section, vals] of Object.entries(s)) {
+    for (const [k, v] of Object.entries(vals)) {
+      const key = section + '.' + k;
+      const tr = document.createElement('tr');
+      const inp = document.createElement('input');
+      inp.type = typeof v === 'number' ? 'number' : 'text';
+      inp.value = v ?? '';
+      inp.dataset.key = key;
+      if (String(v).includes('redacted')) inp.disabled = true;
+      inp.onchange = () => { window._draft[key] = inp.value; };
+      const td1 = document.createElement('td'); td1.textContent = key;
+      const td2 = document.createElement('td'); td2.appendChild(inp);
+      tr.appendChild(td1); tr.appendChild(td2); t.appendChild(tr);
+    }
+  }
+}
+$('save-settings').onclick = async () => {
+  const updates = {};
+  for (const [k, v] of Object.entries(window._draft || {})) {
+    const n = Number(v);
+    updates[k] = (v !== '' && !isNaN(n)) ? n : v;
+  }
+  const r = await fetch('/api/settings', { method: 'PUT', headers: H,
+    body: JSON.stringify({ updates }) });
+  const j = await r.json();
+  $('settings-msg').textContent = 'applied: ' + (j.applied || []).join(', ') +
+    (j.rejected && j.rejected.length ? ' | rejected: ' + j.rejected.join(', ') : '');
+};
+
+async function loadAudit() {
+  const tool = $('audit-q').value;
+  const r = await fetch('/api/audit?limit=30' + (tool ? '&tool=' + encodeURIComponent(tool) : ''), { headers: H });
+  const rows = await r.json();
+  $('audit-out').innerHTML = rows.map(e =>
+    `<div>${e.ts || ''} · <b>${e.tool || ''}</b> · ${e.decision || ''} · ${JSON.stringify(e.args || {})}</div>`).join('') || 'empty';
+}
+$('audit-load').onclick = loadAudit;
+$('audit-stats').onclick = async () => {
+  const r = await fetch('/api/audit/stats', { headers: H });
+  const s = await r.json();
+  $('audit-out').textContent = JSON.stringify(s, null, 1);
+};
+
+async function loadFacts() {
+  const r = await fetch('/api/memory/facts', { headers: H });
+  const facts = await r.json();
+  $('facts-list').innerHTML = facts.map(f =>
+    `<div class="row"><span><b>${f.key}</b>: ${f.value} <span class="muted">(${f.source})</span></span>
+     <button class="danger" data-del="${f.id}">Forget</button></div>`).join('') || 'empty';
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    await fetch('/api/memory/facts/' + b.dataset.del, { method: 'DELETE', headers: H });
+    loadFacts();
+  });
+}
+$('fact-add').onclick = async () => {
+  await fetch('/api/memory/facts', { method: 'POST', headers: H,
+    body: JSON.stringify({ key: $('fact-key').value, value: $('fact-val').value }) });
+  $('fact-key').value = $('fact-val').value = '';
+  loadFacts();
+};
+
+async function loadSkills() {
+  const r = await fetch('/api/skills', { headers: H });
+  const skills = await r.json();
+  $('skills-list').innerHTML = skills.map(s =>
+    `<div class="row"><span><b>${s.name}</b> <span class="muted">${s.version || ''} · ${s.enabled ? 'enabled' : 'disabled'} · ${(s.permissions || []).join(', ')}</span></span>
+     <button data-skill="${s.name}" data-act="${s.enabled ? 'disable' : 'enable'}">${s.enabled ? 'Disable' : 'Enable'}</button></div>`).join('') || 'none';
+  document.querySelectorAll('[data-skill]').forEach(b => b.onclick = async () => {
+    await fetch(`api/skills/${b.dataset.skill}/${b.dataset.act}`, { method: 'POST', headers: H });
+    loadSkills();
+  });
+}
+
+$('prov-load').onclick = async () => {
+  const p = await (await fetch('/api/providers', { headers: H })).json();
+  const c = await (await fetch('/api/costs', { headers: H })).json();
+  $('prov-out').textContent = JSON.stringify(p, null, 1);
+  $('costs-out').textContent = 'Daily cost: ' + JSON.stringify(c, null, 1);
+};
+
+loadSettings(); loadAudit(); loadFacts(); loadSkills();
+</script>
+</body>
+</html>

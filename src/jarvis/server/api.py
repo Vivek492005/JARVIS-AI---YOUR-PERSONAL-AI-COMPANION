@@ -76,6 +76,7 @@ def create_app(service: JarvisService, token: str):
     _HUD_STATIC = Path(__file__).resolve().parent.parent / "hud" / "static"
     _HUD_FILES = {
         "index.html": "text/html",
+        "control.html": "text/html",
         "styles.css": "text/css",
         "app.js": "text/javascript",
         "manifest.json": "application/manifest+json",
@@ -178,5 +179,9 @@ def create_app(service: JarvisService, token: str):
         finally:
             reader.cancel()
             service.bus.off(Event, _on_event)  # off() also removes on_all subs
+
+    # Task 7.7: control center (settings, audit, memory, skills, providers, costs)
+    from jarvis.server.control import build_control_router
+    app.include_router(build_control_router(service, verify))
 
     return app
