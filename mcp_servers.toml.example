@@ -1,0 +1,20 @@
+# MCP servers allowlist (Task 6.1). Copy to `mcp_servers.toml` and edit.
+# ONLY servers listed here are ever connected — unknown servers are never
+# auto-connected. Discovered tools default to DESTRUCTIVE risk; downgrade
+# individual tools with risk_overrides AFTER reviewing what they do.
+
+[servers.filesystem]
+command = ["npx", "-y", "@modelcontextprotocol/server-filesystem", "C:/Users/me/JarvisWorkspace"]
+default_risk = "DESTRUCTIVE"
+version_pin = "@modelcontextprotocol/server-filesystem@1.2.3"
+
+[servers.filesystem.risk_overrides]
+# read = "READ"          # uncomment only after reviewing the tool
+
+# [servers.github]
+# command = ["npx", "-y", "@modelcontextprotocol/server-github"]
+# default_risk = "DESTRUCTIVE"
+# # Needs GITHUB_PERSONAL_ACCESS_TOKEN in env/keyring (see INTEGRATIONS_SETUP.md)
+
+# Remote (URL) servers are NOT auto-connected; configure a local stdio
+# bridge command instead.
