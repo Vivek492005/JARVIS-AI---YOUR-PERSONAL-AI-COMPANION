@@ -38,3 +38,5 @@ workspace/
 # Large media (covered by check-added-large-files in pre-commit)
 *.wav
 *.mp3
+.coverage
+coverage.xml
