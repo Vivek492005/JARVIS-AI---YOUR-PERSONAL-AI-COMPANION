@@ -108,6 +108,51 @@ def _cmd_send(args) -> int:
     return 0
 
 
+def _cmd_onboard(args) -> int:
+    """Task 7.6: interactive first-run wizard."""
+    from pathlib import Path
+    from jarvis.core import config as config_mod
+    from jarvis.core import secrets as secrets_mod
+    from jarvis.onboarding.wizard import OnboardingWizard, StepContext
+
+    cfg = config_mod.get_settings()
+    workspace = Path(cfg.memory_workspace or (Path.home() / ".jarvis" / "workspace"))
+
+    def _mic_test():
+        try:
+            from jarvis.voice.audio import record_sample_rms  # type: ignore
+            return record_sample_rms(seconds=2.0)
+        except Exception as e:
+            return {"skipped": True, "reason": str(e)}
+
+    def _wakeword_test():
+        # Real calibration needs the mic loop; the wizard records intent and
+        # the threshold stays default until docs/WAKEWORD_TEST.md is followed.
+        return {"skipped": True, "reason": "follow docs/WAKEWORD_TEST.md"}
+
+    def _run_doctor():
+        from jarvis.core.doctor import run_doctor
+        rc = run_doctor()
+        return {"ok": rc == 0, "summary": f"exit={rc}"}
+
+    ctx = StepContext(
+        config=cfg,
+        workspace=workspace,
+        store_secret=secrets_mod.store_secret,
+        mic_test=_mic_test,
+        wakeword_test=_wakeword_test,
+        run_command=lambda c: f"(demo skipped — run 'jarvis send {c!r}' with jarvisd up)",
+        run_doctor=_run_doctor,
+    )
+    wiz = OnboardingWizard(ctx)
+    wiz.run()
+    try:
+        config_mod._write_settings_toml(cfg)
+    except Exception as e:
+        print(f"warning: config not saved: {e}")
+    return 0 if wiz.complete else 1
+
+
 def _cmd_doctor(args) -> int:
     from jarvis.core.doctor import run_doctor
     if getattr(args, "latency", False):
@@ -244,6 +289,9 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--latency", action="store_true",
                    help="latency budget report (Task 3.10)")
     d.set_defaults(func=_cmd_doctor)
+
+    o = sub.add_parser("onboard", help="first-run setup wizard (Task 7.6)")
+    o.set_defaults(func=_cmd_onboard)
 
     r = sub.add_parser("reflex", help="reflex layer utilities (Task 2.6)")
     r.add_argument("reflex_cmd", nargs="?", default="stats")
