@@ -562,6 +562,10 @@ def _register_tools():
     from jarvis.perception.tools import register_perception_tools
     register_perception_tools()
 
+    # Phase 6: integrations (MCP, PIM, scheduler, heartbeat) — same gate.
+    from jarvis.integrations.tools import register_integration_tools
+    register_integration_tools()
+
 
 _BASE_HANDLERS = {
     "open_application": lambda args, cb, nf: open_application(args.get("app_name", ""), cb),
