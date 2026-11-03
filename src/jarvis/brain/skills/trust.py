@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 class TrustLevel(str, Enum):
     LOCAL = "local"
     THIRD_PARTY = "third_party"
+    # Phase 9 moonshot: curator-signed marketplace skills. Still needs
+    # sandbox Level B+ (see min_level_for_trust), but the manifest's
+    # declared risk tiers are honoured because the install-time
+    # confirmation explicitly covered every tool + risk.
+    VERIFIED = "verified"
 
 
 @dataclass

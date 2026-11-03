@@ -171,6 +171,15 @@ def load_all(skills_dir: Path, local_names: frozenset = frozenset()) -> List[Ski
             continue
         trust = (TrustLevel.LOCAL if child.name in local_names
                  else TrustLevel.THIRD_PARTY)
+        if trust is not TrustLevel.LOCAL:
+            # Phase 9 moonshot: a marketplace-installed skill carries a
+            # signed install record; re-verify its pins and honour the
+            # recorded trust tier (fail-closed → THIRD_PARTY).
+            try:
+                from jarvis.marketplace.installer import trust_for_installed
+                trust = trust_for_installed(child)
+            except Exception:
+                logger.exception("skill %s: trust check failed", child.name)
         try:
             manifests.append(load_skill(child, trust=trust))
         except Exception as e:

@@ -29,7 +29,7 @@ import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,11 @@ def current_level() -> SandboxLevel:
 def min_level_for_trust(trust: str) -> SandboxLevel:
     """Minimum sandbox level for a skill trust tier.
 
-    ``trust`` is a TrustLevel value ("local" / "third_party").
+    ``trust`` is a TrustLevel value ("local" / "third_party" / "verified").
+    Anything not local needs Level B+ (fail-closed).
     """
-    if str(trust).lower() in ("third_party", "third-party"):
+    if str(trust).lower() in ("third_party", "third-party",
+                              "verified"):
         return SandboxLevel.B
     return SandboxLevel.A
 
