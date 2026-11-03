@@ -11,6 +11,7 @@ Commands:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 
@@ -184,12 +185,195 @@ def _skills_dir():
     return d
 
 
+def _cmd_skill_marketplace(cmd, arg, extra, skills_dir):
+    """Marketplace subcommands (Phase 9 moonshot). Returns int or None."""
+    from pathlib import Path
+    from jarvis.marketplace import ed25519
+    from jarvis.marketplace.installer import install_package
+    from jarvis.marketplace.installer import _jarvis_version
+    from jarvis.marketplace.package import PackageError, build_package, pack_zip
+    from jarvis.marketplace.revocation import update_from_feed
+    from jarvis.marketplace.signing import (
+        CuratorStore, marketplace_dir, sign_package, verify_package,
+    )
+    from jarvis.marketplace.revocation import check_revoked
+    from jarvis.policy.audit import AuditLogger
+
+    def audit(tool, args, decision, reason=""):
+        try:
+            AuditLogger().log(tool, args, decision, reason)
+        except Exception:
+            logger = logging.getLogger(__name__)
+            logger.exception("marketplace CLI audit write failed")
+
+    if cmd == "install":
+        if not arg:
+            print("usage: jarvis skill install <package.jskill|dir>",
+                  file=sys.stderr)
+            return 2
+        res = install_package(arg, skills_dir)
+        if res.ok:
+            print(f"installed {res.name} v{res.version} "
+                  f"(trust={res.trust}) -> {res.dest}")
+            print("Restart jarvisd to load it.")
+            return 0
+        print("INSTALL REFUSED:", file=sys.stderr)
+        for e in res.errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
+
+    if cmd == "verify":
+        if not arg:
+            print("usage: jarvis skill verify <package.jskill|dir>",
+                  file=sys.stderr)
+            return 2
+        result = verify_package(arg, check_revocation=check_revoked)
+        audit("skill.verify",
+              {"package": arg, "name": result.name,
+               "version": result.version, "key_id": result.key_id,
+               "trust": result.trust},
+              "allow" if result.ok else "deny",
+              "; ".join(result.errors)[:300])
+        if result.ok:
+            print(f"OK: {result.name} v{result.version} by {result.author}")
+            print(f"  trust={result.trust} key={result.key_id}")
+            return 0
+        print("VERIFY FAILED:", file=sys.stderr)
+        for e in result.errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
+
+    if cmd == "package":
+        # jarvis skill package <skill-dir> <private-key-file> [author-name]
+        import shutil
+        if not arg or not extra:
+            print("usage: jarvis skill package <skill-dir> <private-key-file> "
+                  "[author-name]", file=sys.stderr)
+            return 2
+        key_path = Path(extra[0])
+        try:
+            seed = bytes.fromhex(key_path.read_text(
+                encoding="utf-8").strip().split()[0])
+        except (OSError, ValueError) as e:
+            print(f"cannot read private key: {e}", file=sys.stderr)
+            return 1
+        if len(seed) != 32:
+            print("private key must be 32 bytes (64 hex chars)",
+                  file=sys.stderr)
+            return 1
+        pub = ed25519.keypair(seed)[1]
+        key_id = ed25519.key_id(pub)
+        staging = None
+        try:
+            staging = build_package(
+                arg, author=extra[1] if len(extra) > 1 else "anonymous",
+                author_key_id=key_id, min_jarvis=_jarvis_version())
+            sign_package(staging, seed)
+            man = json.loads((staging / "MANIFEST.json").read_text(
+                encoding="utf-8"))
+            out = pack_zip(staging, Path.cwd() /
+                           f"{man['name']}-{man['version']}.jskill")
+        except PackageError as e:
+            print(f"packaging failed: {e}", file=sys.stderr)
+            return 1
+        finally:
+            if staging is not None:
+                shutil.rmtree(staging, ignore_errors=True)
+        print(f"signed package: {out} (key {key_id})")
+        audit("skill.package", {"skill_dir": arg, "out": str(out),
+                                "key_id": key_id}, "allow")
+        return 0
+
+    if cmd == "keygen":
+        import os as _os
+        out = Path(arg) if arg else None
+        seed, pub = ed25519.keypair()
+        key_id = ed25519.key_id(pub)
+        if out is None:
+            out = marketplace_dir() / "keys" / f"{key_id}.key"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fd = _os.open(out, _os.O_WRONLY | _os.O_CREAT | _os.O_TRUNC, 0o600)
+        with _os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(seed.hex() + "\n")
+        print(f"private key: {out} (mode 0600 — never share it)")
+        print(f"public key:  {pub.hex()}")
+        print(f"key id:      {key_id}")
+        audit("skill.keygen", {"key_id": key_id,
+                               "out": str(out)}, "allow")
+        return 0
+
+    if cmd == "trust":
+        # jarvis skill trust <add|list|remove> [pubkey-hex|key-id] [name]
+        store = CuratorStore()
+        sub = arg
+        if sub == "list" or sub is None:
+            keys = store.list()
+            if not keys:
+                print("(no curator keys trusted)")
+                return 0
+            for k in keys:
+                print(f"{k.key_id}  {k.name or '(unnamed)'}")
+                print(f"    {k.public_key}")
+            return 0
+        if sub == "add":
+            if not extra:
+                print("usage: jarvis skill trust add <public-key-hex> [name]",
+                      file=sys.stderr)
+                return 2
+            try:
+                key = store.add(extra[0], extra[1] if len(extra) > 1 else "")
+            except PackageError as e:
+                print(f"bad key: {e}", file=sys.stderr)
+                return 1
+            print(f"trusted curator key: {key.key_id} ({key.name or 'unnamed'})")
+            audit("skill.trust.add", {"key_id": key.key_id,
+                                      "name": key.name}, "allow")
+            return 0
+        if sub == "remove":
+            if not extra:
+                print("usage: jarvis skill trust remove <key-id>",
+                      file=sys.stderr)
+                return 2
+            if store.remove(extra[0]):
+                print(f"removed curator key {extra[0]}")
+                audit("skill.trust.remove", {"key_id": extra[0]}, "allow")
+                return 0
+            print(f"unknown key id: {extra[0]}", file=sys.stderr)
+            return 1
+        print("usage: jarvis skill trust [add|list|remove]",
+              file=sys.stderr)
+        return 2
+
+    if cmd == "update-revocations":
+        # jarvis skill update-revocations <feed.json> <curator-pubkey-hex>
+        if not arg or not extra:
+            print("usage: jarvis skill update-revocations <feed.json> "
+                  "<curator-public-key-hex>", file=sys.stderr)
+            return 2
+        try:
+            merged = update_from_feed(arg, extra[0])
+        except PackageError as e:
+            print(f"feed rejected: {e}", file=sys.stderr)
+            audit("skill.revocations.update", {"feed": arg}, "deny", str(e))
+            return 1
+        print(f"revocation cache updated: {len(merged.revoked_keys)} keys, "
+              f"{len(merged.revoked_packages)} packages")
+        audit("skill.revocations.update", {"feed": arg}, "allow")
+        return 0
+
+    return None
+
+
 def _cmd_skill(args) -> int:
     from jarvis.brain.skills import load_manifest
     from jarvis.brain.skills.scaffold import new_skill
 
     skills_dir = _skills_dir()
     cmd, arg = args.skill_cmd, args.skill_arg
+    extra = getattr(args, "skill_extra", []) or []
+    mp = _cmd_skill_marketplace(cmd, arg, extra, skills_dir)
+    if mp is not None:
+        return mp
     if cmd == "list":
         if not skills_dir.exists():
             print("(no skills dir)")
@@ -229,7 +413,8 @@ def _cmd_skill(args) -> int:
                 flag.unlink()
             print(f"skill '{arg}' enabled (restart to apply)")
         return 0
-    print("usage: jarvis skill [list|new|enable|disable]", file=sys.stderr)
+    print("usage: jarvis skill [list|new|enable|disable|install|verify|"
+          "package|keygen|trust|update-revocations]", file=sys.stderr)
     return 2
 
 
@@ -301,8 +486,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sk = sub.add_parser("skill", help="skill management (Task 4.6)")
     sk.add_argument("skill_cmd", nargs="?", default="list",
-                    help="list | new <name> | enable <name> | disable <name>")
+                    help="list | new <name> | enable <name> | disable <name> | "
+                         "install <pkg> | verify <pkg> | package <dir> <key> | "
+                         "keygen | trust [add|list|remove] | update-revocations")
     sk.add_argument("skill_arg", nargs="?", default=None)
+    sk.add_argument("skill_extra", nargs="*", default=[])
     sk.set_defaults(func=_cmd_skill)
 
     mem = sub.add_parser("memory", help="memory controls (Task 4.4)")
