@@ -13,6 +13,16 @@ All notable changes to JARVIS are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Phase 9 moonshot: signed skill marketplace.** `.jskill` packages
+  (strict MANIFEST.json + hash-pinned files), pure-Python Ed25519
+  sign/verify (stdlib only, libsodium-pinned vectors), trust tiers
+  (self-signed / curator / reserved verified), fail-closed
+  `jarvis skill install|verify`, curator key store, signed revocation
+  feeds with offline cache, author tooling
+  (`keygen`/`package`/`trust`/`update-revocations`), sandbox Level B+
+  gate for third-party skills, audit-log entries, and
+  `docs/SKILL_MARKETPLACE.md` (trust model, author guide, reviewer
+  checklist). No registry server yet — distribution is files.
 - Test-pyramid coverage gate: core modules (policy, lane queue, memory,
   model router) must stay ≥ 80% (`scripts/check_coverage.py`).
 - Performance budget doc + profiler + CI-safe perf gate tests.
