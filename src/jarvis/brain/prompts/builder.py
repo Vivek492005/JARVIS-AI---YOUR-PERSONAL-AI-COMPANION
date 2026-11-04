@@ -17,6 +17,7 @@ reports can pin which prompt produced a result.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -35,6 +36,22 @@ def _read_layer(name: str) -> str:
     except OSError as e:
         logger.warning("prompt layer %s missing: %s", name, e)
         return f"[{name} layer unavailable]"
+
+
+def _read_learned_layer() -> str:
+    """Optional learned-snippets layer (Phase 9 moonshot).
+
+    Returns "" when the file is missing or has no real sections — unlike
+    _read_layer, a missing learned file is normal, not a warning.
+    """
+    path = _PROMPT_DIR / "learned.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    # Strip HTML comments; empty (or comment-only) file => no layer.
+    cleaned = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).strip()
+    return cleaned
 
 
 def tool_catalog() -> str:
@@ -108,6 +125,7 @@ class PromptBuilder:
             tool_catalog(),
             live_context(live_extra),
             _read_layer("style"),
+            _read_learned_layer(),  # Phase 9: human-approved snippets
             f"<!-- prompt_version={PROMPT_VERSION} -->",
         ]
         return "\n\n".join(s for s in sections if s)

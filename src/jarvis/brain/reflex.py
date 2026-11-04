@@ -28,6 +28,7 @@ import time
 import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -231,6 +232,45 @@ class ReflexHit:
                 for k, v in (self.args or {}).items()}
 
 
+def _validate_learned_rule(entry) -> Optional[Dict[str, Any]]:
+    """Shape-check one learned rule entry. Returns it or None."""
+    if not isinstance(entry, dict):
+        return None
+    patterns = entry.get("patterns")
+    tool = entry.get("tool")
+    if (not isinstance(patterns, list) or not patterns
+            or not all(isinstance(p, str) for p in patterns)
+            or not isinstance(tool, str) or not tool):
+        logger.warning("skipping malformed learned rule %r",
+                       entry.get("id"))
+        return None
+    return entry
+
+
+def _load_learned_rules(path: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Load human-approved learned rules (Phase 9 moonshot).
+
+    Fail-open on read errors (returns []), fail-closed on shape: malformed
+    entries are skipped with a warning. Defense in depth — the
+    approval-time validator is the real gate; this just keeps a
+    hand-edited file from breaking the matcher.
+    """
+    path = path or (Path(__file__).resolve().parent / "reflex_learned.json")
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        logger.warning("reflex_learned.json is not a list; ignoring")
+        return []
+    out = []
+    for entry in data:
+        valid = _validate_learned_rule(entry)
+        if valid is not None:
+            out.append(valid)
+    return out
+
+
 class ReflexMatcher:
     """Regex/fuzzy matcher over the extracted rule data."""
 
@@ -238,7 +278,12 @@ class ReflexMatcher:
                  rng: Optional[random.Random] = None) -> None:
         if rules is None:
             from jarvis.legacy.rule_commands import RULES
-            rules = RULES
+            rules = list(RULES)
+            # Phase 9 moonshot: merge human-approved learned rules.
+            # They are appended AFTER the curated built-ins (built-ins win
+            # on overlap) and were gated at approval time to READ/REVERSIBLE
+            # tools only, so they can never bypass confirmation.
+            rules.extend(_load_learned_rules())
         self._rules = rules
         # Pre-compile patterns once.
         self._compiled = [

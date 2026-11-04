@@ -289,6 +289,13 @@ class UndoJournal:
         tool, args, desc = self._stack.pop()
         try:
             result = executor(tool, args)
+            # Phase 9 moonshot: feed the learning loop a correction signal.
+            # Guarded and best-effort — the undo path must never break.
+            try:
+                from jarvis.learning.recorder import record_undo_event
+                record_undo_event(tool, args, desc)
+            except Exception:  # noqa: S110 - undo must never break
+                pass
             return f"Wapas kar diya: {desc} -> {result[:120]}"
         except Exception as e:
             return f"Wapas nahi kar paya ({desc}): {e}"
