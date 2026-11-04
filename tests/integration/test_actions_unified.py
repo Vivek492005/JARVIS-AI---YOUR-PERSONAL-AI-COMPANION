@@ -60,9 +60,9 @@ def proc(tmp_path):
 # 0. Pending confirmations take precedence in process()
 # ---------------------------------------------------------------------------
 
+
 def test_process_delegates_pending_confirmation(proc):
-    proc.ai_agent.pending_confirmation = (
-        "system_control", {"action": "lock_pc"}, time.time())
+    proc.ai_agent.pending_confirmation = ("system_control", {"action": "lock_pc"}, time.time())
     out = proc.process("yes")
     assert out["id"] == "confirm_flow"
     assert out["type"] == CommandType.AI
@@ -81,9 +81,12 @@ def test_process_normal_routing_when_no_pending(proc):
 # _gated(): ALLOW / CONFIRM / DENY handling in the legacy path
 # ---------------------------------------------------------------------------
 
+
 def test_gated_confirm_registers_on_agent(proc):
-    with mock.patch("access_os.voice_interface.run_action",
-                    return_value=("confirm", "ACTION_REQUIRES_CONFIRMATION: q")):
+    with mock.patch(
+        "access_os.voice_interface.run_action",
+        return_value=("confirm", "ACTION_REQUIRES_CONFIRMATION: q"),
+    ):
         resp = proc._action_lock_pc()
     assert "ACTION_REQUIRES_CONFIRMATION" in resp
     assert proc.ai_agent.pending_confirmation is not None
@@ -93,23 +96,25 @@ def test_gated_confirm_registers_on_agent(proc):
 def test_gated_confirm_without_agent_cancels_safely(tmp_path):
     p = VoiceCommandProcessor(notes_file=str(tmp_path / "notes.txt"))
     p.ai_agent = None
-    with mock.patch("access_os.voice_interface.run_action",
-                    return_value=("confirm", "ACTION_REQUIRES_CONFIRMATION: q")):
+    with mock.patch(
+        "access_os.voice_interface.run_action",
+        return_value=("confirm", "ACTION_REQUIRES_CONFIRMATION: q"),
+    ):
         resp = p._action_empty_recycle_bin()
     assert "cancelled" in resp.lower()
 
 
 def test_gated_deny_returns_reason(proc):
-    with mock.patch("access_os.voice_interface.run_action",
-                    return_value=("deny", "Blocked for safety: nope")):
+    with mock.patch(
+        "access_os.voice_interface.run_action", return_value=("deny", "Blocked for safety: nope")
+    ):
         resp = proc._action_lock_pc()
     assert "Blocked for safety" in resp
     assert proc.ai_agent.pending_confirmation is None
 
 
 def test_gated_allow_uses_ok_msg(proc):
-    with mock.patch("access_os.voice_interface.run_action",
-                    return_value=("allow", "raw result")):
+    with mock.patch("access_os.voice_interface.run_action", return_value=("allow", "raw result")):
         resp = proc._action_lock_pc()
     assert resp == "Locking the workstation"
 
@@ -117,6 +122,7 @@ def test_gated_allow_uses_ok_msg(proc):
 # ---------------------------------------------------------------------------
 # Adapters call the right tools with the right args
 # ---------------------------------------------------------------------------
+
 
 def test_adapter_routes_through_run_action(proc):
     seen = {}

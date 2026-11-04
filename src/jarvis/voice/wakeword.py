@@ -68,7 +68,7 @@ class DummyWakeBackend:
 
     def process(self, frame: bytes) -> Optional[str]:
         if frame.startswith(self.MARKER):
-            kw = frame[len(self.MARKER):].split(b"\x00")[0].decode("utf-8", "ignore").lower()
+            kw = frame[len(self.MARKER) :].split(b"\x00")[0].decode("utf-8", "ignore").lower()
             if kw in self.keywords:
                 return kw
         return None
@@ -107,6 +107,7 @@ class OpenWakeWordBackend:
 
     def process(self, frame: bytes) -> Optional[str]:
         import numpy as np  # local import: backend-only dependency
+
         audio = np.frombuffer(frame, dtype=np.int16)
         scores = self._model.predict(audio)
         for model_name, score in scores.items():
@@ -149,6 +150,7 @@ class PorcupineBackend:
 
     def process(self, frame: bytes) -> Optional[str]:
         import numpy as np
+
         audio = np.frombuffer(frame, dtype=np.int16)
         # Porcupine expects a fixed frame length; pad/trim defensively.
         want = self._porcupine.frame_length
@@ -170,7 +172,7 @@ class WakeConfig:
     keywords: List[str] = field(default_factory=lambda: ["hey jarvis", "jarvis"])
     threshold: float = 0.5
     backend: str = "openwakeword"  # openwakeword | porcupine | dummy
-    followup_s: float = 7.0       # conversation mode window after a response
+    followup_s: float = 7.0  # conversation mode window after a response
     duck_threshold_boost: float = 0.25  # added while our own TTS is playing
 
 
@@ -182,9 +184,13 @@ class WakeWordEngine:
     ``followup=True`` so the caller can skip the wake word requirement.
     """
 
-    def __init__(self, backend: WakeBackend, config: Optional[WakeConfig] = None,
-                 echo_guard=None,
-                 on_wake: Optional[Callable[[str, bool], None]] = None) -> None:
+    def __init__(
+        self,
+        backend: WakeBackend,
+        config: Optional[WakeConfig] = None,
+        echo_guard=None,
+        on_wake: Optional[Callable[[str, bool], None]] = None,
+    ) -> None:
         self.backend = backend
         self.config = config or WakeConfig()
         self.echo_guard = echo_guard

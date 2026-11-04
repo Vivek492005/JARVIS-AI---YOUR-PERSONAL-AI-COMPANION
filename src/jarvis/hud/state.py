@@ -11,7 +11,7 @@ See docs/HUD_SPEC.md for the state -> visual mapping.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ _TRANSITIONS: Dict[str, tuple] = {
 @dataclass
 class TimelineEntry:
     """One row in the HUD action timeline."""
+
     label: str
     ok: Optional[bool] = None  # None = in-progress
     detail: str = ""
@@ -181,20 +182,19 @@ class HUDStateMachine:
             if entry.ok is None and entry.label.startswith(tool):
                 entry.ok = ok
                 entry.label = f"{tool} {'✓' if ok else '✗'}"
-                self._emit("timeline", {"action": "finish", "label": entry.label,
-                                        "ok": ok})
+                self._emit("timeline", {"action": "finish", "label": entry.label, "ok": ok})
                 return
         # No matching in-progress entry (e.g. restarted) — still show it.
-        self.timeline.append(TimelineEntry(label=f"{tool} {'✓' if ok else '✗'}",
-                                           ok=ok))
+        self.timeline.append(TimelineEntry(label=f"{tool} {'✓' if ok else '✗'}", ok=ok))
 
     # -- snapshot for new clients ------------------------------------------
     def snapshot(self) -> Dict[str, Any]:
         return {
             "state": self.state,
             "audio_level": self.audio_level,
-            "transcript": [{"who": t.who, "text": t.text, "live": t.live}
-                           for t in self.transcript[-50:]],
+            "transcript": [
+                {"who": t.who, "text": t.text, "live": t.live} for t in self.transcript[-50:]
+            ],
             "timeline": [{"label": e.label, "ok": e.ok} for e in self.timeline[-30:]],
             "confirm_card": self.confirm_card,
             "error": self.error_info,

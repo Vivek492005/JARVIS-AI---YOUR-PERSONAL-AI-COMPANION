@@ -41,6 +41,7 @@ def test_serial_execution_no_overlap(lane):
             time.sleep(dur)
             with lock:
                 events.append(("end", name))
+
         return fn
 
     lane.submit(task("a"), name="a")
@@ -138,6 +139,7 @@ def test_on_done_callback(lane):
 
 def test_interrupt_emits_event_and_fires_hooks(lane):
     from jarvis.core.events import get_bus
+
     seen = []
     get_bus().on(Interrupt, seen.append)
     hooks = []

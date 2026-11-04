@@ -21,9 +21,9 @@ import hashlib
 import logging
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +45,14 @@ class TierDecision:
 # Signals that push toward T2 (strong): planning, code, multi-step.
 _T2_KEYWORDS = re.compile(
     r"(?i)\b(plan|steps|compare|analyze|analyse|debug|code|script|"
-    r"explain in detail|research|strategy|design)\b")
+    r"explain in detail|research|strategy|design)\b"
+)
 
 
 def _looks_multi_tool(text: str) -> bool:
     # "aur" / "and" joining two imperatives, or explicit sequencing.
     t = text.lower()
-    return bool(re.search(r"\b(aur|and|then|phir|uske baad)\b", t)
-                and len(t.split()) > 6)
+    return bool(re.search(r"\b(aur|and|then|phir|uske baad)\b", t) and len(t.split()) > 6)
 
 
 class ModelRouter:
@@ -66,8 +66,9 @@ class ModelRouter:
         if tier == Tier.T1_FAST:
             return getattr(getattr(s, "brain", None), "t1_model", "") or "fast-default"
         if tier == Tier.T2_STRONG:
-            return getattr(getattr(s, "brain", None), "t2_model", "") or \
-                getattr(getattr(s, "brain", None), "hf_model", "strong-default")
+            return getattr(getattr(s, "brain", None), "t2_model", "") or getattr(
+                getattr(s, "brain", None), "hf_model", "strong-default"
+            )
         if tier == Tier.T3_LOCAL:
             return getattr(getattr(s, "brain", None), "t3_model", "") or "ollama-default"
         return "reflex"
@@ -78,20 +79,25 @@ class ModelRouter:
 
         # T3: offline / privacy / provider down — explicit, never guessed.
         if ctx.get("offline") or ctx.get("privacy_mode") or ctx.get("provider_down"):
-            d = TierDecision(Tier.T3_LOCAL, self._model_for(Tier.T3_LOCAL),
-                             "offline/privacy/provider-down -> local")
+            d = TierDecision(
+                Tier.T3_LOCAL,
+                self._model_for(Tier.T3_LOCAL),
+                "offline/privacy/provider-down -> local",
+            )
             logger.info("model_router: %s", d)
             return d
         # T2: strong signals.
         if _T2_KEYWORDS.search(text) or _looks_multi_tool(text) or len(text) > 220:
-            d = TierDecision(Tier.T2_STRONG, self._model_for(Tier.T2_STRONG),
-                             "planning/code/multi-step signal")
+            d = TierDecision(
+                Tier.T2_STRONG, self._model_for(Tier.T2_STRONG), "planning/code/multi-step signal"
+            )
             logger.info("model_router: %s", d)
             return d
         # T1: everything else that needs the LLM. (T0 is decided by the
         # reflex matcher upstream in brain/router.py.)
-        d = TierDecision(Tier.T1_FAST, self._model_for(Tier.T1_FAST),
-                         "short utterance, single intent")
+        d = TierDecision(
+            Tier.T1_FAST, self._model_for(Tier.T1_FAST), "short utterance, single intent"
+        )
         logger.info("model_router: %s", d)
         return d
 
@@ -99,6 +105,7 @@ class ModelRouter:
 # ---------------------------------------------------------------------------
 # Cost guard
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Usage:
@@ -114,8 +121,7 @@ class CostGuard:
     brain.daily_cost_inr_budget; 0 = unlimited).
     """
 
-    def __init__(self, settings=None,
-                 notify: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(self, settings=None, notify: Optional[Callable[[str], None]] = None) -> None:
         self.settings = settings
         self.notify = notify or (lambda msg: logger.warning("cost guard: %s", msg))
         self._day = time.strftime("%Y-%m-%d")
@@ -124,8 +130,10 @@ class CostGuard:
 
     def _budgets(self) -> Tuple[int, float]:
         brain = getattr(self.settings, "brain", None)
-        return (int(getattr(brain, "daily_token_budget", 0) or 0),
-                float(getattr(brain, "daily_cost_inr_budget", 0) or 0))
+        return (
+            int(getattr(brain, "daily_token_budget", 0) or 0),
+            float(getattr(brain, "daily_cost_inr_budget", 0) or 0),
+        )
 
     def _roll_day(self) -> None:
         today = time.strftime("%Y-%m-%d")
@@ -139,12 +147,12 @@ class CostGuard:
         self.used.cost_inr += usage.cost_inr
         tok_budget, inr_budget = self._budgets()
         total_tok = self.used.prompt_tokens + self.used.completion_tokens
-        breached = ((tok_budget and total_tok >= tok_budget) or
-                    (inr_budget and self.used.cost_inr >= inr_budget))
+        breached = (tok_budget and total_tok >= tok_budget) or (
+            inr_budget and self.used.cost_inr >= inr_budget
+        )
         if breached and not self._breached:
             self._breached = True
-            self.notify(
-                "Daily AI budget khatm ho gaya — ab fast/local models use honge.")
+            self.notify("Daily AI budget khatm ho gaya — ab fast/local models use honge.")
 
     @property
     def breached(self) -> bool:
@@ -161,6 +169,7 @@ class CostGuard:
 # ---------------------------------------------------------------------------
 # Semantic cache (READ-only answers, short TTL)
 # ---------------------------------------------------------------------------
+
 
 class SemanticCache:
     """Caches repeated factual answers. Never caches tool calls."""

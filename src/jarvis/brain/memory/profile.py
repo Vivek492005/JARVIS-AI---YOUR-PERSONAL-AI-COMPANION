@@ -31,7 +31,7 @@ class ProfileStore:
 
     def propose_lines(self, lines: List[str]) -> List[str]:
         """Return lines formatted as a proposal block (not yet written)."""
-        return ["## Proposed memory additions (pending approval)", *[f"- {l}" for l in lines]]
+        return ["## Proposed memory additions (pending approval)", *[f"- {line}" for line in lines]]
 
     def append_approved(self, lines: List[str], name: str = "MEMORY.md") -> None:
         """Append user-approved lines. Only call after explicit approval."""

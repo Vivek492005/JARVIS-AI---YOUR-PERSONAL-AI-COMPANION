@@ -26,26 +26,49 @@ from typing import Dict, List, Optional, Tuple
 
 from jarvis.perception import backends as _backends
 from jarvis.perception.backends import ElementNode, WindowInfo
-from jarvis.perception.privacy import SensitiveWindowError, check_window
+from jarvis.perception.privacy import check_window
 from jarvis.tools.registry import Risk
 
 logger = logging.getLogger(__name__)
 
 # Button labels that escalate invoke() from REVERSIBLE to DESTRUCTIVE.
-DESTRUCTIVE_LABELS = frozenset({
-    "delete", "remove", "erase", "format",
-    "send", "submit", "post", "publish",
-    "pay", "buy", "purchase", "checkout",
-    "install", "uninstall",
-    "ok", "confirm",  # deliberately NOT here: too generic; policy decides
-})
+DESTRUCTIVE_LABELS = frozenset(
+    {
+        "delete",
+        "remove",
+        "erase",
+        "format",
+        "send",
+        "submit",
+        "post",
+        "publish",
+        "pay",
+        "buy",
+        "purchase",
+        "checkout",
+        "install",
+        "uninstall",
+        "ok",
+        "confirm",  # deliberately NOT here: too generic; policy decides
+    }
+)
 
 # Extra guard: these exact labels are always destructive even as substrings
 # of longer names ("Delete all" etc. is covered by substring match below).
-_ALWAYS_DESTRUCTIVE = frozenset({
-    "delete", "remove", "send", "pay", "buy", "purchase", "install",
-    "uninstall", "format", "submit",
-})
+_ALWAYS_DESTRUCTIVE = frozenset(
+    {
+        "delete",
+        "remove",
+        "send",
+        "pay",
+        "buy",
+        "purchase",
+        "install",
+        "uninstall",
+        "format",
+        "submit",
+    }
+)
 
 
 def invoke_risk_for_label(name: str) -> Risk:
@@ -64,8 +87,7 @@ def _compact_node(node: ElementNode, depth: int, out: List[str]) -> None:
     out.append(f"{indent}- [{node.role}] '{node.name}' #{node.element_id}{aid}{disabled}")
 
 
-def _walk(node: ElementNode, depth: int, max_depth: int,
-          out: List[str]) -> None:
+def _walk(node: ElementNode, depth: int, max_depth: int, out: List[str]) -> None:
     if depth > max_depth:
         return
     _compact_node(node, depth, out)
@@ -95,12 +117,11 @@ class UIAController:
         except Exception:
             wins = self.list_windows()
             if not wins:
-                raise RuntimeError("no windows available")
+                raise RuntimeError("no windows available") from None
             return wins[0]
 
     # -- describe ----------------------------------------------------------
-    def describe_screen(self, handle: Optional[int] = None,
-                        depth: int = 3) -> str:
+    def describe_screen(self, handle: Optional[int] = None, depth: int = 3) -> str:
         """Compact tree of the active (or given) window.
 
         Refuses sensitive windows (password managers, banking, incognito).
@@ -108,9 +129,7 @@ class UIAController:
         win = self._window(handle)
         check_window(win.title, win.process)
         tree = self._be().get_tree(win.handle, depth)
-        lines: List[str] = [
-            f"window '{win.title}' (handle={win.handle}, process={win.process})"
-        ]
+        lines: List[str] = [f"window '{win.title}' (handle={win.handle}, process={win.process})"]
         _walk(tree, 0, depth, lines)
         return "\n".join(lines)
 
@@ -123,18 +142,20 @@ class UIAController:
         return self.active_window()
 
     # -- find (cached) -----------------------------------------------------
-    def find(self, name: Optional[str] = None,
-             role: Optional[str] = None,
-             automation_id: Optional[str] = None,
-             handle: Optional[int] = None) -> Optional[ElementNode]:
+    def find(
+        self,
+        name: Optional[str] = None,
+        role: Optional[str] = None,
+        automation_id: Optional[str] = None,
+        handle: Optional[int] = None,
+    ) -> Optional[ElementNode]:
         win = self._window(handle)
         check_window(win.title, win.process)
         # Cache key includes the query so repeats are O(1).
         key = (win.handle, f"{name}|{role}|{automation_id}")
         if key in self._cache:
             return self._cache[key]
-        el = self._be().find(win.handle, name=name, role=role,
-                             automation_id=automation_id)
+        el = self._be().find(win.handle, name=name, role=role, automation_id=automation_id)
         if el is not None:
             self._cache[key] = el
         return el

@@ -18,9 +18,9 @@ fallback is audit-logged ("UIA se fail, OCR par gaya") per the plan.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -54,31 +54,29 @@ class LadderExhausted(Exception):
     def __init__(self, task: str, failures: List[Tuple[Rung, str]]) -> None:
         self.task = task
         self.failures = failures
-        detail = "; ".join(f"{RUNG_LABELS[r]}: {why}"
-                           for r, why in failures)
+        detail = "; ".join(f"{RUNG_LABELS[r]}: {why}" for r, why in failures)
         super().__init__(f"ladder exhausted for {task!r}: {detail}")
 
 
 @dataclass
 class Attempt:
     """One rung's way of doing the task."""
+
     rung: Rung
     label: str
     fn: Callable[[], str]
     available: bool = True  # False = backend missing; skip without audit noise
 
 
-def _audit_fallback(task: str, failed_rung: Rung, why: str,
-                    next_rung: Optional[Rung]) -> None:
+def _audit_fallback(task: str, failed_rung: Rung, why: str, next_rung: Optional[Rung]) -> None:
     """Audit-log a ladder fallback (plan: 'UIA se fail, OCR par gaya')."""
     try:
         from jarvis.policy.audit import AuditLogger
+
         nxt = RUNG_LABELS[next_rung] if next_rung else "handoff"
         AuditLogger().log(
             "ladder.fallback",
-            {"task": task,
-             "from": RUNG_LABELS[failed_rung],
-             "to": nxt},
+            {"task": task, "from": RUNG_LABELS[failed_rung], "to": nxt},
             decision="fallback",
             reason=f"{RUNG_LABELS[failed_rung]} failed ({why}); trying {nxt}",
         )
@@ -86,8 +84,7 @@ def _audit_fallback(task: str, failed_rung: Rung, why: str,
         logger.exception("ladder audit failed")
 
 
-def run_ladder(task: str, attempts: List[Attempt],
-               audit: bool = True) -> Tuple[Rung, str]:
+def run_ladder(task: str, attempts: List[Attempt], audit: bool = True) -> Tuple[Rung, str]:
     """Try attempts highest-rung-first; return (winning_rung, result).
 
     Attempts must be pre-sorted highest-first (Rung 1 = best). Unavailable
@@ -104,7 +101,7 @@ def run_ladder(task: str, attempts: List[Attempt],
         except AttemptFailed as e:
             why = str(e) or "no reason given"
             failures.append((attempt.rung, why))
-            remaining = [a for a in ordered[i + 1:] if a.available]
+            remaining = [a for a in ordered[i + 1 :] if a.available]
             nxt = remaining[0].rung if remaining else None
             if audit:
                 _audit_fallback(task, attempt.rung, why, nxt)
@@ -112,7 +109,7 @@ def run_ladder(task: str, attempts: List[Attempt],
         except Exception as e:  # unexpected error: also fall through
             why = f"unexpected: {type(e).__name__}: {e}"
             failures.append((attempt.rung, why))
-            remaining = [a for a in ordered[i + 1:] if a.available]
+            remaining = [a for a in ordered[i + 1 :] if a.available]
             nxt = remaining[0].rung if remaining else None
             if audit:
                 _audit_fallback(task, attempt.rung, why, nxt)

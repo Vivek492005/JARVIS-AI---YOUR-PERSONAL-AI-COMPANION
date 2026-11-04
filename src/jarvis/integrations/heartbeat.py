@@ -47,9 +47,7 @@ QUIET_START = dtime(23, 0)
 QUIET_END = dtime(7, 0)
 
 
-def in_quiet_hours(now: datetime,
-                   start: dtime = QUIET_START,
-                   end: dtime = QUIET_END) -> bool:
+def in_quiet_hours(now: datetime, start: dtime = QUIET_START, end: dtime = QUIET_END) -> bool:
     t = now.time()
     if start <= end:
         return start <= t < end
@@ -63,24 +61,29 @@ class HeartbeatConfig:
     quiet_end: dtime = QUIET_END
     max_per_day: int = 20
     # per-rule opt-in; unknown rules default to False (opt-in, not opt-out)
-    rules: Dict[str, bool] = field(default_factory=lambda: {
-        "calendar_meeting": True,
-        "mail_vip": True,
-        "battery_low": True,
-        "daily_brief": False,
-    })
+    rules: Dict[str, bool] = field(
+        default_factory=lambda: {
+            "calendar_meeting": True,
+            "mail_vip": True,
+            "battery_low": True,
+            "daily_brief": False,
+        }
+    )
     vip_senders: List[str] = field(default_factory=list)
     checklist_path: Optional[str] = None
 
 
 class Heartbeat:
-    def __init__(self,
-                 config: Optional[HeartbeatConfig] = None,
-                 notify: Optional[Callable[[Notification], None]] = None,
-                 now_fn: Callable[[], datetime] = datetime.now) -> None:
+    def __init__(
+        self,
+        config: Optional[HeartbeatConfig] = None,
+        notify: Optional[Callable[[Notification], None]] = None,
+        now_fn: Callable[[], datetime] = datetime.now,
+    ) -> None:
         self.config = config or HeartbeatConfig()
-        self._notify = notify or (lambda n: logger.info(
-            f"heartbeat notify [{n.urgency}] {n.title}: {n.body}"))
+        self._notify = notify or (
+            lambda n: logger.info(f"heartbeat notify [{n.urgency}] {n.title}: {n.body}")
+        )
         self._now = now_fn
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -93,8 +96,7 @@ class Heartbeat:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(target=self._loop, daemon=True,
-                                        name="jarvis-heartbeat")
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="jarvis-heartbeat")
         self._thread.start()
 
     def stop(self) -> None:
@@ -124,16 +126,14 @@ class Heartbeat:
             logger.debug("HEARTBEAT_OK")
             return "HEARTBEAT_OK"
 
-        quiet = in_quiet_hours(now, self.config.quiet_start,
-                               self.config.quiet_end)
+        quiet = in_quiet_hours(now, self.config.quiet_start, self.config.quiet_end)
         sent_any = False
         for n in notes:
             if quiet and n.urgency != "urgent":
                 logger.info(f"heartbeat: quiet hours, holding [{n.title}]")
                 continue
             if not self._within_budget():
-                logger.warning("heartbeat: daily notification budget "
-                               "exhausted, holding remainder")
+                logger.warning("heartbeat: daily notification budget exhausted, holding remainder")
                 break
             self._notify(n)
             with self._lock:
@@ -156,6 +156,7 @@ class Heartbeat:
     # -- checks (READ-only; anything else is skipped, never executed) ----
     def _run_read(self, tool: str, args: Dict[str, Any]) -> Optional[str]:
         from jarvis.tools.actions import run_action
+
         spec = resolve(tool, args)
         if spec is None or spec.risk > Risk.READ:
             logger.warning(f"heartbeat: refusing non-READ tool {tool}")
@@ -169,45 +170,56 @@ class Heartbeat:
         if not self._rule_on("calendar_meeting"):
             return []
         from datetime import timedelta
+
         start = now.isoformat()
         end = (now + timedelta(minutes=30)).isoformat()
-        result = self._run_read("calendar_list",
-                                {"start": start, "end": end})
+        result = self._run_read("calendar_list", {"start": start, "end": end})
         if not result or result.strip() in ("", "No events.", "[]"):
             return []
-        return [Notification(
-            title="Meeting in 30 minutes",
-            body=result[:400], source="heartbeat", urgency="normal")]
+        return [
+            Notification(
+                title="Meeting in 30 minutes",
+                body=result[:400],
+                source="heartbeat",
+                urgency="normal",
+            )
+        ]
 
     def _check_mail(self, now: datetime) -> List[Notification]:
         if not self._rule_on("mail_vip") or not self.config.vip_senders:
             return []
-        result = self._run_read("mail_list", {"query": "is:unread",
-                                              "max_n": 10})
+        result = self._run_read("mail_list", {"query": "is:unread", "max_n": 10})
         if not result:
             return []
-        vips = [line for line in result.splitlines()
-                if any(v.lower() in line.lower()
-                       for v in self.config.vip_senders)]
+        vips = [
+            line
+            for line in result.splitlines()
+            if any(v.lower() in line.lower() for v in self.config.vip_senders)
+        ]
         if not vips:
             return []
-        return [Notification(
-            title=f"{len(vips)} unread from VIP senders",
-            body="\n".join(vips)[:500], source="heartbeat",
-            urgency="normal")]
+        return [
+            Notification(
+                title=f"{len(vips)} unread from VIP senders",
+                body="\n".join(vips)[:500],
+                source="heartbeat",
+                urgency="normal",
+            )
+        ]
 
     def _check_battery(self, now: datetime) -> List[Notification]:
         if not self._rule_on("battery_low"):
             return []
-        result = self._run_read("system_control",
-                                {"action": "check_battery"})
+        result = self._run_read("system_control", {"action": "check_battery"})
         if not result:
             return []
         low = "low" in result.lower() or "%" in result and _pct(result) < 15
         if low:
-            return [Notification(
-                title="Battery low",
-                body=result[:200], source="heartbeat", urgency="urgent")]
+            return [
+                Notification(
+                    title="Battery low", body=result[:200], source="heartbeat", urgency="urgent"
+                )
+            ]
         return []
 
     def _check_daily_brief(self, now: datetime) -> List[Notification]:
@@ -219,9 +231,10 @@ class Heartbeat:
         if now.hour < 6 or now.hour > 10:
             return []  # morning window only
         parts = []
-        cal = self._run_read("calendar_list", {
-            "start": now.isoformat(),
-            "end": now.replace(hour=23, minute=59).isoformat()})
+        cal = self._run_read(
+            "calendar_list",
+            {"start": now.isoformat(), "end": now.replace(hour=23, minute=59).isoformat()},
+        )
         if cal:
             parts.append("Today's calendar:\n" + cal[:600])
         tasks = self._run_read("tasks_list", {})
@@ -230,13 +243,18 @@ class Heartbeat:
         if not parts:
             return []
         self._brief_done_for = today
-        return [Notification(
-            title="Daily Brief",
-            body="\n\n".join(parts)[:1200], source="heartbeat",
-            urgency="normal")]
+        return [
+            Notification(
+                title="Daily Brief",
+                body="\n\n".join(parts)[:1200],
+                source="heartbeat",
+                urgency="normal",
+            )
+        ]
 
 
 def _pct(text: str) -> int:
     import re
+
     m = re.search(r"(\d+)\s*%", text)
     return int(m.group(1)) if m else 100

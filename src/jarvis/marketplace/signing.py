@@ -28,8 +28,13 @@ from typing import Dict, List, Optional
 
 from jarvis.marketplace import ed25519
 from jarvis.marketplace.package import (
-    MANIFEST_NAME, SIGNATURE_NAME, PackageError,
-    canonical_bytes, list_package_files, load_package, sha256_file,
+    MANIFEST_NAME,
+    SIGNATURE_NAME,
+    PackageError,
+    canonical_bytes,
+    list_package_files,
+    load_package,
+    sha256_file,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +53,7 @@ def marketplace_dir() -> Path:
 # ---------------------------------------------------------------------------
 # Curator key store (public keys only — never secrets)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CuratorKey:
@@ -78,20 +84,28 @@ class CuratorStore:
                     logger.warning("curator store: key_id mismatch, skipping")
                     continue
                 self._keys[kid] = CuratorKey(
-                    key_id=kid, public_key=entry["public_key"],
+                    key_id=kid,
+                    public_key=entry["public_key"],
                     name=str(entry.get("name", "")),
-                    added_at=str(entry.get("added_at", "")))
+                    added_at=str(entry.get("added_at", "")),
+                )
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning("curator store: bad entry skipped: %s", e)
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        data = {"keys": [
-            {"key_id": k.key_id, "public_key": k.public_key,
-             "name": k.name, "added_at": k.added_at}
-            for k in sorted(self._keys.values(), key=lambda k: k.key_id)]}
-        self.path.write_text(json.dumps(data, indent=2) + "\n",
-                             encoding="utf-8")
+        data = {
+            "keys": [
+                {
+                    "key_id": k.key_id,
+                    "public_key": k.public_key,
+                    "name": k.name,
+                    "added_at": k.added_at,
+                }
+                for k in sorted(self._keys.values(), key=lambda k: k.key_id)
+            ]
+        }
+        self.path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
     def add(self, public_key_hex: str, name: str = "") -> CuratorKey:
         try:
@@ -100,10 +114,12 @@ class CuratorStore:
             raise PackageError(f"bad public key hex: {e}") from e
         if len(pub) != 32:
             raise PackageError("public key must be 32 bytes (64 hex chars)")
-        key = CuratorKey(key_id=ed25519.key_id(pub),
-                         public_key=pub.hex(), name=name,
-                         added_at=datetime.datetime.now().isoformat(
-                             timespec="seconds"))
+        key = CuratorKey(
+            key_id=ed25519.key_id(pub),
+            public_key=pub.hex(),
+            name=name,
+            added_at=datetime.datetime.now().isoformat(timespec="seconds"),
+        )
         self._keys[key.key_id] = key
         self._save()
         logger.info("curator key added: %s (%s)", key.key_id, name)
@@ -127,6 +143,7 @@ class CuratorStore:
 # Signing (author side)
 # ---------------------------------------------------------------------------
 
+
 def sign_package(package_dir: str | Path, secret_seed: bytes) -> Dict:
     """Sign a package dir built by build_package(). Writes SIGNATURE.json.
 
@@ -148,7 +165,8 @@ def sign_package(package_dir: str | Path, secret_seed: bytes) -> Dict:
     if key_id != manifest["author_key_id"]:
         raise PackageError(
             f"signing key {key_id} does not match manifest "
-            f"author_key_id {manifest['author_key_id']!r}")
+            f"author_key_id {manifest['author_key_id']!r}"
+        )
     signature = ed25519.sign(bytes(secret_seed), canonical_bytes(manifest))
     sig_doc = {
         "algorithm": "ed25519",
@@ -158,10 +176,9 @@ def sign_package(package_dir: str | Path, secret_seed: bytes) -> Dict:
         "signed_at": datetime.datetime.now().isoformat(timespec="seconds"),
     }
     (root / SIGNATURE_NAME).write_text(
-        json.dumps(sig_doc, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8")
-    logger.info("signed package %s v%s with key %s",
-                manifest["name"], manifest["version"], key_id)
+        json.dumps(sig_doc, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    logger.info("signed package %s v%s with key %s", manifest["name"], manifest["version"], key_id)
     return sig_doc
 
 
@@ -169,10 +186,11 @@ def sign_package(package_dir: str | Path, secret_seed: bytes) -> Dict:
 # Verification (install/verify side)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VerificationResult:
     ok: bool
-    trust: str = ""            # self-signed | curator | verified
+    trust: str = ""  # self-signed | curator | verified
     key_id: str = ""
     name: str = ""
     version: str = ""
@@ -183,8 +201,7 @@ class VerificationResult:
 
 def _verify_signature_structure(sig: Dict) -> None:
     if sig.get("algorithm") != "ed25519":
-        raise PackageError(
-            f"unsupported signature algorithm: {sig.get('algorithm')!r}")
+        raise PackageError(f"unsupported signature algorithm: {sig.get('algorithm')!r}")
     for f_ in ("key_id", "public_key", "signature"):
         if f_ not in sig:
             raise PackageError(f"SIGNATURE.json missing field: {f_}")
@@ -201,15 +218,13 @@ def _verify_signature_structure(sig: Dict) -> None:
         raise PackageError("key_id does not match public_key")
 
 
-def verify_signature(pkg_root: Path, manifest: Dict,
-                     sig: Dict) -> tuple[str, str]:
+def verify_signature(pkg_root: Path, manifest: Dict, sig: Dict) -> tuple[str, str]:
     """Returns (key_id, trust_tier). Raises PackageError on any failure."""
     _verify_signature_structure(sig)
     pub = bytes.fromhex(sig["public_key"])
     if sig["key_id"] != manifest["author_key_id"]:
         raise PackageError("SIGNATURE key_id != MANIFEST author_key_id")
-    if not ed25519.verify(pub, canonical_bytes(manifest),
-                           bytes.fromhex(sig["signature"])):
+    if not ed25519.verify(pub, canonical_bytes(manifest), bytes.fromhex(sig["signature"])):
         raise PackageError("signature verification FAILED")
     return sig["key_id"], TRUST_SELF_SIGNED  # tier upgraded by caller
 
@@ -233,9 +248,9 @@ def verify_file_hashes(pkg_root: Path, manifest: Dict) -> List[str]:
     return errors
 
 
-def verify_package(path: str | Path,
-                   curators: Optional[CuratorStore] = None,
-                   check_revocation=None) -> VerificationResult:
+def verify_package(
+    path: str | Path, curators: Optional[CuratorStore] = None, check_revocation=None
+) -> VerificationResult:
     """Full offline verification. Never imports package code."""
     res = VerificationResult(ok=False)
     try:
@@ -255,8 +270,7 @@ def verify_package(path: str | Path,
             return res
         res.key_id = key_id
         store = curators or CuratorStore()
-        res.trust = (TRUST_CURATOR if store.is_curator(key_id)
-                     else TRUST_SELF_SIGNED)
+        res.trust = TRUST_CURATOR if store.is_curator(key_id) else TRUST_SELF_SIGNED
         hash_errors = verify_file_hashes(pkg.root, manifest)
         if hash_errors:
             res.errors.extend(hash_errors)
@@ -264,6 +278,7 @@ def verify_package(path: str | Path,
         # SKILL.md must agree with the package manifest (parse-only).
         try:
             from jarvis.brain.skills.loader import load_manifest
+
             skill_manifest = load_manifest(pkg.root)
         except Exception as e:
             res.errors.append(f"SKILL.md invalid: {e}")
@@ -274,15 +289,13 @@ def verify_package(path: str | Path,
         if skill_manifest.version != manifest["version"]:
             res.errors.append("SKILL.md version != MANIFEST version")
             return res
-        if sorted(set(skill_manifest.permissions)) != \
-                sorted(set(manifest["permissions"])):
+        if sorted(set(skill_manifest.permissions)) != sorted(set(manifest["permissions"])):
             res.errors.append(
-                "SKILL.md permissions != MANIFEST permissions "
-                "(declare them up front)")
+                "SKILL.md permissions != MANIFEST permissions (declare them up front)"
+            )
             return res
         if check_revocation is not None:
-            rev_err = check_revocation(key_id, manifest["name"],
-                                       manifest["version"])
+            rev_err = check_revocation(key_id, manifest["name"], manifest["version"])
             if rev_err:
                 res.errors.append(rev_err)
                 return res
@@ -295,6 +308,7 @@ def verify_package(path: str | Path,
 def trust_to_skill_trust(trust: str):
     """Map marketplace trust tier -> brain TrustLevel."""
     from jarvis.brain.skills.trust import TrustLevel
+
     if trust in (TRUST_CURATOR, TRUST_VERIFIED):
         return TrustLevel.VERIFIED
     return TrustLevel.THIRD_PARTY

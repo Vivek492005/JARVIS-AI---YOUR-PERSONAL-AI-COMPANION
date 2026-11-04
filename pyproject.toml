@@ -54,6 +54,12 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "ruff",
+    # Tests import fastapi TestClient (test_control.py, test_learning_api.py);
+    # CI installs only .[dev], so the server deps needed by tests live here too.
+    "fastapi",
+    "httpx",
+    # scripts/lint_packaging.py (run by test_phase8_packaging.py) needs yaml.
+    "pyyaml",
 ]
 
 [project.scripts]
@@ -109,3 +115,6 @@ ignore = ["S101"]  # assert is fine in tests
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S"]
+# Skill tool.py files run inside the loader, which injects `register_skill_tool`
+# into the module namespace before exec — the name is defined at runtime.
+"skills/*/tool.py" = ["F821"]

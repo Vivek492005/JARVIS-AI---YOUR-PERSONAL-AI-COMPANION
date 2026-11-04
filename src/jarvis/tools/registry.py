@@ -32,7 +32,7 @@ class Risk(IntEnum):
 class ToolSpec:
     name: str
     description: str
-    params: type[BaseModel]          # pydantic model = schema + validation
+    params: type[BaseModel]  # pydantic model = schema + validation
     risk: Risk
     handler: Callable[[Dict[str, Any], Any, str], str]
     timeout_s: float = 15.0
@@ -76,11 +76,13 @@ def resolve(tool_name: str, args: Optional[Dict[str, Any]] = None) -> Optional[T
 
     args = args or {}
     action = args.get("action")
-    if (tool_name == "keyboard_mouse_action" and action == "press_hotkey"):
+    if tool_name == "keyboard_mouse_action" and action == "press_hotkey":
         norm = _normalize_hotkey(args.get("value", ""))
-        sub = ("keyboard_mouse_action.press_hotkey_safe"
-               if norm in SAFE_HOTKEYS
-               else "keyboard_mouse_action.press_hotkey_other")
+        sub = (
+            "keyboard_mouse_action.press_hotkey_safe"
+            if norm in SAFE_HOTKEYS
+            else "keyboard_mouse_action.press_hotkey_other"
+        )
         spec = REGISTRY.get(sub)
         if spec is not None:
             return spec
@@ -104,6 +106,7 @@ def _uia_invoke_subspec(args: Dict[str, Any]) -> str:
     from jarvis.perception import backends as _backends
     from jarvis.perception.uia import invoke_risk_for_label
     from jarvis.tools.registry import Risk
+
     element_id = args.get("element_id", "")
     try:
         backend = _backends.get_backend("uia")
@@ -128,8 +131,7 @@ def _uia_invoke_subspec(args: Dict[str, Any]) -> str:
     if not label:
         return "uia_invoke.destructive"
     risk = invoke_risk_for_label(label)
-    return ("uia_invoke.destructive"
-            if risk == Risk.DESTRUCTIVE else "uia_invoke.normal")
+    return "uia_invoke.destructive" if risk == Risk.DESTRUCTIVE else "uia_invoke.normal"
 
 
 def function_schemas() -> List[Dict[str, Any]]:
@@ -143,14 +145,16 @@ def function_schemas() -> List[Dict[str, Any]]:
         if "." in name:
             continue
         spec = REGISTRY[name]
-        schemas.append({
-            "type": "function",
-            "function": {
-                "name": spec.name,
-                "description": spec.description,
-                "parameters": spec.params.model_json_schema(),
-            },
-        })
+        schemas.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": spec.name,
+                    "description": spec.description,
+                    "parameters": spec.params.model_json_schema(),
+                },
+            }
+        )
     return schemas
 
 
@@ -159,33 +163,43 @@ def function_schemas() -> List[Dict[str, Any]]:
 # part of any schema — see A-06)
 # ---------------------------------------------------------------------------
 
+
 class OpenApplicationParams(BaseModel):
     app_name: str = Field(
-        ..., min_length=1, max_length=60,
+        ...,
+        min_length=1,
+        max_length=60,
         description="The common name of the application to launch "
-                    "(e.g. 'chrome', 'notepad', 'calculator', 'spotify').")
+        "(e.g. 'chrome', 'notepad', 'calculator', 'spotify').",
+    )
 
 
 class OpenWebsiteParams(BaseModel):
     url_or_name: str = Field(
-        ..., min_length=1, max_length=500,
+        ...,
+        min_length=1,
+        max_length=500,
         description="The URL (e.g. 'https://youtube.com') or website name "
-                    "(e.g. 'youtube', 'github').")
+        "(e.g. 'youtube', 'github').",
+    )
 
 
 class WebSearchParams(BaseModel):
-    query: str = Field(..., min_length=1, max_length=500,
-                       description="The search query.")
+    query: str = Field(..., min_length=1, max_length=500, description="The search query.")
 
 
 class DownloadMediaParams(BaseModel):
     url_or_query: str = Field(
-        ..., min_length=1, max_length=500,
-        description="The media URL or the search term of the song/video.")
+        ...,
+        min_length=1,
+        max_length=500,
+        description="The media URL or the search term of the song/video.",
+    )
     media_type: str = Field(
         default="audio",
         description="Whether to download audio (mp3/m4a) or video (mp4).",
-        pattern="^(audio|video)$")
+        pattern="^(audio|video)$",
+    )
 
 
 class SystemControlParams(BaseModel):
@@ -193,44 +207,59 @@ class SystemControlParams(BaseModel):
         ...,
         description="The specific system action to perform.",
         pattern="^(volume_up|volume_down|mute|unmute|take_screenshot|"
-                "lock_pc|empty_recycle_bin|check_battery)$")
+        "lock_pc|empty_recycle_bin|check_battery)$",
+    )
 
 
 class KeyboardMouseParams(BaseModel):
     action: str = Field(
         ...,
         description="One of: type_text, press_key, press_hotkey.",
-        pattern="^(type_text|press_key|press_hotkey)$")
-    value: str = Field(default="",
-                       description="Text to type, or key/hotkey like 'ctrl+s'.",
-                       max_length=2000)
+        pattern="^(type_text|press_key|press_hotkey)$",
+    )
+    value: str = Field(
+        default="", description="Text to type, or key/hotkey like 'ctrl+s'.", max_length=2000
+    )
 
 
 class ManageNotesParams(BaseModel):
     action: str = Field(
-        ..., description="One of: save, read, clear.",
-        pattern="^(save|read|clear)$")
+        ..., description="One of: save, read, clear.", pattern="^(save|read|clear)$"
+    )
     content: Optional[str] = Field(
-        default=None, max_length=10000,
-        description="Note text (required for 'save').")
+        default=None, max_length=10000, description="Note text (required for 'save')."
+    )
 
 
 class RunPowershellParams(BaseModel):
     command: str = Field(
-        ..., min_length=1, max_length=2000,
+        ...,
+        min_length=1,
+        max_length=2000,
         description="A read-only PowerShell command (validated against the "
-                    "allowlist; destructive cmdlets are denied).")
+        "allowlist; destructive cmdlets are denied).",
+    )
 
 
 class RunCommandParams(BaseModel):
     command_key: str = Field(
-        ...,
-        description="Which allowlisted diagnostic to run.",
-        pattern="^(ipconfig|disk_free)$")
+        ..., description="Which allowlisted diagnostic to run.", pattern="^(ipconfig|disk_free)$"
+    )
 
 
 # Task 1.4.2: hotkeys on this list are ordinary editing/navigation keys.
-SAFE_HOTKEYS = frozenset({
-    "ctrl+c", "ctrl+v", "ctrl+x", "ctrl+z", "ctrl+s", "ctrl+f", "ctrl+a",
-    "ctrl+t", "ctrl+w", "ctrl+r", "win+d",
-})
+SAFE_HOTKEYS = frozenset(
+    {
+        "ctrl+c",
+        "ctrl+v",
+        "ctrl+x",
+        "ctrl+z",
+        "ctrl+s",
+        "ctrl+f",
+        "ctrl+a",
+        "ctrl+t",
+        "ctrl+w",
+        "ctrl+r",
+        "win+d",
+    }
+)

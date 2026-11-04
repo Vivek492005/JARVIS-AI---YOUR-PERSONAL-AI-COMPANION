@@ -34,8 +34,7 @@ def author_key(tmp_path, home):
     seed, pub = ed25519.keypair()
     key_path = tmp_path / "author.key"
     key_path.write_text(seed.hex() + "\n", encoding="utf-8")
-    return {"seed": seed, "pub": pub, "key_id": ed25519.key_id(pub),
-            "path": key_path}
+    return {"seed": seed, "pub": pub, "key_id": ed25519.key_id(pub), "path": key_path}
 
 
 @pytest.fixture()
@@ -50,9 +49,11 @@ def skill_dir(tmp_path):
 @pytest.fixture()
 def package_path(tmp_path, skill_dir, author_key, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    args = types.SimpleNamespace(skill_cmd="package", skill_arg=str(skill_dir),
-                                 skill_extra=[str(author_key["path"]),
-                                              "tester"])
+    args = types.SimpleNamespace(
+        skill_cmd="package",
+        skill_arg=str(skill_dir),
+        skill_extra=[str(author_key["path"]), "tester"],
+    )
     assert _cmd_skill(args) == 0
     zpath = tmp_path / "demo-skill-1.2.0.jskill"
     assert zpath.exists()
@@ -62,8 +63,7 @@ def package_path(tmp_path, skill_dir, author_key, monkeypatch):
 def _run(cmd, arg=None, extra=(), monkeypatch=None, skills_dir=None):
     if monkeypatch is not None and skills_dir is not None:
         monkeypatch.setattr("jarvis.cli._skills_dir", lambda: skills_dir)
-    args = types.SimpleNamespace(skill_cmd=cmd, skill_arg=arg,
-                                 skill_extra=list(extra))
+    args = types.SimpleNamespace(skill_cmd=cmd, skill_arg=arg, skill_extra=list(extra))
     return _cmd_skill(args)
 
 
@@ -77,27 +77,25 @@ def test_verify_bad_package(home, tmp_path):
 
 def test_install_with_confirmation(home, package_path, tmp_path, monkeypatch):
     from jarvis.perception.sandbox import SandboxLevel
-    monkeypatch.setattr("jarvis.perception.sandbox.current_level",
-                        lambda: SandboxLevel.B)
+
+    monkeypatch.setattr("jarvis.perception.sandbox.current_level", lambda: SandboxLevel.B)
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda _: "haan")
     skills = tmp_path / "skills"
     skills.mkdir()
-    assert _run("install", str(package_path), monkeypatch=monkeypatch,
-                skills_dir=skills) == 0
+    assert _run("install", str(package_path), monkeypatch=monkeypatch, skills_dir=skills) == 0
     assert (skills / "demo-skill" / "SKILL.md").exists()
 
 
 def test_install_declined(home, package_path, tmp_path, monkeypatch):
     from jarvis.perception.sandbox import SandboxLevel
-    monkeypatch.setattr("jarvis.perception.sandbox.current_level",
-                        lambda: SandboxLevel.B)
+
+    monkeypatch.setattr("jarvis.perception.sandbox.current_level", lambda: SandboxLevel.B)
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda _: "nahi")
     skills = tmp_path / "skills"
     skills.mkdir()
-    assert _run("install", str(package_path), monkeypatch=monkeypatch,
-                skills_dir=skills) == 1
+    assert _run("install", str(package_path), monkeypatch=monkeypatch, skills_dir=skills) == 1
     assert not (skills / "demo-skill").exists()
 
 
@@ -125,23 +123,22 @@ def test_trust_add_bad_key(home):
 
 
 def test_package_needs_key(home, skill_dir):
-    args = types.SimpleNamespace(skill_cmd="package",
-                                 skill_arg=str(skill_dir), skill_extra=[])
+    args = types.SimpleNamespace(skill_cmd="package", skill_arg=str(skill_dir), skill_extra=[])
     assert _cmd_skill(args) == 2
 
 
 def test_update_revocations(home, tmp_path, author_key):
     from jarvis.marketplace.revocation import sign_feed
+
     feed = sign_feed(["deadbeefdeadbeef"], [], author_key["seed"])
     feed_path = tmp_path / "feed.json"
     feed_path.write_text(json.dumps(feed), encoding="utf-8")
-    assert _run("update-revocations", str(feed_path),
-                (author_key["pub"].hex(),)) == 0
+    assert _run("update-revocations", str(feed_path), (author_key["pub"].hex(),)) == 0
     from jarvis.marketplace.revocation import load_local
+
     assert "deadbeefdeadbeef" in load_local().revoked_keys
 
 
 def test_unknown_marketplace_cmd_falls_through(home):
-    args = types.SimpleNamespace(skill_cmd="frobnicate", skill_arg=None,
-                                 skill_extra=[])
+    args = types.SimpleNamespace(skill_cmd="frobnicate", skill_arg=None, skill_extra=[])
     assert _cmd_skill(args) == 2

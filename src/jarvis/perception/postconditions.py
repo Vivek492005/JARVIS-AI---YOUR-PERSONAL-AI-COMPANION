@@ -11,32 +11,35 @@ checks run first, then the legacy ``_verify_<tool>`` methods.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
 # Tools whose effects we cannot observe — honesty required.
-UNVERIFIABLE = frozenset({
-    "open_website",     # browser state not observable from here
-    "web_search",       # data in, data out
-    "download_media",   # async download; result message only
-    "speak",            # TTS fire-and-forget
-})
+UNVERIFIABLE = frozenset(
+    {
+        "open_website",  # browser state not observable from here
+        "web_search",  # data in, data out
+        "download_media",  # async download; result message only
+        "speak",  # TTS fire-and-forget
+    }
+)
 
 
 def is_verifiable(tool_name: str) -> bool:
     return tool_name not in UNVERIFIABLE
 
 
-def _result_ok(result: str, bad_markers=("could not", "failed", "blocked",
-                                         "error", "refused")) -> bool:
+def _result_ok(
+    result: str, bad_markers=("could not", "failed", "blocked", "error", "refused")
+) -> bool:
     lowered = (result or "").lower()
     return not any(m in lowered for m in bad_markers)
 
 
 # -- individual checks -------------------------------------------------------
 # Each: (args, result) -> (ok, evidence)
+
 
 def _check_describe_screen(args: Dict[str, Any], result: str) -> Tuple[bool, str]:
     ok = "window '" in result and _result_ok(result)
@@ -59,6 +62,7 @@ def _check_uia_set_text(args: Dict[str, Any], result: str) -> Tuple[bool, str]:
     # Read-back: the strongest postcondition for set_text.
     try:
         from jarvis.perception import backends as _backends
+
         actual = _backends.get_backend("uia").get_text(args.get("element_id", ""))
         want = args.get("value", "")
         if actual == want:
@@ -109,6 +113,7 @@ def _check_move_file(args: Dict[str, Any], result: str) -> Tuple[bool, str]:
         return False, result[:200]
     try:
         from jarvis.perception.files import resolve_scoped
+
         dst = resolve_scoped(args.get("dst", ""))
         src = resolve_scoped(args.get("src", ""))
         if dst.exists() and not src.exists():
@@ -123,6 +128,7 @@ def _check_copy_file(args: Dict[str, Any], result: str) -> Tuple[bool, str]:
         return False, result[:200]
     try:
         from jarvis.perception.files import resolve_scoped
+
         dst = resolve_scoped(args.get("dst", ""))
         return (dst.exists(), f"copy on disk: {dst.exists()}")
     except Exception:
@@ -134,6 +140,7 @@ def _check_delete_file(args: Dict[str, Any], result: str) -> Tuple[bool, str]:
         return False, result[:200]
     try:
         from jarvis.perception.files import resolve_scoped
+
         gone = not resolve_scoped(args.get("path", "")).exists()
         return gone, f"trashed, path gone: {gone}"
     except Exception:
@@ -184,8 +191,7 @@ def has_check(tool_name: str) -> bool:
     return tool_name in _CHECKS
 
 
-def verify(tool_name: str, args: Dict[str, Any],
-           result: str) -> Tuple[bool, str]:
+def verify(tool_name: str, args: Dict[str, Any], result: str) -> Tuple[bool, str]:
     """Run the postcondition for a tool. Unknown tools -> honest pass."""
     check = _CHECKS.get(tool_name)
     if check is None:
@@ -197,15 +203,13 @@ def verify(tool_name: str, args: Dict[str, Any],
         return False, f"postcondition error: {e}"
 
 
-def honest_message(tool_name: str, args: Dict[str, Any],
-                   result: str) -> str:
+def honest_message(tool_name: str, args: Dict[str, Any], result: str) -> str:
     """User-facing outcome: 'ho gaya' vs 'bhej diya, confirm nahi kar paaya'.
 
     Unverifiable tools never claim success — the plan's honesty rule.
     """
     if not is_verifiable(tool_name):
-        return (f"Bhej diya, confirm nahi kar paaya ({tool_name}): "
-                f"{result[:160]}")
+        return f"Bhej diya, confirm nahi kar paaya ({tool_name}): {result[:160]}"
     ok, evidence = verify(tool_name, args, result)
     if ok:
         return f"Ho gaya: {evidence[:160]}"

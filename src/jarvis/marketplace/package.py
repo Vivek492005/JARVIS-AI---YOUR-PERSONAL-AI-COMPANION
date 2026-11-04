@@ -44,8 +44,14 @@ _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _KEY_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 
 _REQUIRED_MANIFEST_FIELDS = (
-    "format", "name", "version", "author", "author_key_id",
-    "min_jarvis", "permissions", "files",
+    "format",
+    "name",
+    "version",
+    "author",
+    "author_key_id",
+    "min_jarvis",
+    "permissions",
+    "files",
 )
 _OPTIONAL_MANIFEST_FIELDS = ("description", "homepage", "created")
 
@@ -56,8 +62,9 @@ class PackageError(ValueError):
 
 def canonical_bytes(obj) -> bytes:
     """Deterministic JSON encoding used for signing."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=False).encode("utf-8")
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def sha256_file(path: Path) -> str:
@@ -98,11 +105,11 @@ def validate_manifest_schema(data: object) -> Dict:
     _check_version(data["min_jarvis"])
     if not isinstance(data["author"], str) or not data["author"].strip():
         raise PackageError("author must be a non-empty string")
-    if not isinstance(data["author_key_id"], str) or \
-            not _KEY_ID_RE.match(data["author_key_id"]):
+    if not isinstance(data["author_key_id"], str) or not _KEY_ID_RE.match(data["author_key_id"]):
         raise PackageError("author_key_id must be 16 hex chars")
     if not isinstance(data["permissions"], list) or not all(
-            isinstance(p, str) and p.strip() for p in data["permissions"]):
+        isinstance(p, str) and p.strip() for p in data["permissions"]
+    ):
         raise PackageError("permissions must be a list of strings")
     if len(set(data["permissions"])) != len(data["permissions"]):
         raise PackageError("duplicate permissions")
@@ -141,11 +148,11 @@ def _check_zip_member(zinfo: zipfile.ZipInfo) -> str:
 @dataclass
 class LoadedPackage:
     """A package extracted to a temp dir (parse-only)."""
+
     root: Path
     manifest: Dict
     signature: Dict
-    _tmpdir: Optional[tempfile.TemporaryDirectory] = field(default=None,
-                                                           repr=False)
+    _tmpdir: Optional[tempfile.TemporaryDirectory] = field(default=None, repr=False)
 
     def close(self) -> None:
         if self._tmpdir is not None:
@@ -163,8 +170,7 @@ def _read_json(path: Path, what: str) -> Dict:
     return data
 
 
-def load_package(path: str | Path,
-                 require_signature: bool = True) -> LoadedPackage:
+def load_package(path: str | Path, require_signature: bool = True) -> LoadedPackage:
     """Load a package dir or .jskill zip. Raises PackageError on anomaly."""
     src = Path(path)
     if not src.exists():
@@ -212,14 +218,18 @@ def load_package(path: str | Path,
         if keep_tmp is not None:
             keep_tmp.cleanup()
         raise
-    return LoadedPackage(root=root, manifest=manifest, signature=signature,
-                         _tmpdir=keep_tmp)
+    return LoadedPackage(root=root, manifest=manifest, signature=signature, _tmpdir=keep_tmp)
 
 
-def build_package(skill_dir: str | Path, *, author: str,
-                  author_key_id: str, min_jarvis: str,
-                  version: Optional[str] = None,
-                  out_dir: Optional[Path] = None) -> Path:
+def build_package(
+    skill_dir: str | Path,
+    *,
+    author: str,
+    author_key_id: str,
+    min_jarvis: str,
+    version: Optional[str] = None,
+    out_dir: Optional[Path] = None,
+) -> Path:
     """Author flow: build an UNSIGNED package dir from a skill folder.
 
     Reads SKILL.md via the existing loader (frontmatter only — tool.py is
@@ -240,8 +250,7 @@ def build_package(skill_dir: str | Path, *, author: str,
     if not _KEY_ID_RE.match(author_key_id or ""):
         raise PackageError("author_key_id must be 16 hex chars")
 
-    staging = Path(out_dir) if out_dir else Path(
-        tempfile.mkdtemp(prefix=f"{name}-{ver}_"))
+    staging = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix=f"{name}-{ver}_"))
     staging.mkdir(parents=True, exist_ok=True)
 
     files: Dict[str, str] = {}
@@ -273,10 +282,9 @@ def build_package(skill_dir: str | Path, *, author: str,
     }
     validate_manifest_schema(pkg_manifest)  # fail fast
     (staging / MANIFEST_NAME).write_text(
-        json.dumps(pkg_manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8")
-    logger.info("built unsigned package %s v%s (%d files) at %s",
-                name, ver, len(files), staging)
+        json.dumps(pkg_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    logger.info("built unsigned package %s v%s (%d files) at %s", name, ver, len(files), staging)
     return staging
 
 

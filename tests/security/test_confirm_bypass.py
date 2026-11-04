@@ -9,8 +9,7 @@ import time
 from unittest import mock
 from unittest.mock import MagicMock
 
-for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip",
-             "fuzzywuzzy"):
+for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip", "fuzzywuzzy"):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 sys.modules["fuzzywuzzy"].fuzz = MagicMock()
 
@@ -29,16 +28,14 @@ def agent(tmp_path, monkeypatch):
 
 def test_confirm_does_not_execute(agent):
     with mock.patch.object(agent, "_execute_tool") as m:
-        r = agent._dispatch_tool_call("system_control",
-                                      {"action": "empty_recycle_bin"})
+        r = agent._dispatch_tool_call("system_control", {"action": "empty_recycle_bin"})
     m.assert_not_called()
     assert "ACTION_REQUIRES_CONFIRMATION" in r
     assert agent.pending_confirmation is not None
 
 
 def test_non_confirm_word_cancels(agent):
-    agent._dispatch_tool_call("system_control",
-                              {"action": "empty_recycle_bin"})
+    agent._dispatch_tool_call("system_control", {"action": "empty_recycle_bin"})
     with mock.patch.object(agent, "_execute_tool") as m:
         r = agent.process("yes please do it now")
     m.assert_not_called()
@@ -49,8 +46,7 @@ def test_non_confirm_word_cancels(agent):
 def test_wrong_turn_cannot_confirm(agent):
     # pending_confirmation resolves only on the user's *next* message via
     # process(); a direct _dispatch_tool_call never consumes it.
-    agent._dispatch_tool_call("system_control",
-                              {"action": "empty_recycle_bin"})
+    agent._dispatch_tool_call("system_control", {"action": "empty_recycle_bin"})
     with mock.patch.object(agent, "_execute_tool") as m:
         agent._dispatch_tool_call("web_search", {"query": "x"})
     m.assert_called_once()  # only the web_search ran
@@ -59,8 +55,7 @@ def test_wrong_turn_cannot_confirm(agent):
 
 
 def test_expired_confirmation_cancels(agent):
-    agent._dispatch_tool_call("system_control",
-                              {"action": "empty_recycle_bin"})
+    agent._dispatch_tool_call("system_control", {"action": "empty_recycle_bin"})
     tool, args, _ts = agent.pending_confirmation
     agent.pending_confirmation = (tool, args, time.time() - 9999)
     with mock.patch.object(agent, "_execute_tool") as m:
@@ -70,10 +65,8 @@ def test_expired_confirmation_cancels(agent):
 
 
 def test_confirm_word_executes_exactly_once(agent):
-    agent._dispatch_tool_call("system_control",
-                              {"action": "empty_recycle_bin"})
-    with mock.patch.object(agent, "_execute_tool",
-                           return_value="done") as m:
+    agent._dispatch_tool_call("system_control", {"action": "empty_recycle_bin"})
+    with mock.patch.object(agent, "_execute_tool", return_value="done") as m:
         r1 = agent.process("haan")
         r2 = agent.process("haan")  # second haan: nothing pending
     assert m.call_count == 1

@@ -61,16 +61,25 @@ def load_local() -> RevocationList:
     return RevocationList(
         revoked_keys=[str(k) for k in keys],
         revoked_packages=[str(p) for p in pkgs],
-        updated_at=str(data.get("updated_at", "")))
+        updated_at=str(data.get("updated_at", "")),
+    )
 
 
 def save_local(rev: RevocationList) -> None:
-    _cache_path().write_text(json.dumps({
-        "revoked_keys": sorted(set(rev.revoked_keys)),
-        "revoked_packages": sorted(set(rev.revoked_packages)),
-        "updated_at": rev.updated_at or datetime.datetime.now().isoformat(
-            timespec="seconds"),
-    }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _cache_path().write_text(
+        json.dumps(
+            {
+                "revoked_keys": sorted(set(rev.revoked_keys)),
+                "revoked_packages": sorted(set(rev.revoked_packages)),
+                "updated_at": rev.updated_at
+                or datetime.datetime.now().isoformat(timespec="seconds"),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def check_revoked(key_id: str, name: str, version: str) -> Optional[str]:
@@ -83,8 +92,7 @@ def verify_feed(feed: Dict, curator_public_key_hex: str) -> RevocationList:
     if not isinstance(feed, dict):
         raise PackageError("feed must be a JSON object")
     if feed.get("format") != FEED_FORMAT:
-        raise PackageError(
-            f"unsupported feed format: {feed.get('format')!r}")
+        raise PackageError(f"unsupported feed format: {feed.get('format')!r}")
     sig = feed.get("signature")
     if not isinstance(sig, dict) or sig.get("algorithm") != "ed25519":
         raise PackageError("feed has no valid signature block")
@@ -106,12 +114,14 @@ def verify_feed(feed: Dict, curator_public_key_hex: str) -> RevocationList:
         raise PackageError("bad revoked_keys in feed")
     if not isinstance(pkgs, list) or not all(isinstance(p, str) for p in pkgs):
         raise PackageError("bad revoked_packages in feed")
-    return RevocationList(revoked_keys=list(keys), revoked_packages=list(pkgs),
-                          updated_at=str(body.get("issued_at", "")))
+    return RevocationList(
+        revoked_keys=list(keys),
+        revoked_packages=list(pkgs),
+        updated_at=str(body.get("issued_at", "")),
+    )
 
 
-def update_from_feed(feed_path: str | Path,
-                     curator_public_key_hex: str) -> RevocationList:
+def update_from_feed(feed_path: str | Path, curator_public_key_hex: str) -> RevocationList:
     """Verify ``feed_path`` and merge it into the local cache."""
     try:
         feed = json.loads(Path(feed_path).read_text(encoding="utf-8"))
@@ -125,13 +135,15 @@ def update_from_feed(feed_path: str | Path,
         updated_at=incoming.updated_at or current.updated_at,
     )
     save_local(merged)
-    logger.info("revocation cache updated: %d keys, %d packages",
-                len(merged.revoked_keys), len(merged.revoked_packages))
+    logger.info(
+        "revocation cache updated: %d keys, %d packages",
+        len(merged.revoked_keys),
+        len(merged.revoked_packages),
+    )
     return merged
 
 
-def sign_feed(revoked_keys: List[str], revoked_packages: List[str],
-              secret_seed: bytes) -> Dict:
+def sign_feed(revoked_keys: List[str], revoked_packages: List[str], secret_seed: bytes) -> Dict:
     """Curator-side helper: build a signed feed dict."""
     if len(secret_seed) != 32:
         raise PackageError("secret seed must be 32 bytes")
@@ -143,9 +155,12 @@ def sign_feed(revoked_keys: List[str], revoked_packages: List[str],
         "revoked_packages": sorted(set(revoked_packages)),
     }
     sig = ed25519.sign(bytes(secret_seed), canonical_bytes(body))
-    return {**body, "signature": {
-        "algorithm": "ed25519",
-        "key_id": ed25519.key_id(pub),
-        "public_key": pub.hex(),
-        "signature": sig.hex(),
-    }}
+    return {
+        **body,
+        "signature": {
+            "algorithm": "ed25519",
+            "key_id": ed25519.key_id(pub),
+            "public_key": pub.hex(),
+            "signature": sig.hex(),
+        },
+    }

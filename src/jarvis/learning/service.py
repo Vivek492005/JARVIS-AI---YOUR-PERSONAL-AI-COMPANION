@@ -22,8 +22,7 @@ def _default_db() -> Path:
 
 
 class LearningService:
-    def __init__(self, db_path: Optional[Path] = None,
-                 skills_dir: Optional[Path] = None) -> None:
+    def __init__(self, db_path: Optional[Path] = None, skills_dir: Optional[Path] = None) -> None:
         self.store = LearningStore(db_path or _default_db())
         self.recorder = LearningRecorder(self.store)
         self.reviewer = Reviewer(self.store, skills_dir=skills_dir)
@@ -50,20 +49,19 @@ class LearningService:
     # -- analysis ---------------------------------------------------------
     def analyze(self, min_evidence: int = 3) -> dict:
         from jarvis.learning.proposer import DEFAULT_MIN_EVIDENCE
-        return generate_proposals(
-            self.store, min_evidence or DEFAULT_MIN_EVIDENCE)
+
+        return generate_proposals(self.store, min_evidence or DEFAULT_MIN_EVIDENCE)
 
     def ingest_audit(self, limit: int = 2000) -> dict:
         from jarvis.policy import audit
+
         entries = audit.query(limit=limit)
         n = self.recorder.ingest_audit(entries)
         return {"ingested": n}
 
     # -- review (delegated) ----------------------------------------------
-    def approve(self, pid: str, reviewer: str = "user",
-                eval_runner=None):
+    def approve(self, pid: str, reviewer: str = "user", eval_runner=None):
         return self.reviewer.approve(pid, reviewer, eval_runner)
 
-    def eval_gate(self, proposal_type: str,
-                  eval_runner=None) -> EvalGateResult:
+    def eval_gate(self, proposal_type: str, eval_runner=None) -> EvalGateResult:
         return run_eval_gate(proposal_type, runner=eval_runner)

@@ -1,6 +1,5 @@
 """Tests for Phase 5.6 file intelligence (scoped workspace, dry-run, undo)."""
 
-import os
 import sys
 
 import pytest
@@ -82,14 +81,14 @@ def test_organize_execute_and_undo(ws):
     pending = F.drain_pending_undo()
     assert len(pending) == 3  # top-level files only: notes, photo, song
     # every pending undo is a move back
-    for tool, args in pending:
+    for tool, _args in pending:
         assert tool == "move_file"
 
 
 def test_organize_never_overwrites(ws):
     (ws / "Images").mkdir()
     (ws / "Images" / "photo.jpg").write_bytes(b"existing")
-    out = F.organize_folder(".", dry_run=False)
+    F.organize_folder(".", dry_run=False)
     assert (ws / "photo.jpg").exists()  # untouched
     assert (ws / "Images" / "photo.jpg").read_bytes() == b"existing"
 
@@ -103,13 +102,16 @@ def test_delete_uses_trash(ws, tmp_path):
 
 def test_undo_journal_integration(ws, tmp_path):
     from jarvis.brain.loop import UndoJournal
+
     j = UndoJournal()
     F.move_file("notes.txt", "sub/notes.txt")
     j.record("move_file", {"src": "notes.txt", "dst": "sub/notes.txt"}, "moved")
     assert len(j) == 1
+
     # undo replays the inverse via executor
     def fake_executor(tool, args):
         return F.move_file(args["src"], args["dst"])
+
     msg = j.undo_last(fake_executor)
     assert "Wapas kar diya" in msg
     assert (tmp_path / "notes.txt").exists()
@@ -117,6 +119,7 @@ def test_undo_journal_integration(ws, tmp_path):
 
 def test_bulk_undo_drained_into_journal(ws, tmp_path):
     from jarvis.brain.loop import UndoJournal
+
     F.organize_folder(".", dry_run=False)
     j = UndoJournal()
     j.record("organize_folder", {"path": ".", "dry_run": False}, "organized")

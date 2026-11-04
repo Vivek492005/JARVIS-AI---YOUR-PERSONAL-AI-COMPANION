@@ -24,7 +24,6 @@ import json
 import os
 import statistics
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
@@ -41,8 +40,7 @@ def wer(ref: str, hyp: str) -> float:
     for i, rw in enumerate(r, 1):
         cur = [i]
         for j, hw in enumerate(h, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1,
-                           prev[j - 1] + (0 if rw == hw else 1)))
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (0 if rw == hw else 1)))
         prev = cur
     return prev[len(h)] / len(r)
 
@@ -51,6 +49,7 @@ def intent_of(text: str) -> str:
     """Command-intent accuracy probe: which tool would the reflex router pick?"""
     try:
         from jarvis.brain.reflex import match_command
+
         m = match_command(text)
         return m.tool_name if m else "<none>"
     except Exception:
@@ -84,16 +83,20 @@ def run(manifest_path: str, engines: list, out_path: str) -> None:
             if want and intent_of(t.text) == want:
                 intent_ok += 1
         n = len(wers) or 1
-        rows.append({
-            "engine": eng_name,
-            "n": len(wers),
-            "wer_mean": round(statistics.mean(wers), 3),
-            "intent_acc": round(intent_ok / n, 3),
-            "lat_p50_ms": round(statistics.median(lats) * 1000, 1) if lats else 0,
-            "lat_p95_ms": round(sorted(lats)[int(0.95 * (len(lats) - 1))] * 1000, 1) if lats else 0,
-            "offline": getattr(engine, "offline_capable", False),
-            "streaming": getattr(engine, "supports_streaming", False),
-        })
+        rows.append(
+            {
+                "engine": eng_name,
+                "n": len(wers),
+                "wer_mean": round(statistics.mean(wers), 3),
+                "intent_acc": round(intent_ok / n, 3),
+                "lat_p50_ms": round(statistics.median(lats) * 1000, 1) if lats else 0,
+                "lat_p95_ms": round(sorted(lats)[int(0.95 * (len(lats) - 1))] * 1000, 1)
+                if lats
+                else 0,
+                "offline": getattr(engine, "offline_capable", False),
+                "streaming": getattr(engine, "supports_streaming", False),
+            }
+        )
         print(f"[done] {eng_name}: WER {rows[-1]['wer_mean']}, intent {rows[-1]['intent_acc']}")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as f:
@@ -105,8 +108,7 @@ def run(manifest_path: str, engines: list, out_path: str) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--engines", default="google",
-                    help="comma-separated engine names")
+    ap.add_argument("--engines", default="google", help="comma-separated engine names")
     ap.add_argument("--manifest", default="evals/stt/manifest.jsonl")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()

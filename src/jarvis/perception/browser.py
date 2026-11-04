@@ -26,8 +26,7 @@ Tools: ``browser_open`` (REVERSIBLE), ``browser_read`` (READ),
 from __future__ import annotations
 
 import logging
-import re
-from typing import Dict, List, Optional
+from typing import List, Optional
 from urllib.parse import urlparse
 
 from jarvis.perception import backends as _backends
@@ -35,32 +34,63 @@ from jarvis.perception import backends as _backends
 logger = logging.getLogger(__name__)
 
 # Schemes that are never opened, no exceptions.
-BLOCKED_SCHEMES = frozenset({
-    "file", "chrome", "chrome-extension", "about", "data",
-    "javascript", "vbscript",
-})
+BLOCKED_SCHEMES = frozenset(
+    {
+        "file",
+        "chrome",
+        "chrome-extension",
+        "about",
+        "data",
+        "javascript",
+        "vbscript",
+    }
+)
 
 # Domains never automated (phishing/malware-adjacent placeholders;
 # extend via settings).
-DOMAIN_DENYLIST = frozenset({
-    "localhost",  # SSRF guard: the agent browser must not probe local services
-})
+DOMAIN_DENYLIST = frozenset(
+    {
+        "localhost",  # SSRF guard: the agent browser must not probe local services
+    }
+)
 
 # URL/snapshot hints that a page is auth or payment -> handoff.
 AUTH_PAYMENT_HINTS = (
-    "login", "log-in", "signin", "sign-in", "password",
-    "2fa", "two-factor", "otp", "captcha",
-    "payment", "checkout", "pay now", "card number", "billing",
+    "login",
+    "log-in",
+    "signin",
+    "sign-in",
+    "password",
+    "2fa",
+    "two-factor",
+    "otp",
+    "captcha",
+    "payment",
+    "checkout",
+    "pay now",
+    "card number",
+    "billing",
 )
 
-HANDOFF_MESSAGE = ("Mujhse nahi hoga, aap kar do — "
-                   "yeh login/payment wala page hai.")
+HANDOFF_MESSAGE = "Mujhse nahi hoga, aap kar do — yeh login/payment wala page hai."
 
 # Downloadable-but-dangerous extensions refused outright.
-BLOCKED_DOWNLOAD_EXTS = frozenset({
-    ".exe", ".msi", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar",
-    ".scr", ".com", ".pif", ".dll",
-})
+BLOCKED_DOWNLOAD_EXTS = frozenset(
+    {
+        ".exe",
+        ".msi",
+        ".bat",
+        ".cmd",
+        ".ps1",
+        ".vbs",
+        ".js",
+        ".jar",
+        ".scr",
+        ".com",
+        ".pif",
+        ".dll",
+    }
+)
 
 
 class BrowserBlocked(Exception):
@@ -88,8 +118,7 @@ def _check_url(url: str, allowed_domains: Optional[List[str]] = None) -> str:
         raise BrowserBlocked(f"denylisted domain: {host}")
     if allowed_domains:
         allowed = {d.lower() for d in allowed_domains}
-        if host not in allowed and not any(
-                host.endswith("." + d) for d in allowed):
+        if host not in allowed and not any(host.endswith("." + d) for d in allowed):
             raise BrowserBlocked(f"domain not in allowlist: {host}")
     return url
 
@@ -110,8 +139,7 @@ def check_download_filename(name: str) -> None:
 class BrowserController:
     """DOM automation controller. Backend injected via backends registry."""
 
-    def __init__(self, backend=None,
-                 allowed_domains: Optional[List[str]] = None) -> None:
+    def __init__(self, backend=None, allowed_domains: Optional[List[str]] = None) -> None:
         self._backend = backend
         self._allowed = allowed_domains
 
@@ -123,6 +151,7 @@ class BrowserController:
             return self._allowed
         try:
             from jarvis.core.config import get_settings
+
             domains = getattr(get_settings().browser, "allowed_domains", None)
             return list(domains) if domains else None
         except Exception:
@@ -132,8 +161,10 @@ class BrowserController:
         url = _check_url(url, self._settings_allowlist())
         out = self._be().open(url)
         if _looks_like_auth_or_payment(url):
-            out += (" NOTE: this looks like a login/payment page — "
-                    "automation will hand off for sensitive steps.")
+            out += (
+                " NOTE: this looks like a login/payment page — "
+                "automation will hand off for sensitive steps."
+            )
         return out
 
     def read(self) -> str:
@@ -152,12 +183,12 @@ class BrowserController:
         snapshot = ""
         try:
             url = self._be().current_url or ""
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("browser current_url best-effort failed: %s", e)
         try:
             snapshot = self._be().snapshot() or ""
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("browser snapshot best-effort failed: %s", e)
         if _looks_like_auth_or_payment(url, snapshot):
             return HANDOFF_MESSAGE
         return self._be().submit(ref)

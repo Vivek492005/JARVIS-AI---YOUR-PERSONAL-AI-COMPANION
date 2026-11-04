@@ -20,7 +20,7 @@ play/pause/next go through the Spotify adapter or the existing
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Dict
 
 from jarvis.perception import backends as _backends
 
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # VS Code (`code` CLI)
 # ---------------------------------------------------------------------------
+
 
 class VSCodeAdapter:
     def __init__(self, backend=None) -> None:
@@ -49,6 +50,7 @@ class VSCodeAdapter:
 # Office (Word/Excel/PowerPoint via COM)
 # ---------------------------------------------------------------------------
 
+
 class OfficeAdapter:
     def __init__(self, backend=None) -> None:
         self._backend = backend
@@ -59,8 +61,7 @@ class OfficeAdapter:
     def open_document(self, path: str) -> str:
         return self._be().open_document(path)
 
-    def read(self, path: str, sheet: str = "",
-             cell_range: str = "") -> str:
+    def read(self, path: str, sheet: str = "", cell_range: str = "") -> str:
         return self._be().read_cells(path, sheet, cell_range)
 
     def save(self, path: str) -> str:
@@ -84,8 +85,7 @@ class SpotifyAdapter:
     def control(self, action: str, query: str = "") -> str:
         action = (action or "").lower().strip()
         if action not in _SPOTIFY_ACTIONS:
-            return (f"unknown spotify action {action!r}; "
-                    f"choose from {sorted(_SPOTIFY_ACTIONS)}")
+            return f"unknown spotify action {action!r}; choose from {sorted(_SPOTIFY_ACTIONS)}"
         return self._be().control(action, query)
 
 
@@ -109,11 +109,11 @@ def apply_setting(name: str) -> str:
     """Apply one allowlisted system setting. Unknown names are refused."""
     key = (name or "").lower().strip().replace(" ", "_")
     if key not in _SETTINGS_MAP:
-        return (f"unknown setting {name!r}; "
-                f"allowed: {sorted(_SETTINGS_MAP)}")
+        return f"unknown setting {name!r}; allowed: {sorted(_SETTINGS_MAP)}"
     kind, arg = _SETTINGS_MAP[key]
     if kind == "system_control":
         from jarvis.tools.actions import system_control
+
         return system_control(arg)
     # settings-kind: real backend would use WMI/PowerShell; fake records.
     return f"setting applied: {key} (backend: {kind})"

@@ -76,6 +76,7 @@ class TelegramBot:
     # -- HTTP -----------------------------------------------------------
     def _default_http(self, method: str, **kwargs: Any) -> Dict[str, Any]:
         import httpx
+
         url = API.format(token=self.token, method=method)
         r = httpx.post(url, timeout=30.0, **kwargs)
         r.raise_for_status()
@@ -92,8 +93,7 @@ class TelegramBot:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(target=self._poll_loop, daemon=True,
-                                        name="jarvis-telegram")
+        self._thread = threading.Thread(target=self._poll_loop, daemon=True, name="jarvis-telegram")
         self._thread.start()
 
     def stop(self) -> None:
@@ -106,8 +106,11 @@ class TelegramBot:
             try:
                 updates = self._api(
                     "getUpdates",
-                    json={"offset": self._offset, "timeout": 25,
-                          "allowed_updates": ["message", "callback_query"]},
+                    json={
+                        "offset": self._offset,
+                        "timeout": 25,
+                        "allowed_updates": ["message", "callback_query"],
+                    },
                 ).get("result", [])
                 for u in updates:
                     self._offset = max(self._offset, u.get("update_id", 0) + 1)
@@ -124,7 +127,8 @@ class TelegramBot:
                 chat_id=(cq.get("message") or {}).get("chat", {}).get("id", 0),
                 user_id=frm.get("id", 0),
                 callback_id=cq.get("id", ""),
-                callback_data=cq.get("data", ""))
+                callback_data=cq.get("data", ""),
+            )
         m = u.get("message") or {}
         frm = m.get("from", {})
         voice = (m.get("voice") or {}).get("file_id", "")
@@ -134,7 +138,9 @@ class TelegramBot:
             chat_id=(m.get("chat") or {}).get("id", 0),
             user_id=frm.get("id", 0),
             text=m.get("text", "") or "",
-            voice_file_id=voice, photo_file_id=photo)
+            voice_file_id=voice,
+            photo_file_id=photo,
+        )
 
     def _handle_update(self, u: Dict[str, Any]) -> None:
         msg = self._parse(u)
@@ -142,8 +148,7 @@ class TelegramBot:
             return
         if msg.user_id not in self.allowed:
             # Strangers get silence, not even an error message.
-            logger.warning(f"telegram: ignoring message from unknown user "
-                           f"{msg.user_id}")
+            logger.warning(f"telegram: ignoring message from unknown user {msg.user_id}")
             return
         try:
             if msg.callback_data:
@@ -162,15 +167,13 @@ class TelegramBot:
         except Exception as e:
             logger.exception(f"telegram: handling failed: {e}")
             try:
-                self.send_message(msg.chat_id,
-                                  f"Something went wrong: {e}")
+                self.send_message(msg.chat_id, f"Something went wrong: {e}")
             except Exception as send_e:
                 logger.debug(f"telegram: error reply failed: {send_e}")
 
     def _handle_callback(self, msg: TgMessage) -> None:
         # Inline-button confirmations: "<confirm|deny>:<token>"
-        self._api("answerCallbackQuery",
-                  json={"callback_query_id": msg.callback_id})
+        self._api("answerCallbackQuery", json={"callback_query_id": msg.callback_id})
         action = (msg.callback_data or "").split(":", 1)[0]
         if action in ("confirm", "deny"):
             reply = self.on_command(f"/{action}", self.remote_level)
@@ -180,28 +183,30 @@ class TelegramBot:
         info = self._api("getFile", json={"file_id": file_id})
         path = info["result"]["file_path"]
         import httpx
+
         url = f"https://api.telegram.org/file/bot{self.token}/{path}"
         r = httpx.get(url, timeout=30.0)
         r.raise_for_status()
         return r.content
 
     # -- sending ------------------------------------------------------------
-    def send_message(self, chat_id: int, text: str,
-                     buttons: Optional[List[List[str]]] = None) -> None:
-        payload: Dict[str, Any] = {"chat_id": chat_id,
-                                   "text": text[:4000]}
+    def send_message(
+        self, chat_id: int, text: str, buttons: Optional[List[List[str]]] = None
+    ) -> None:
+        payload: Dict[str, Any] = {"chat_id": chat_id, "text": text[:4000]}
         if buttons:
             payload["reply_markup"] = {
                 "inline_keyboard": [
-                    [{"text": b, "callback_data": f"confirm:{b}"}
-                     for b in row] for row in buttons]}
+                    [{"text": b, "callback_data": f"confirm:{b}"} for b in row] for row in buttons
+                ]
+            }
         self._api("sendMessage", json=payload)
 
 
-def from_config(on_command: Callable[[str, int], str],
-                **kwargs: Any) -> Optional[TelegramBot]:
+def from_config(on_command: Callable[[str, int], str], **kwargs: Any) -> Optional[TelegramBot]:
     """Build a bot from secrets/env. Returns None when not configured."""
     from jarvis.core.secrets import get_secret
+
     token = get_secret("TELEGRAM_BOT_TOKEN")
     if not token:
         logger.info("telegram: TELEGRAM_BOT_TOKEN not set; remote disabled")
@@ -214,5 +219,4 @@ def from_config(on_command: Callable[[str, int], str],
     if not allowed:
         logger.warning("telegram: no TELEGRAM_ALLOWED_USERS; remote disabled")
         return None
-    return TelegramBot(token=token, allowed_users=allowed,
-                       on_command=on_command, **kwargs)
+    return TelegramBot(token=token, allowed_users=allowed, on_command=on_command, **kwargs)

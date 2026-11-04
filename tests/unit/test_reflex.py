@@ -10,8 +10,14 @@ import pytest  # noqa: E402
 # it for dependency isolation); restored by tests/conftest.py.
 pytestmark = pytest.mark.usefixtures("real_fuzzywuzzy")
 
-from jarvis.brain.reflex import (ReflexHit, ReflexMatcher, ReflexStats,  # noqa: E402
-                                 normalize, print_stats, render_template)
+from jarvis.brain.reflex import (  # noqa: E402
+    ReflexHit,
+    ReflexMatcher,
+    ReflexStats,  # noqa: E402
+    normalize,
+    print_stats,
+    render_template,
+)
 from jarvis.brain.router import REFLEX_CONFIDENCE, Router  # noqa: E402
 
 
@@ -22,6 +28,7 @@ def matcher(tmp_path):
 
 
 # -- normalization ----------------------------------------------------------
+
 
 def test_normalize_hinglish_verbs():
     assert normalize("kholo youtube") == "open youtube"
@@ -42,6 +49,7 @@ def test_normalize_hindi_numbers():
 
 # -- templates --------------------------------------------------------------
 
+
 def test_render_template_groups():
     assert render_template("hi {group1}", ["bob"]) == "hi bob"
     assert render_template("q={group1|urlencode}", ["a b"]) == "q=a+b"
@@ -53,8 +61,10 @@ def test_render_template_groups():
 
 # -- extraction fidelity ----------------------------------------------------
 
+
 def test_rule_table_shape():
     from jarvis.legacy.rule_commands import RULES
+
     assert len(RULES) == 152
     for r in RULES:
         assert r["id"] and r["patterns"]
@@ -64,6 +74,7 @@ def test_rule_table_shape():
 def test_legacy_table_fully_covered_or_excluded():
     """Every legacy command is either extracted or explicitly excluded."""
     import ast
+
     src = open("src/jarvis/voice/interface.py").read()
     tree = ast.parse(src)
     legacy_ids = set()
@@ -77,6 +88,7 @@ def test_legacy_table_fully_covered_or_excluded():
                                 legacy_ids.add(v.value)
     from jarvis.legacy.rule_commands import RULES
     from jarvis.brain.reflex import ReflexMatcher  # noqa
+
     extracted = {r["id"] for r in RULES}
     excluded = {"find_file", "ai_summarize", "ai_fix_code", "repeat_last"}
     assert legacy_ids == extracted | excluded
@@ -84,6 +96,7 @@ def test_legacy_table_fully_covered_or_excluded():
 
 def test_spot_mappings():
     from jarvis.legacy.rule_commands import RULES
+
     by_id = {r["id"]: r for r in RULES}
     # direct pyautogui/webbrowser paths are now gated ToolSpec calls
     assert by_id["open_youtube"]["tool"] == "open_website"
@@ -96,6 +109,7 @@ def test_spot_mappings():
 
 
 # -- matcher -----------------------------------------------------------------
+
 
 def test_regex_hit_confidence_1(matcher):
     hit = matcher.match("open youtube")
@@ -137,18 +151,18 @@ def test_compute_rules(matcher):
 
 # -- router ------------------------------------------------------------------
 
+
 def _router_with(agent=None, **kw):
-    stats = ReflexStats(path=str(kw.pop("tmp_path", ".") ) + "/s.json") \
-        if "tmp_path" in kw else None
+    stats = ReflexStats(path=str(kw.pop("tmp_path", ".")) + "/s.json") if "tmp_path" in kw else None
     return Router(reflex=ReflexMatcher(stats=stats), agent=agent)
 
 
 def test_router_reflex_path_uses_policy_gate(tmp_path):
     agent = mock.MagicMock()
-    router = Router(reflex=ReflexMatcher(
-        stats=ReflexStats(path=str(tmp_path / "s.json"))), agent=agent)
-    with mock.patch("jarvis.tools.actions.run_action",
-                    return_value=("allow", "tool-output")) as ra:
+    router = Router(
+        reflex=ReflexMatcher(stats=ReflexStats(path=str(tmp_path / "s.json"))), agent=agent
+    )
+    with mock.patch("jarvis.tools.actions.run_action", return_value=("allow", "tool-output")) as ra:
         out = router.handle("open youtube")
     ra.assert_called_once()
     tool, args = ra.call_args[0][:2]
@@ -161,22 +175,28 @@ def test_router_reflex_path_uses_policy_gate(tmp_path):
 def test_router_confirm_delegates_to_agent(tmp_path):
     agent = mock.MagicMock()
     agent.request_confirmation.return_value = "confirm?"
-    router = Router(reflex=ReflexMatcher(
-        stats=ReflexStats(path=str(tmp_path / "s.json"))), agent=agent)
-    with mock.patch("jarvis.tools.actions.run_action",
-                    return_value=("confirm", "ACTION_REQUIRES_CONFIRMATION: ...")):
+    router = Router(
+        reflex=ReflexMatcher(stats=ReflexStats(path=str(tmp_path / "s.json"))), agent=agent
+    )
+    with mock.patch(
+        "jarvis.tools.actions.run_action",
+        return_value=("confirm", "ACTION_REQUIRES_CONFIRMATION: ..."),
+    ):
         out = router.handle("empty recycle bin")
     agent.request_confirmation.assert_called_once_with(
-        "system_control", {"action": "empty_recycle_bin"})
+        "system_control", {"action": "empty_recycle_bin"}
+    )
     assert out == "confirm?"
 
 
 def test_router_deny_returns_block_reason(tmp_path):
     agent = mock.MagicMock()
-    router = Router(reflex=ReflexMatcher(
-        stats=ReflexStats(path=str(tmp_path / "s.json"))), agent=agent)
-    with mock.patch("jarvis.tools.actions.run_action",
-                    return_value=("deny", "Blocked for safety: nope")):
+    router = Router(
+        reflex=ReflexMatcher(stats=ReflexStats(path=str(tmp_path / "s.json"))), agent=agent
+    )
+    with mock.patch(
+        "jarvis.tools.actions.run_action", return_value=("deny", "Blocked for safety: nope")
+    ):
         out = router.handle("empty recycle bin")
     assert out == "Blocked for safety: nope"
     agent.process.assert_not_called()
@@ -188,19 +208,25 @@ def test_router_low_confidence_falls_to_llm(tmp_path):
     reflex = ReflexMatcher(stats=ReflexStats(path=str(tmp_path / "s.json")))
     router = Router(reflex=reflex, agent=agent)
     # force a below-threshold hit
-    with mock.patch.object(reflex, "match",
-                           return_value=ReflexHit(
-                               rule_id="x", tool="open_website", args={},
-                               reply="r", compute=None, confidence=0.80)):
+    with mock.patch.object(
+        reflex,
+        "match",
+        return_value=ReflexHit(
+            rule_id="x", tool="open_website", args={}, reply="r", compute=None, confidence=0.80
+        ),
+    ):
         assert router.handle("whatever") == "llm reply"
     agent.process.assert_called_once_with("whatever")
 
 
 def test_router_compute_rule_needs_no_tool_or_llm(tmp_path):
     agent = mock.MagicMock()
-    router = Router(reflex=ReflexMatcher(
-        stats=ReflexStats(path=str(tmp_path / "s.json")),
-        rng=random.Random(1)), agent=agent)
+    router = Router(
+        reflex=ReflexMatcher(
+            stats=ReflexStats(path=str(tmp_path / "s.json")), rng=random.Random(1)
+        ),
+        agent=agent,
+    )
     out = router.handle("flip a coin")
     assert out in ("It's Heads!", "It's Tails!")
     agent.process.assert_not_called()
@@ -211,8 +237,8 @@ def test_router_records_stats(tmp_path):
     agent.process.return_value = "llm"
     stats = ReflexStats(path=str(tmp_path / "s.json"))
     router = Router(reflex=ReflexMatcher(stats=stats), agent=agent)
-    router.handle("open youtube")   # reflex
-    router.handle("xqzw blorpt")    # llm
+    router.handle("open youtube")  # reflex
+    router.handle("xqzw blorpt")  # llm
     s = stats.summary()
     assert s["total"] == 2 and s["reflex"] == 1
     assert s["pct"] == 50.0
@@ -220,15 +246,20 @@ def test_router_records_stats(tmp_path):
 
 # -- google fallback removed (privacy) ---------------------------------------
 
+
 def test_legacy_process_no_google_fallback():
     """Unrecognized input no longer opens a Google search (privacy leak)."""
     from jarvis.voice.interface import VoiceCommandProcessor
     import jarvis.voice.interface as iface
+
     proc = VoiceCommandProcessor.__new__(VoiceCommandProcessor)
     # minimal attrs for process(): commands + ai_agent=None
     from jarvis.legacy.rule_commands import RULES
-    proc.commands = [{"id": r["id"], "patterns": r["patterns"],
-                      "action": lambda m: "x", "type": "WEB"} for r in RULES[:1]]
+
+    proc.commands = [
+        {"id": r["id"], "patterns": r["patterns"], "action": lambda m: "x", "type": "WEB"}
+        for r in RULES[:1]
+    ]
     proc.ai_agent = None
     with mock.patch.object(iface.webbrowser, "open") as wopen:
         out = VoiceCommandProcessor.process(proc, "xqzw blorpt fnord 123")
@@ -239,9 +270,11 @@ def test_legacy_process_no_google_fallback():
 
 # -- stats CLI ----------------------------------------------------------------
 
+
 def test_print_stats_empty(tmp_path, capsys):
-    with mock.patch("jarvis.brain.reflex._default_stats_path",
-                    return_value=str(tmp_path / "s.json")):
+    with mock.patch(
+        "jarvis.brain.reflex._default_stats_path", return_value=str(tmp_path / "s.json")
+    ):
         print_stats()
     out = capsys.readouterr().out
     assert "Reflex layer coverage" in out

@@ -1,5 +1,6 @@
 """Tests for Task 8.3 (reliability): watchdog, crash reports, migrations,
 safe mode, offline mode."""
+
 import json
 import os
 
@@ -18,15 +19,14 @@ class _P(BaseModel):
 
 
 def _spec(risk):
-    return ToolSpec(name="t", description="t", params=_P, risk=risk,
-                    handler=lambda a, b, c: "")
+    return ToolSpec(name="t", description="t", params=_P, risk=risk, handler=lambda a, b, c: "")
 
 
 # --- watchdog ---------------------------------------------------------------
 
+
 def test_watchdog_backoff_caps():
-    w = Watchdog(WatchdogConfig(command=["x"], backoff_base_s=2.0,
-                                backoff_max_s=60.0))
+    w = Watchdog(WatchdogConfig(command=["x"], backoff_base_s=2.0, backoff_max_s=60.0))
     assert w._backoff(0) == 2.0
     assert w._backoff(1) == 4.0
     assert w._backoff(10) == 60.0  # capped
@@ -40,11 +40,9 @@ def test_watchdog_clean_exit_returns_zero(monkeypatch):
 
 def test_watchdog_gives_up_after_max_restarts(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
-    w = Watchdog(WatchdogConfig(command=["x"], max_restarts=2,
-                                backoff_base_s=0, window_s=3600))
+    w = Watchdog(WatchdogConfig(command=["x"], max_restarts=2, backoff_base_s=0, window_s=3600))
     calls = []
-    monkeypatch.setattr(w, "run_once",
-                        lambda: calls.append(1) or 1)  # always crash
+    monkeypatch.setattr(w, "run_once", lambda: calls.append(1) or 1)  # always crash
     assert w.supervise() == 1
     assert len(calls) == 3  # initial + 2 restarts, then give up
     # one crash report per crash
@@ -59,6 +57,7 @@ def test_watchdog_stop(monkeypatch):
 
 
 # --- crash reports ----------------------------------------------------------
+
 
 def test_crash_report_written_locally(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -87,6 +86,7 @@ def test_crash_report_never_raises(monkeypatch, tmp_path):
 
 # --- migrations -------------------------------------------------------------
 
+
 def test_migrate_0_to_1_adds_new_keys():
     out = migrations.migrate_settings({})
     assert out["schema_version"] == 1
@@ -96,8 +96,7 @@ def test_migrate_0_to_1_adds_new_keys():
 
 
 def test_migrate_preserves_user_keys():
-    out = migrations.migrate_settings(
-        {"safety": {"autonomy_level": 2}, "custom": {"x": 1}})
+    out = migrations.migrate_settings({"safety": {"autonomy_level": 2}, "custom": {"x": 1}})
     assert out["safety"]["autonomy_level"] == 2
     assert out["custom"] == {"x": 1}
     assert out["schema_version"] == 1
@@ -112,8 +111,8 @@ def test_migrate_idempotent():
 
 # --- safe mode / offline policy ---------------------------------------------
 
-@pytest.mark.parametrize("risk", [Risk.REVERSIBLE, Risk.DESTRUCTIVE,
-                                  Risk.SYSTEM])
+
+@pytest.mark.parametrize("risk", [Risk.REVERSIBLE, Risk.DESTRUCTIVE, Risk.SYSTEM])
 def test_safe_mode_denies_above_read(risk):
     ctx = PolicyContext(safe_mode=True)
     assert decide(_spec(risk), ctx, 3) is Decision.DENY
@@ -131,12 +130,12 @@ def test_offline_denies_network_tools():
 
 
 def test_offline_allows_local_tools():
-    assert decide(_spec(Risk.READ), PolicyContext(offline=True), 3) \
-        is Decision.ALLOW
+    assert decide(_spec(Risk.READ), PolicyContext(offline=True), 3) is Decision.ALLOW
 
 
 def test_context_from_settings_safe_mode(monkeypatch, tmp_path):
     from jarvis.core.config import reset_settings_cache
+
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("safety__safe_mode", "true")
     monkeypatch.setenv("privacy__offline", "true")
@@ -151,16 +150,16 @@ def test_context_from_settings_safe_mode(monkeypatch, tmp_path):
 
 def test_cloud_egress_allowed():
     from jarvis.core.config import Settings, cloud_egress_allowed
+
     assert cloud_egress_allowed(Settings()) is True
-    assert cloud_egress_allowed(
-        Settings(privacy={"offline": True})) is False
-    assert cloud_egress_allowed(
-        Settings(privacy={"privacy_mode": True})) is False
+    assert cloud_egress_allowed(Settings(privacy={"offline": True})) is False
+    assert cloud_egress_allowed(Settings(privacy={"privacy_mode": True})) is False
 
 
 def test_pim_offline_forces_fake(monkeypatch, tmp_path):
     from jarvis.core.config import reset_settings_cache
     from jarvis.integrations import pim
+
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("privacy__offline", "true")
     monkeypatch.setenv("JARVIS_PIM_PROVIDER", "google")
@@ -176,6 +175,7 @@ def test_pim_offline_forces_fake(monkeypatch, tmp_path):
 
 def test_cli_safe_flag_parses():
     from jarvis.cli import build_parser
+
     args = build_parser().parse_args(["--safe", "doctor"])
     assert args.safe is True
     args2 = build_parser().parse_args(["doctor"])

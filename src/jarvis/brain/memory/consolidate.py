@@ -18,7 +18,8 @@ from jarvis.brain.memory.store import MemoryStore
 logger = logging.getLogger(__name__)
 
 _STOP = frozenset(
-    "ka kya hai aur ko ne se me par ke ki ko ya the a an is are was were to of in on for".split())
+    "ka kya hai aur ko ne se me par ke ki ko ya the a an is are was were to of in on for".split()
+)
 
 
 def _keywords(texts: List[str], n: int = 8) -> List[str]:
@@ -49,13 +50,12 @@ class Consolidator:
         self.proposer = proposer or extractive_proposals
 
     def run(self, since_ts: str = "", limit: int = 200) -> List[str]:
-        eps = (self.store.episodes_since(since_ts) if since_ts
-               else self.store.recent_episodes(limit))
-        texts = [f"{e['role']}: {e['text']}" for e in eps
-                 if e["role"] in ("user", "assistant")]
+        eps = self.store.episodes_since(since_ts) if since_ts else self.store.recent_episodes(limit)
+        texts = [f"{e['role']}: {e['text']}" for e in eps if e["role"] in ("user", "assistant")]
         if not texts:
             return []
         proposals = self.proposer(texts)
-        logger.info("consolidation produced %d proposals from %d episodes",
-                    len(proposals), len(texts))
+        logger.info(
+            "consolidation produced %d proposals from %d episodes", len(proposals), len(texts)
+        )
         return proposals

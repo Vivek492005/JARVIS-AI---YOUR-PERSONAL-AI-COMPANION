@@ -16,19 +16,23 @@ from jarvis.server.control import build_control_router
 
 def _gate_pass(ptype, runner=None):
     from jarvis.learning.eval_gate import EvalGateResult
+
     return EvalGateResult(True, ["safety"], {}, 1.0, "fake pass")
 
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     svc = SimpleNamespace()
-    svc.learning = LearningService(db_path=tmp_path / "learning.db",
-                                   skills_dir=tmp_path / "skills")
+    svc.learning = LearningService(db_path=tmp_path / "learning.db", skills_dir=tmp_path / "skills")
     # Seed one pending proposal.
     pid = svc.learning.store.add_proposal(
-        "prompt_snippet", "get_time:undo", "Usage note",
+        "prompt_snippet",
+        "get_time:undo",
+        "Usage note",
         {"section_title": "Learned: get_time", "markdown": "**get_time**: x"},
-        {"corrections": 2}, 0.6)
+        {"corrections": 2},
+        0.6,
+    )
     svc._seed_pid = pid
     monkeypatch.setattr("jarvis.learning.reviewer.run_eval_gate", _gate_pass)
 
@@ -64,8 +68,9 @@ def test_proposals_list_and_detail(client):
 def test_analyze_generates_proposals(client):
     c, svc = client
     for _ in range(3):
-        svc.learning.store.add_run(tool="get_time", args_redacted={},
-                                   args_hash="h1", decision="allow", ok=True)
+        svc.learning.store.add_run(
+            tool="get_time", args_redacted={}, args_hash="h1", decision="allow", ok=True
+        )
     r = c.post("/api/learning/analyze")
     assert r.status_code == 200
     ids = r.json()["new_proposals"]["reflex_rule"]
@@ -89,8 +94,7 @@ def test_approve_applies_with_eval_gate(client, tmp_path):
 def test_reject_and_revert_flow(client):
     c, svc = client
     pid = svc._seed_pid
-    r = c.post(f"/api/learning/proposals/{pid}/reject",
-               json={"reason": "not now"})
+    r = c.post(f"/api/learning/proposals/{pid}/reject", json={"reason": "not now"})
     assert r.status_code == 200
     # Already decided -> approve is a conflict.
     r = c.post(f"/api/learning/proposals/{pid}/approve")
@@ -100,8 +104,7 @@ def test_reject_and_revert_flow(client):
 def test_edit_proposal(client):
     c, svc = client
     pid = svc._seed_pid
-    r = c.put(f"/api/learning/proposals/{pid}",
-              json={"title": "edited title"})
+    r = c.put(f"/api/learning/proposals/{pid}", json={"title": "edited title"})
     assert r.status_code == 200
     one = c.get(f"/api/learning/proposals/{pid}").json()
     assert one["title"] == "edited title"
@@ -111,8 +114,10 @@ def test_ingest_audit(client, monkeypatch):
     c, svc = client
     monkeypatch.setattr(
         "jarvis.policy.audit.query",
-        lambda **kw: [{"tool": "get_time", "args": {}, "decision": "allow",
-                       "latency_ms": 2.0, "reason": "ok"}])
+        lambda **kw: [
+            {"tool": "get_time", "args": {}, "decision": "allow", "latency_ms": 2.0, "reason": "ok"}
+        ],
+    )
     r = c.post("/api/learning/ingest-audit?limit=10")
     assert r.status_code == 200
     assert r.json()["ingested"] == 1
@@ -121,8 +126,7 @@ def test_ingest_audit(client, monkeypatch):
 
 def test_runs_endpoint(client):
     c, svc = client
-    svc.learning.store.add_run(tool="get_time", args_redacted={},
-                               args_hash="h", decision="allow")
+    svc.learning.store.add_run(tool="get_time", args_redacted={}, args_hash="h", decision="allow")
     rows = c.get("/api/learning/runs?limit=5").json()
     assert len(rows) == 1
     assert rows[0]["tool"] == "get_time"

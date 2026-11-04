@@ -23,14 +23,15 @@ from fakes.fake_desktop import install_fake_desktop, uninstall_fake_desktop  # n
 def desktop():
     made = install_fake_desktop()
     uia = made["uia"]
-    handle = uia.add_window("App", "app.exe", children=[
-        ElementNode(element_id="e0", role="button", name="Save",
-                    bounds=(10, 10, 80, 24)),
-        ElementNode(element_id="e1", role="button", name="Cancel",
-                    bounds=(100, 10, 80, 24)),
-        ElementNode(element_id="e2", role="static", name="label",
-                    bounds=(10, 50, 80, 24)),
-    ])
+    handle = uia.add_window(
+        "App",
+        "app.exe",
+        children=[
+            ElementNode(element_id="e0", role="button", name="Save", bounds=(10, 10, 80, 24)),
+            ElementNode(element_id="e1", role="button", name="Cancel", bounds=(100, 10, 80, 24)),
+            ElementNode(element_id="e2", role="static", name="label", bounds=(10, 50, 80, 24)),
+        ],
+    )
     uia._index(uia.trees[handle])
     yield made, uia, handle
     uninstall_fake_desktop()
@@ -66,8 +67,7 @@ def test_click_target_picks_vlm_index(desktop):
 def test_click_target_verifies(desktop):
     made, uia, handle = desktop
     clicker = VLMClicker()
-    out = clicker.click_target("Save", handle=handle,
-                               verify_fn=lambda: (True, "dialog closed"))
+    out = clicker.click_target("Save", handle=handle, verify_fn=lambda: (True, "dialog closed"))
     assert "verified" in out
 
 
@@ -75,8 +75,7 @@ def test_click_target_retries_then_hands_off(desktop):
     made, uia, handle = desktop
     clicker = VLMClicker(max_retries=1)
     with pytest.raises(HandoffRequired):
-        clicker.click_target("Save", handle=handle,
-                             verify_fn=lambda: (False, "still open"))
+        clicker.click_target("Save", handle=handle, verify_fn=lambda: (False, "still open"))
     # 1 initial + 1 retry = 2 VLM calls
     assert clicker.calls_made == 2
 
@@ -85,8 +84,7 @@ def test_vlm_call_budget_enforced(desktop):
     made, uia, handle = desktop
     clicker = VLMClicker(max_calls=1, max_retries=5)
     with pytest.raises(HandoffRequired) as exc:
-        clicker.click_target("Save", handle=handle,
-                             verify_fn=lambda: (False, "nope"))
+        clicker.click_target("Save", handle=handle, verify_fn=lambda: (False, "nope"))
     assert "budget exhausted" in str(exc.value)
 
 
@@ -110,6 +108,7 @@ def test_out_of_range_index_retries(desktop):
 
 def test_overlay_marks_without_pil(desktop, monkeypatch):
     import sys as _sys
+
     monkeypatch.setitem(_sys.modules, "PIL", None)
     monkeypatch.setitem(_sys.modules, "PIL.Image", None)
     out = overlay_marks(b"\x89PNG", [])
@@ -122,6 +121,7 @@ def test_tool_registered_destructive():
 
 def test_run_action_vlm_click_hands_off_login(desktop):
     from jarvis.tools.actions import run_action
+
     # DESTRUCTIVE at L1 -> confirm gate; the handler itself hands off.
     # Use execute path via confirm is complex; call handler-level via run_action
     # with autonomy that allows: instead test the tool resolves + handler.

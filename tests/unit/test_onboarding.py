@@ -37,16 +37,23 @@ def _ctx(**over):
         say=said.append,
     )
     base.update(over)
-    ctx = StepContext(**{k: v for k, v in base.items()
-                         if k in StepContext.__dataclass_fields__})
+    ctx = StepContext(**{k: v for k, v in base.items() if k in StepContext.__dataclass_fields__})
     ctx._secrets = secrets
     ctx._said = said
     return ctx
 
 
 def test_eight_steps_in_plan_order():
-    assert [s.id for s in STEPS] == ["mic", "wakeword", "api_keys", "privacy",
-                                     "autonomy", "persona", "demos", "doctor"]
+    assert [s.id for s in STEPS] == [
+        "mic",
+        "wakeword",
+        "api_keys",
+        "privacy",
+        "autonomy",
+        "persona",
+        "demos",
+        "doctor",
+    ]
 
 
 def test_full_run_all_ok(tmp_path):
@@ -83,6 +90,7 @@ def test_mic_failure_does_not_kill_wizard(tmp_path):
 def test_step_exception_is_contained(tmp_path):
     def boom():
         raise RuntimeError("mic exploded")
+
     ctx = _ctx(workspace=tmp_path, mic_test=boom)
     wiz = OnboardingWizard(ctx, state_dir=tmp_path / "state")
     results = wiz.run()
@@ -92,25 +100,26 @@ def test_step_exception_is_contained(tmp_path):
 
 
 def test_autonomy_level_written_to_config(tmp_path):
-    ctx = _ctx(workspace=tmp_path,
-               answers={"Level (0-3)": "2"})
+    ctx = _ctx(workspace=tmp_path, answers={"Level (0-3)": "2"})
     wiz = OnboardingWizard(ctx, state_dir=tmp_path / "state")
     wiz.run()
     assert ctx.config.safety.autonomy_level == 2
 
 
 def test_autonomy_invalid_falls_back_to_1(tmp_path):
-    ctx = _ctx(workspace=tmp_path,
-               answers={"Level (0-3)": "banana"})
+    ctx = _ctx(workspace=tmp_path, answers={"Level (0-3)": "banana"})
     wiz = OnboardingWizard(ctx, state_dir=tmp_path / "state")
     results = wiz.run()
     assert results["autonomy"].data["autonomy_level"] == 1
 
 
 def test_privacy_choices_written(tmp_path):
-    ctx = _ctx(workspace=tmp_path, answers={
-        "Speech-to-text (Google) cloud use kare? (haan/nahi)": "nahi",
-    })
+    ctx = _ctx(
+        workspace=tmp_path,
+        answers={
+            "Speech-to-text (Google) cloud use kare? (haan/nahi)": "nahi",
+        },
+    )
     wiz = OnboardingWizard(ctx, state_dir=tmp_path / "state")
     wiz.run()
     assert ctx.config.privacy.allow_google_stt is False
@@ -118,10 +127,13 @@ def test_privacy_choices_written(tmp_path):
 
 
 def test_api_keys_stored_via_secrets(tmp_path):
-    ctx = _ctx(workspace=tmp_path, answers={
-        "secret:Rumik TTS key (Enter=skip)": "rk-test-123",
-        "secret:Telegram bot token (Enter=skip)": "",
-    })
+    ctx = _ctx(
+        workspace=tmp_path,
+        answers={
+            "secret:Rumik TTS key (Enter=skip)": "rk-test-123",
+            "secret:Telegram bot token (Enter=skip)": "",
+        },
+    )
     wiz = OnboardingWizard(ctx, state_dir=tmp_path / "state")
     wiz.run()
     assert ctx._secrets == {"RUMIK_API_KEY": "rk-test-123"}

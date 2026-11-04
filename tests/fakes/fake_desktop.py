@@ -19,6 +19,7 @@ from jarvis.perception.backends import ElementNode, WindowInfo
 # Fake UIA
 # ---------------------------------------------------------------------------
 
+
 class FakeUIA(B.UIABackend):
     """In-memory window/element tree."""
 
@@ -30,14 +31,15 @@ class FakeUIA(B.UIABackend):
         self.text_set: Dict[str, str] = {}
         self._next = 1  # matches FakeContext's default active-window handle
 
-    def add_window(self, title: str, process: str = "app.exe",
-                   children: Optional[List[ElementNode]] = None) -> int:
+    def add_window(
+        self, title: str, process: str = "app.exe", children: Optional[List[ElementNode]] = None
+    ) -> int:
         handle = self._next
         self._next += 1
-        self.windows[handle] = WindowInfo(handle=handle, title=title,
-                                          process=process)
-        root = ElementNode(element_id=f"w{handle}", role="window", name=title,
-                           children=children or [])
+        self.windows[handle] = WindowInfo(handle=handle, title=title, process=process)
+        root = ElementNode(
+            element_id=f"w{handle}", role="window", name=title, children=children or []
+        )
         self.trees[handle] = root
         self._index(root)
         return handle
@@ -47,13 +49,16 @@ class FakeUIA(B.UIABackend):
         for child in node.children:
             self._index(child)
 
-    def add_element(self, handle: int, parent_id: str,
-                    role: str, name: str,
-                    automation_id: str = "") -> ElementNode:
+    def add_element(
+        self, handle: int, parent_id: str, role: str, name: str, automation_id: str = ""
+    ) -> ElementNode:
         el = ElementNode(
-            element_id=f"e{len(self.by_id)}", role=role, name=name,
+            element_id=f"e{len(self.by_id)}",
+            role=role,
+            name=name,
             automation_id=automation_id,
-            bounds=(10, 10, 80, 24))
+            bounds=(10, 10, 80, 24),
+        )
         parent = self.by_id[parent_id]
         parent.children.append(el)
         self.by_id[el.element_id] = el
@@ -66,9 +71,13 @@ class FakeUIA(B.UIABackend):
     def get_tree(self, handle: int, depth: int = 3) -> ElementNode:
         return self.trees[handle]
 
-    def find(self, handle: int, name: Optional[str] = None,
-             role: Optional[str] = None,
-             automation_id: Optional[str] = None) -> Optional[ElementNode]:
+    def find(
+        self,
+        handle: int,
+        name: Optional[str] = None,
+        role: Optional[str] = None,
+        automation_id: Optional[str] = None,
+    ) -> Optional[ElementNode]:
         for el in self.by_id.values():
             if name and name.lower() not in el.name.lower():
                 continue
@@ -102,17 +111,26 @@ class FakeUIA(B.UIABackend):
 # Fake screen + OCR
 # ---------------------------------------------------------------------------
 
+# A real, minimal 1x1 PNG. Fake captures must be parseable by PIL because
+# production code (e.g. vlm.overlay_marks) opens them with Image.open().
+_FAKE_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+    b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
 class FakeScreen(B.ScreenBackend):
     def __init__(self) -> None:
         self.captures: List[Tuple[str, tuple]] = []
 
     def capture_window(self, handle: int) -> bytes:
         self.captures.append(("window", (handle,)))
-        return b"\x89PNG-fake-window-" + str(handle).encode()
+        return _FAKE_PNG
 
     def capture_region(self, x: int, y: int, w: int, h: int) -> bytes:
         self.captures.append(("region", (x, y, w, h)))
-        return b"\x89PNG-fake-region"
+        return _FAKE_PNG
 
 
 class FakeOCR(B.OCRBackend):
@@ -129,11 +147,12 @@ class FakeOCR(B.OCRBackend):
 # Fake browser
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FakePage:
     url: str
     title: str
-    ax_tree: str                      # accessibility snapshot text
+    ax_tree: str  # accessibility snapshot text
     refs: Dict[str, str] = field(default_factory=dict)  # ref -> description
 
 
@@ -181,13 +200,13 @@ class FakeBrowser(B.BrowserBackend):
 # Fake VLM
 # ---------------------------------------------------------------------------
 
+
 class FakeVLM(B.VLMBackend):
     def __init__(self, pick: int = 1) -> None:
         self.pick = pick
         self.calls: List[Tuple[bytes, str, int]] = []
 
-    def pick_element(self, image_png: bytes, prompt: str,
-                     max_marks: int = 12) -> int:
+    def pick_element(self, image_png: bytes, prompt: str, max_marks: int = 12) -> int:
         self.calls.append((image_png, prompt, max_marks))
         return self.pick
 
@@ -196,11 +215,16 @@ class FakeVLM(B.VLMBackend):
 # Fake context + apps
 # ---------------------------------------------------------------------------
 
+
 class FakeContext(B.ContextBackend):
-    def __init__(self, title: str = "Untitled - Notepad",
-                 process: str = "notepad.exe",
-                 selection: str = "", clipboard: bool = False,
-                 clipboard_text: str = "") -> None:
+    def __init__(
+        self,
+        title: str = "Untitled - Notepad",
+        process: str = "notepad.exe",
+        selection: str = "",
+        clipboard: bool = False,
+        clipboard_text: str = "",
+    ) -> None:
         self._win = WindowInfo(handle=1, title=title, process=process)
         self._selection = selection
         self._clipboard = clipboard
@@ -239,8 +263,7 @@ class FakeApps:
         self.calls.append(("office.open_document", (path,)))
         return f"opened {path}"
 
-    def read_cells(self, path: str, sheet: str = "",
-                   cell_range: str = "") -> str:
+    def read_cells(self, path: str, sheet: str = "", cell_range: str = "") -> str:
         self.calls.append(("office.read_cells", (path, sheet, cell_range)))
         return "A1: fake"
 
@@ -257,6 +280,7 @@ class FakeApps:
 # ---------------------------------------------------------------------------
 # Installer
 # ---------------------------------------------------------------------------
+
 
 def install_fake_desktop(**overrides) -> Dict[str, object]:
     """Register a full fake desktop; returns the backend objects.

@@ -13,6 +13,7 @@ Fails with a clear message if dist/JARVIS does not exist (i.e. the
 PyInstaller step was skipped). Never tested on real Windows yet — the
 first real run is the v1.0.0 tag build (docs/PACKAGING.md).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,8 +71,9 @@ def write_checksums(version: str, extra_files: list[str]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="build the portable zip")
     ap.add_argument("--version", required=True, help="e.g. 1.0.0")
-    ap.add_argument("--extra", action="append", default=[],
-                    help="extra file to checksum (repeatable)")
+    ap.add_argument(
+        "--extra", action="append", default=[], help="extra file to checksum (repeatable)"
+    )
     args = ap.parse_args()
     zip_path = build_portable(args.version)
     write_checksums(args.version, [zip_path, *args.extra])

@@ -1,21 +1,19 @@
 """Tests for Phase 4.4 (memory system)."""
 
 import sys
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock
 
 sys.modules.setdefault("pyautogui", MagicMock(name="pyautogui"))
 
-import pytest
+import pytest  # noqa: E402
 
-from jarvis.brain.memory.commands import MemoryCommands, parse
-from jarvis.brain.memory.consolidate import Consolidator
-from jarvis.brain.memory.decay import decay
-from jarvis.brain.memory.profile import ProfileStore
-from jarvis.brain.memory.retrieval import Retriever, jaccard_similarity
-from jarvis.brain.memory.store import MemoryStore
-from jarvis.brain.memory.write_policy import (
+from jarvis.brain.memory.commands import MemoryCommands, parse  # noqa: E402
+from jarvis.brain.memory.consolidate import Consolidator  # noqa: E402
+from jarvis.brain.memory.decay import decay  # noqa: E402
+from jarvis.brain.memory.profile import ProfileStore  # noqa: E402
+from jarvis.brain.memory.retrieval import Retriever, jaccard_similarity  # noqa: E402
+from jarvis.brain.memory.store import MemoryStore  # noqa: E402
+from jarvis.brain.memory.write_policy import (  # noqa: E402
     WriteRequest,
     contains_sensitive,
     guard_write_source,
@@ -32,7 +30,7 @@ def store(tmp_path):
 
 class TestStore:
     def test_fact_roundtrip(self, store):
-        fid = store.add_fact("browser", "Chrome", source="user")
+        store.add_fact("browser", "Chrome", source="user")
         facts = store.all_facts()
         assert len(facts) == 1 and facts[0].value == "Chrome"
 
@@ -121,8 +119,7 @@ class TestConsolidateDecay:
         assert isinstance(props, list)
 
     def test_decay_and_purge(self, store):
-        store.add_fact("old", "thing", source="user", importance=0.9,
-                       expires="2000-01-01T00:00:00")
+        store.add_fact("old", "thing", source="user", importance=0.9, expires="2000-01-01T00:00:00")
         assert store.purge_expired() == 1
         store.add_fact("k", "v", source="user", importance=0.9)
         decay(store)  # must not crash; fresh fact barely decays

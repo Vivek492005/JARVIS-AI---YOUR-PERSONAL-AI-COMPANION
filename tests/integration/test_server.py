@@ -46,8 +46,7 @@ def test_service_handler_result_reaches_caller(service):
 
     service.handler = handler
     done = []
-    service.lanes.submit(lambda tok: done.append(service._run_command("x", tok)),
-                         name="t")
+    service.lanes.submit(lambda tok: done.append(service._run_command("x", tok)), name="t")
     assert _wait_for(lambda: done)
     assert done[0] == "did:x"
 
@@ -100,6 +99,7 @@ def test_send_text_command_alias_blank(service):
 
 
 # -- token ---------------------------------------------------------------
+
 
 def test_token_created_once_with_0600(tmp_path):
     p = tmp_path / "token"
@@ -154,8 +154,9 @@ def test_api_health_state_command():
         assert _wait_for(lambda: svc.commands_processed == 1)
 
         # bad priority / empty -> 400
-        assert c.post("/command", json={"text": "x", "priority": "NOPE"},
-                      headers=h).status_code == 400
+        assert (
+            c.post("/command", json={"text": "x", "priority": "NOPE"}, headers=h).status_code == 400
+        )
         assert c.post("/command", json={"text": "  "}, headers=h).status_code == 400
     finally:
         svc.stop()
@@ -204,9 +205,11 @@ def test_http_client_against_api():
         return httpx.Response(200, json={"v": 1, "accepted": True})
 
     client = HttpJarvisClient.__new__(HttpJarvisClient)
-    client._http = httpx.Client(transport=httpx.MockTransport(handler),
-                                base_url="http://127.0.0.1:8765",
-                                headers={"Authorization": "Bearer tok-abc"})
+    client._http = httpx.Client(
+        transport=httpx.MockTransport(handler),
+        base_url="http://127.0.0.1:8765",
+        headers={"Authorization": "Bearer tok-abc"},
+    )
     out = client.send_command("hello", priority="TASK")
     assert out == {"v": 1, "accepted": True}
     assert seen["auth"] == "Bearer tok-abc"

@@ -43,8 +43,8 @@ def test_mode_capture_policy():
     assert m.tts_allowed()
 
     m.set_mode(InputMode.QUIET)
-    assert m.mic_captures()       # mic on (whisper-level)
-    assert not m.tts_allowed()    # replies text-only
+    assert m.mic_captures()  # mic on (whisper-level)
+    assert not m.tts_allowed()  # replies text-only
 
     m.set_mode(InputMode.PTT)
     assert m.ptt_armed() and not m.requires_wake_word()

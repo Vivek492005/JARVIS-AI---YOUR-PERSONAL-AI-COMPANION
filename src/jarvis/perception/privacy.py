@@ -14,16 +14,39 @@ from typing import Iterable, List, Tuple
 # (not full regexes) so the list stays auditable; compiled below.
 _SENSITIVE_SUBSTRINGS: Tuple[str, ...] = (
     # password managers
-    "keepass", "1password", "bitwarden", "lastpass", "dashlane",
-    "keepassxc", "enpass", "nordpass", "password manager",
+    "keepass",
+    "1password",
+    "bitwarden",
+    "lastpass",
+    "dashlane",
+    "keepassxc",
+    "enpass",
+    "nordpass",
+    "password manager",
     # banking / finance
-    "bank", "banking", "paytm", "phonepe", "gpay", "upi",
-    "zerodha", "groww", "upstox", "hdfc", "icici", "sbi ",
-    "credit card", "netbanking", "net banking",
+    "bank",
+    "banking",
+    "paytm",
+    "phonepe",
+    "gpay",
+    "upi",
+    "zerodha",
+    "groww",
+    "upstox",
+    "hdfc",
+    "icici",
+    "sbi ",
+    "credit card",
+    "netbanking",
+    "net banking",
     # private browsing
-    "incognito", "private browsing", "inprivate",
+    "incognito",
+    "private browsing",
+    "inprivate",
     # secrets
-    "seed phrase", "recovery phrase", "private key",
+    "seed phrase",
+    "recovery phrase",
+    "private key",
 )
 
 _PATTERNS: List[re.Pattern] = [
@@ -57,10 +80,8 @@ def redact_text(text: str, patterns: Iterable[str] = ()) -> str:
     assignments with ``[REDACTED]``. Not a substitute for the window
     blocklist — a second layer.
     """
-    out = re.sub(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,4}\b",
-                 "[REDACTED]", text)
-    out = re.sub(r"(?i)(password|passwd|pwd|secret|token)\s*[:=]\s*\S+",
-                 r"\1=[REDACTED]", out)
+    out = re.sub(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,4}\b", "[REDACTED]", text)
+    out = re.sub(r"(?i)(password|passwd|pwd|secret|token)\s*[:=]\s*\S+", r"\1=[REDACTED]", out)
     for pat in patterns:
         out = out.replace(pat, "[REDACTED]")
     return out

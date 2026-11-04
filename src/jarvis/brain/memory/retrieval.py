@@ -78,5 +78,4 @@ class Retriever:
         return top
 
     def format_for_prompt(self, query: str, k: int = 5) -> List[str]:
-        return [f"{s.fact.key}: {s.fact.value}"
-                for s in self.retrieve(query, k)]
+        return [f"{s.fact.key}: {s.fact.value}" for s in self.retrieve(query, k)]

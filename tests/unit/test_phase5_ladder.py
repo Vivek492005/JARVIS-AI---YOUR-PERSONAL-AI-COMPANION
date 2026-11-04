@@ -1,7 +1,6 @@
 """Tests for Phase 5.1 control-surface ladder."""
 
 import sys
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -93,10 +92,14 @@ def test_fallback_is_audit_logged(tmp_path, monkeypatch):
     def fail():
         raise AttemptFailed("UIA miss")
 
-    run_ladder("click save", [
-        Attempt(Rung.UIA, "uia", fail),
-        Attempt(Rung.OCR, "ocr", lambda: "ok"),
-    ], audit=True)
+    run_ladder(
+        "click save",
+        [
+            Attempt(Rung.UIA, "uia", fail),
+            Attempt(Rung.OCR, "ocr", lambda: "ok"),
+        ],
+        audit=True,
+    )
 
     assert len(logged) == 1
     tool, args, decision, reason = logged[0]

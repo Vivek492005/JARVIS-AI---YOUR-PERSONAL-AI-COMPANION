@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Cron parsing (minute hour dom month dow, * and */n and lists/ranges)
 # ---------------------------------------------------------------------------
 
+
 def _parse_field(text: str, lo: int, hi: int) -> set:
     values: set = set()
 
@@ -93,13 +94,13 @@ def _cron_matches(spec: CronSpec, dt: datetime) -> bool:
         day_ok = dt.day in doms
     else:
         day_ok = (dt.day in doms) or ((dt.isoweekday() % 7) in dows)
-    return (dt.minute in minutes and dt.hour in hours
-            and dt.month in months and day_ok)
+    return dt.minute in minutes and dt.hour in hours and dt.month in months and day_ok
 
 
 # ---------------------------------------------------------------------------
 # Jobs
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Job:
@@ -107,10 +108,10 @@ class Job:
     name: str
     tool: str
     args: Dict[str, Any] = field(default_factory=dict)
-    cron: Optional[str] = None          # "*/30 * * * *"
-    every_s: Optional[float] = None     # interval
-    at: Optional[datetime] = None       # one-shot
-    watch_file: Optional[str] = None    # file-watch trigger
+    cron: Optional[str] = None  # "*/30 * * * *"
+    every_s: Optional[float] = None  # interval
+    at: Optional[datetime] = None  # one-shot
+    watch_file: Optional[str] = None  # file-watch trigger
     enabled: bool = True
     last_run: Optional[datetime] = None
     last_file_hash: Optional[str] = None
@@ -134,19 +135,18 @@ class Job:
 @dataclass
 class Notification:
     """A proactive nudge for the user (never a silent action)."""
+
     title: str
     body: str
-    source: str          # "heartbeat" | "scheduler" | ...
-    urgency: str = "normal"   # "low" | "normal" | "urgent"
+    source: str  # "heartbeat" | "scheduler" | ...
+    urgency: str = "normal"  # "low" | "normal" | "urgent"
 
 
 class Scheduler:
     """Runs jobs on the BACKGROUND lane. READ-only tools auto-execute;
     anything above READ becomes a Notification instead."""
 
-    def __init__(self,
-                 notify: Callable[[Notification], None],
-                 tick_s: float = 20.0) -> None:
+    def __init__(self, notify: Callable[[Notification], None], tick_s: float = 20.0) -> None:
         self._jobs: Dict[str, Job] = {}
         self._notify = notify
         self._tick_s = tick_s
@@ -172,8 +172,7 @@ class Scheduler:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(target=self._loop, daemon=True,
-                                        name="jarvis-scheduler")
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="jarvis-scheduler")
         self._thread.start()
 
     def stop(self) -> None:
@@ -220,24 +219,40 @@ class Scheduler:
         job.last_run = now
         spec = resolve(job.tool, job.args)
         if spec is None:
-            self._notify(Notification(
-                title=f"Scheduled job failed: {job.name}",
-                body=f"Unknown tool: {job.tool}",
-                source="scheduler", urgency="low"))
+            self._notify(
+                Notification(
+                    title=f"Scheduled job failed: {job.name}",
+                    body=f"Unknown tool: {job.tool}",
+                    source="scheduler",
+                    urgency="low",
+                )
+            )
             return
         if spec.risk > Risk.READ:
             # SAFETY: never silently run above-READ from a timer.
-            self._notify(Notification(
-                title=f"Scheduled: {job.name}",
-                body=(f"Wants to run {job.tool} ({spec.risk.name}). "
-                      f"Confirm to execute — timers never run this silently."),
-                source="scheduler", urgency="normal"))
+            self._notify(
+                Notification(
+                    title=f"Scheduled: {job.name}",
+                    body=(
+                        f"Wants to run {job.tool} ({spec.risk.name}). "
+                        f"Confirm to execute — timers never run this silently."
+                    ),
+                    source="scheduler",
+                    urgency="normal",
+                )
+            )
             logger.info(f"job {job.id}: {job.tool} above READ -> notification")
             return
         from jarvis.tools.actions import run_action
+
         verdict, result = run_action(job.tool, job.args)
         logger.info(f"job {job.id}: {job.tool} -> {verdict}")
         if verdict != "allow":
-            self._notify(Notification(
-                title=f"Scheduled job needs attention: {job.name}",
-                body=result[:300], source="scheduler", urgency="low"))
+            self._notify(
+                Notification(
+                    title=f"Scheduled job needs attention: {job.name}",
+                    body=result[:300],
+                    source="scheduler",
+                    urgency="low",
+                )
+            )

@@ -22,8 +22,9 @@ from access_os.tools.registry import WebSearchParams
 
 
 def _spec(risk):
-    return ToolSpec(name="t", description="t", params=WebSearchParams,
-                    risk=risk, handler=lambda a, c, n: "")
+    return ToolSpec(
+        name="t", description="t", params=WebSearchParams, risk=risk, handler=lambda a, c, n: ""
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -32,25 +33,24 @@ def _spec(risk):
 
 MATRIX = {
     # level: {risk: {tainted: decision}}
-    0: {r: {False: Decision.CONFIRM, True: Decision.CONFIRM}
-        for r in Risk},
+    0: {r: {False: Decision.CONFIRM, True: Decision.CONFIRM} for r in Risk},
     1: {
-        Risk.READ:        {False: Decision.ALLOW,   True: Decision.ALLOW},
-        Risk.REVERSIBLE:  {False: Decision.CONFIRM, True: Decision.CONFIRM},
+        Risk.READ: {False: Decision.ALLOW, True: Decision.ALLOW},
+        Risk.REVERSIBLE: {False: Decision.CONFIRM, True: Decision.CONFIRM},
         Risk.DESTRUCTIVE: {False: Decision.CONFIRM, True: Decision.CONFIRM},
-        Risk.SYSTEM:      {False: Decision.CONFIRM, True: Decision.CONFIRM},
+        Risk.SYSTEM: {False: Decision.CONFIRM, True: Decision.CONFIRM},
     },
     2: {
-        Risk.READ:        {False: Decision.ALLOW,   True: Decision.ALLOW},
-        Risk.REVERSIBLE:  {False: Decision.ALLOW,   True: Decision.CONFIRM},
+        Risk.READ: {False: Decision.ALLOW, True: Decision.ALLOW},
+        Risk.REVERSIBLE: {False: Decision.ALLOW, True: Decision.CONFIRM},
         Risk.DESTRUCTIVE: {False: Decision.CONFIRM, True: Decision.CONFIRM},
-        Risk.SYSTEM:      {False: Decision.CONFIRM, True: Decision.CONFIRM},
+        Risk.SYSTEM: {False: Decision.CONFIRM, True: Decision.CONFIRM},
     },
     3: {
-        Risk.READ:        {False: Decision.ALLOW,   True: Decision.ALLOW},
-        Risk.REVERSIBLE:  {False: Decision.ALLOW,   True: Decision.CONFIRM},
-        Risk.DESTRUCTIVE: {False: Decision.ALLOW,   True: Decision.CONFIRM},
-        Risk.SYSTEM:      {False: Decision.CONFIRM, True: Decision.CONFIRM},
+        Risk.READ: {False: Decision.ALLOW, True: Decision.ALLOW},
+        Risk.REVERSIBLE: {False: Decision.ALLOW, True: Decision.CONFIRM},
+        Risk.DESTRUCTIVE: {False: Decision.ALLOW, True: Decision.CONFIRM},
+        Risk.SYSTEM: {False: Decision.CONFIRM, True: Decision.CONFIRM},
     },
 }
 
@@ -82,6 +82,7 @@ def test_auto_up_to_mapping():
 # decide_tool_call: registry tier x arg rules, stricter wins
 # ---------------------------------------------------------------------------
 
+
 def test_unregistered_tool_is_deny():
     d, reason = decide_tool_call("delete_everything", {}, level=3)
     assert d == Decision.DENY
@@ -99,20 +100,18 @@ def test_l1_read_auto_reversible_confirm():
 def test_l2_reversible_auto():
     d, _ = decide_tool_call("open_application", {"app_name": "x"}, level=2)
     assert d == Decision.ALLOW
-    d, _ = decide_tool_call("system_control", {"action": "empty_recycle_bin"},
-                            level=2)
+    d, _ = decide_tool_call("system_control", {"action": "empty_recycle_bin"}, level=2)
     assert d == Decision.CONFIRM
 
 
 def test_arg_rules_still_apply_at_l3():
     # PowerShell destructive cmdlet: denied even at max autonomy.
-    d, _ = decide_tool_call("run_powershell_command",
-                            {"command": "Remove-Item C:\\x"}, level=3)
+    d, _ = decide_tool_call("run_powershell_command", {"command": "Remove-Item C:\\x"}, level=3)
     assert d == Decision.DENY
     # Blocked hotkey: denied even at max autonomy.
-    d, _ = decide_tool_call("keyboard_mouse_action",
-                            {"action": "press_hotkey", "value": "alt+f4"},
-                            level=3)
+    d, _ = decide_tool_call(
+        "keyboard_mouse_action", {"action": "press_hotkey", "value": "alt+f4"}, level=3
+    )
     assert d == Decision.DENY
 
 
@@ -128,6 +127,7 @@ def test_tainted_turn_confirms_non_read():
 # Confirmation UX (1.3.3 / 1.3.5)
 # ---------------------------------------------------------------------------
 
+
 def test_confirm_vocabulary():
     for w in ("haan", "yes", "confirm", "kar do", "haan kar de"):
         assert w in CONFIRM_YES
@@ -139,16 +139,14 @@ def test_confirm_vocabulary():
 def test_confirmation_question_is_exact():
     q = confirmation_question("system_control", {"action": "empty_recycle_bin"})
     assert "Recycle Bin" in q and "haan" in q
-    q = confirmation_question("manage_notes",
-                              {"action": "save", "content": "x" * 50})
+    q = confirmation_question("manage_notes", {"action": "save", "content": "x" * 50})
     assert "50 chars" in q
-    q = confirmation_question("open_website", {"url_or_name": "http://evil"},
-                              tainted_args=True)
+    q = confirmation_question("open_website", {"url_or_name": "http://evil"}, tainted_args=True)
     assert "untrusted source" in q
 
 
 def test_describe_action_exactness():
-    assert "Recycle Bin" in describe_action(
-        "system_control", {"action": "empty_recycle_bin"}, None)
+    assert "Recycle Bin" in describe_action("system_control", {"action": "empty_recycle_bin"}, None)
     assert "Remove-Item" in describe_action(
-        "run_powershell_command", {"command": "Remove-Item C:\\x"}, None)
+        "run_powershell_command", {"command": "Remove-Item C:\\x"}, None
+    )

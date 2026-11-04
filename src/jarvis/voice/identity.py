@@ -28,9 +28,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EngineTrim:
     """Per-engine normalization trims. Ranges are conservative on purpose."""
-    volume: float = 1.0   # 0.0 .. 1.5 multiplier
-    rate: int = 0         # -10 .. +10 (Edge-TTS style offset)
-    pitch: int = 0        # -10 .. +10 semitone-ish offset, where supported
+
+    volume: float = 1.0  # 0.0 .. 1.5 multiplier
+    rate: int = 0  # -10 .. +10 (Edge-TTS style offset)
+    pitch: int = 0  # -10 .. +10 semitone-ish offset, where supported
 
 
 # Measured-ish defaults so tiers sound close. Tuned further on real hardware
@@ -46,11 +47,14 @@ DEFAULT_TRIMS: Dict[str, EngineTrim] = {
 @dataclass
 class VoiceIdentity:
     """The assistant's single voice identity across all TTS tiers."""
+
     voice_name: str = "en-IN-NeerjaNeural"
     voice_name_hi: str = "hi-IN-SwaraNeural"
     trims: Dict[str, EngineTrim] = field(
-        default_factory=lambda: {k: EngineTrim(v.volume, v.rate, v.pitch)
-                                 for k, v in DEFAULT_TRIMS.items()})
+        default_factory=lambda: {
+            k: EngineTrim(v.volume, v.rate, v.pitch) for k, v in DEFAULT_TRIMS.items()
+        }
+    )
 
     def trim_for(self, engine: str) -> EngineTrim:
         return self.trims.get(engine, EngineTrim())
@@ -59,8 +63,10 @@ class VoiceIdentity:
         return {
             "voice": self.voice_name,
             "voice_hi": self.voice_name_hi,
-            "trims": {k: {"volume": t.volume, "rate": t.rate, "pitch": t.pitch}
-                      for k, t in self.trims.items()},
+            "trims": {
+                k: {"volume": t.volume, "rate": t.rate, "pitch": t.pitch}
+                for k, t in self.trims.items()
+            },
         }
 
 
@@ -79,8 +85,10 @@ def resolve_speaker_wav(configured_wav: str, consent: bool) -> Optional[str]:
     if not configured_wav:
         return None
     if not consent:
-        logger.warning("custom speaker_wav configured but voice_custom_consent "
-                       "is not set — refusing (7.4 consent gate)")
+        logger.warning(
+            "custom speaker_wav configured but voice_custom_consent "
+            "is not set — refusing (7.4 consent gate)"
+        )
         return None
     p = Path(configured_wav).expanduser()
     if not p.is_file():
@@ -93,7 +101,6 @@ def resolve_speaker_wav(configured_wav: str, consent: bool) -> Optional[str]:
     except OSError:
         return None
     if not any(str(resolved).startswith(str(r)) for r in jarvis_roots):
-        logger.warning("custom speaker_wav outside JARVIS dirs — refusing: %s",
-                       resolved)
+        logger.warning("custom speaker_wav outside JARVIS dirs — refusing: %s", resolved)
         return None
     return str(resolved)

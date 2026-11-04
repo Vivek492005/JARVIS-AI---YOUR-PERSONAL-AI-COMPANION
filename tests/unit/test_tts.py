@@ -31,15 +31,17 @@ def test_sentence_splitter_hindi_danda():
 
 
 def test_detect_script():
-    assert detect_script("chrome khol de") == "en"      # Latin Hinglish -> en voice
-    assert detect_script("क्रोम खोल दे") == "hi"          # Devanagari -> hi voice
+    assert detect_script("chrome khol de") == "en"  # Latin Hinglish -> en voice
+    assert detect_script("क्रोम खोल दे") == "hi"  # Devanagari -> hi voice
     assert detect_script("") == "en"
     assert detect_script("123") == "en"
 
 
 def test_speak_style_caps_sentences_and_strips_urls():
-    text = ("Chrome khol diya. Ab kya karna hai? Yeh raha link https://example.com/x. "
-            "Aur ek teesra sentence jo nahi bolna chahiye.")
+    text = (
+        "Chrome khol diya. Ab kya karna hai? Yeh raha link https://example.com/x. "
+        "Aur ek teesra sentence jo nahi bolna chahiye."
+    )
     out = speak_style(text)
     assert "https://" not in out
     assert out.count(".") + out.count("?") <= 2
@@ -110,6 +112,7 @@ def test_phrase_cache_synths_once():
 
 def test_xtts_lazy_error_without_package(monkeypatch):
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -119,6 +122,7 @@ def test_xtts_lazy_error_without_package(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     from jarvis.voice.tts_xtts import XTTSEngine, check_xtts
+
     eng = XTTSEngine()
     assert eng.offline_capable
     try:
@@ -132,6 +136,7 @@ def test_xtts_lazy_error_without_package(monkeypatch):
 
 def test_xtts_needs_speaker_wav(tmp_path, monkeypatch):
     import builtins
+
     real_import = builtins.__import__
     fake_tts_mod = type("FakeTTSMod", (), {})()
 
@@ -154,6 +159,7 @@ def test_xtts_needs_speaker_wav(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     from jarvis.voice.tts_xtts import XTTSEngine
+
     eng = XTTSEngine(speaker_wav="/nonexistent/voice.wav")
     try:
         eng.synth("hello")

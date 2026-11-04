@@ -22,17 +22,19 @@ class LocalHeuristicProvider:
     def __init__(self, handler: Callable[[str], str]) -> None:
         self._handler = handler
 
-    def complete(self, messages: List[Dict[str, Any]],
-                 tools: Optional[List[Dict[str, Any]]] = None,
-                 temperature: float = 0.3) -> Completion:
+    def complete(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.3,
+    ) -> Completion:
         # The heuristic engine works on the latest user utterance only.
         text = ""
         for m in reversed(messages):
             if m.get("role") == "user":
                 text = m.get("content", "")
                 break
-        return Completion(text=self._handler(text or ""),
-                          tool_calls=[], provider=self.name)
+        return Completion(text=self._handler(text or ""), tool_calls=[], provider=self.name)
 
     def health(self) -> bool:
         return True

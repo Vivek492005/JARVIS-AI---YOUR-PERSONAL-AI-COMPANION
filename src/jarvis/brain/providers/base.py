@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Protocol
 @dataclass
 class ToolCall:
     """A normalized tool call requested by the model."""
+
     id: str
     name: str
     args: Dict[str, Any] = field(default_factory=dict)
@@ -32,6 +33,7 @@ class ToolCall:
 @dataclass
 class Completion:
     """One normalized model round-trip."""
+
     text: str
     tool_calls: List[ToolCall] = field(default_factory=list)
     provider: str = ""
@@ -44,9 +46,12 @@ class LLMProvider(Protocol):
     @property
     def name(self) -> str: ...
 
-    def complete(self, messages: List[Dict[str, Any]],
-                 tools: Optional[List[Dict[str, Any]]] = None,
-                 temperature: float = 0.3) -> Completion:
+    def complete(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.3,
+    ) -> Completion:
         """One chat round-trip. Raises ProviderError (or subclass) on failure."""
         ...
 

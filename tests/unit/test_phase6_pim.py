@@ -45,15 +45,14 @@ def test_fake_tasks_flow():
 
 def test_tool_risk_tiers():
     assert resolve("calendar_list", {}).risk == Risk.READ
-    assert resolve("calendar_create", {"title": "x", "start": "s",
-                                       "end": "e"}).risk == Risk.REVERSIBLE
+    assert (
+        resolve("calendar_create", {"title": "x", "start": "s", "end": "e"}).risk == Risk.REVERSIBLE
+    )
     assert resolve("calendar_delete", {"event_id": "1"}).risk == Risk.DESTRUCTIVE
     assert resolve("mail_list", {}).risk == Risk.READ
     assert resolve("mail_read", {"msg_id": "1"}).risk == Risk.READ
-    assert resolve("mail_draft", {"to": "a", "subject": "s",
-                                  "body": "b"}).risk == Risk.REVERSIBLE
-    assert resolve("mail_send", {"to": "a", "subject": "s",
-                                 "body": "b"}).risk == Risk.DESTRUCTIVE
+    assert resolve("mail_draft", {"to": "a", "subject": "s", "body": "b"}).risk == Risk.REVERSIBLE
+    assert resolve("mail_send", {"to": "a", "subject": "s", "body": "b"}).risk == Risk.DESTRUCTIVE
     assert resolve("tasks_add", {"title": "x"}).risk == Risk.REVERSIBLE
 
 
@@ -67,9 +66,8 @@ def test_mail_body_marked_untrusted():
 def test_mail_send_needs_confirmation_by_default():
     # DESTRUCTIVE at default autonomy -> CONFIRM via run_action.
     from jarvis.tools.actions import run_action
-    verdict, result = run_action("mail_send", {"to": "a@b.c",
-                                               "subject": "hi",
-                                               "body": "hello"})
+
+    verdict, result = run_action("mail_send", {"to": "a@b.c", "subject": "hi", "body": "hello"})
     assert verdict == "confirm"
     assert "a@b.c" in result  # full preview in the prompt
 
@@ -77,6 +75,7 @@ def test_mail_send_needs_confirmation_by_default():
 def test_mail_send_handler_only_after_allow(monkeypatch):
     # The handler itself just sends; the gate is what protects.
     from jarvis.integrations import tools as tmod
+
     mail = FakeMail()
     monkeypatch.setattr(pim, "get_mail", lambda: mail)
     out = tmod._h_mail_send({"to": "a@b.c", "subject": "s", "body": "b"})
@@ -85,6 +84,7 @@ def test_mail_send_handler_only_after_allow(monkeypatch):
 
 def test_mail_read_wraps_untrusted(monkeypatch):
     from jarvis.integrations import tools as tmod
+
     mail = FakeMail()
     mail.seed("x@y.z", "sub", "secret body here")
     monkeypatch.setattr(tmod, "get_mail", lambda: mail)
@@ -100,11 +100,12 @@ def test_default_provider_is_fake():
 
 def test_google_provider_opt_in_only(monkeypatch):
     import jarvis.core.secrets as sec
-    monkeypatch.setattr(sec, "get_secret",
-                        lambda name: "google" if name == "JARVIS_PIM_PROVIDER" else "")
+
+    monkeypatch.setattr(
+        sec, "get_secret", lambda name: "google" if name == "JARVIS_PIM_PROVIDER" else ""
+    )
     # Opt-in selects the Google provider; the helpful error surfaces on use.
-    assert isinstance(pim.get_calendar(),
-                      pim._google_calendar().__class__)
+    assert isinstance(pim.get_calendar(), pim._google_calendar().__class__)
     with pytest.raises(RuntimeError, match="not installed|GOOGLE_OAUTH"):
         pim.get_calendar().list_events("2026-01-01", "2026-01-02")
 
@@ -112,6 +113,7 @@ def test_google_provider_opt_in_only(monkeypatch):
 def test_google_provider_import_error_message(monkeypatch):
     from jarvis.integrations import google_pim
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *a, **k):

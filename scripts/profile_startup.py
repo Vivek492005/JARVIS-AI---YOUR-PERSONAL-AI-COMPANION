@@ -8,6 +8,7 @@ Usage:
 Prints the top 30 cumulative-time functions. Use before v1.0.0 to catch
 import-time regressions (heavy deps must stay lazily imported).
 """
+
 from __future__ import annotations
 
 import cProfile

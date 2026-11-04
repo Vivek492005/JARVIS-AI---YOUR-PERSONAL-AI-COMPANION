@@ -9,6 +9,7 @@ read/write/delete is forwarded to the real module. That keeps
 ``mock.patch("access_os.policy....")`` and ``monkeypatch.setattr`` working
 exactly as before the move (including pytest's ``__dict__``-based undo).
 """
+
 import sys as _sys
 import warnings as _warnings
 import importlib as _importlib

@@ -40,3 +40,6 @@ workspace/
 *.mp3
 .coverage
 coverage.xml
+
+# local editable-install artifact
+*.egg-info/

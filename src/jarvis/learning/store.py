@@ -85,16 +85,14 @@ CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status);
 
 
 def _utcnow() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(
-        timespec="seconds")
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
 
 class LearningStore:
     """Thread-safe SQLite store for the learning loop."""
 
     def __init__(self, path: Optional[Path] = None) -> None:
-        self.path = Path(path) if path else (
-            Path.home() / ".jarvis" / "learning.db")
+        self.path = Path(path) if path else (Path.home() / ".jarvis" / "learning.db")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
@@ -109,8 +107,7 @@ class LearningStore:
 
     # -- meta -----------------------------------------------------------
     def _get_meta(self, key: str) -> Optional[str]:
-        row = self._conn.execute(
-            "SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        row = self._conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
         return row["value"] if row else None
 
     def _set_meta(self, key: str, value: str) -> None:
@@ -118,7 +115,8 @@ class LearningStore:
             self._conn.execute(
                 "INSERT INTO meta(key, value) VALUES(?, ?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (key, value))
+                (key, value),
+            )
             self._conn.commit()
 
     def is_enabled(self) -> bool:
@@ -133,29 +131,45 @@ class LearningStore:
             self._conn.execute(
                 "INSERT INTO meta(key, value) VALUES('proposal_seq', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (str(seq),))
+                (str(seq),),
+            )
             self._conn.commit()
         return f"LP-{seq:04d}"
 
     # -- skill runs ------------------------------------------------------
-    def add_run(self, tool: str, args_redacted: Dict[str, Any],
-                args_hash: str, decision: str = "",
-                ok: Optional[bool] = None,
-                latency_ms: Optional[float] = None, path: str = "",
-                source_trust: str = "local", learnable: bool = True,
-                withheld: bool = False) -> int:
+    def add_run(
+        self,
+        tool: str,
+        args_redacted: Dict[str, Any],
+        args_hash: str,
+        decision: str = "",
+        ok: Optional[bool] = None,
+        latency_ms: Optional[float] = None,
+        path: str = "",
+        source_trust: str = "local",
+        learnable: bool = True,
+        withheld: bool = False,
+    ) -> int:
         with self._lock:
             cur = self._conn.execute(
                 """INSERT INTO skill_runs
                    (ts, tool, args_redacted, args_hash, decision, ok,
                     latency_ms, path, source_trust, learnable, withheld)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (_utcnow(), tool, json.dumps(args_redacted,
-                                             ensure_ascii=False),
-                 args_hash, decision,
-                 None if ok is None else (1 if ok else 0),
-                 latency_ms, path, source_trust,
-                 1 if learnable else 0, 1 if withheld else 0))
+                (
+                    _utcnow(),
+                    tool,
+                    json.dumps(args_redacted, ensure_ascii=False),
+                    args_hash,
+                    decision,
+                    None if ok is None else (1 if ok else 0),
+                    latency_ms,
+                    path,
+                    source_trust,
+                    1 if learnable else 0,
+                    1 if withheld else 0,
+                ),
+            )
             self._conn.commit()
             return int(cur.lastrowid)
 
@@ -169,30 +183,27 @@ class LearningStore:
 
     def count_corrections(self) -> int:
         with self._lock:
-            row = self._conn.execute(
-                "SELECT COUNT(*) AS n FROM corrections").fetchone()
+            row = self._conn.execute("SELECT COUNT(*) AS n FROM corrections").fetchone()
         return int(row["n"])
 
-    def recent_runs(self, limit: int = 500,
-                    learnable_only: bool = True) -> List[Dict[str, Any]]:
+    def recent_runs(self, limit: int = 500, learnable_only: bool = True) -> List[Dict[str, Any]]:
         if learnable_only:
-            q = ("SELECT * FROM skill_runs WHERE learnable=1 "
-                 "ORDER BY id DESC LIMIT ?")
+            q = "SELECT * FROM skill_runs WHERE learnable=1 ORDER BY id DESC LIMIT ?"
         else:
             q = "SELECT * FROM skill_runs ORDER BY id DESC LIMIT ?"
         with self._lock:
             rows = self._conn.execute(q, (limit,)).fetchall()
         return [dict(r) for r in rows]
 
-    def run_clusters(self, min_count: int = 3,
-                     since_days: int = 30) -> List[Dict[str, Any]]:
+    def run_clusters(self, min_count: int = 3, since_days: int = 30) -> List[Dict[str, Any]]:
         """Clusters of repeated (tool, args_hash) executions.
 
         The evidence base for reflex_rule proposals: the same tool called
         with the same (hashed) args again and again is a reflex candidate.
         """
-        cutoff = (datetime.datetime.now(datetime.timezone.utc)
-                  - datetime.timedelta(days=since_days)).isoformat()
+        cutoff = (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=since_days)
+        ).isoformat()
         with self._lock:
             rows = self._conn.execute(
                 """SELECT tool, args_hash, args_redacted, COUNT(*) AS n,
@@ -202,14 +213,15 @@ class LearningStore:
                    GROUP BY tool, args_hash
                    HAVING COUNT(*) >= ?
                    ORDER BY n DESC""",
-                (cutoff, min_count)).fetchall()
+                (cutoff, min_count),
+            ).fetchall()
         return [dict(r) for r in rows]
 
-    def correction_clusters(self, min_count: int = 2,
-                            since_days: int = 30) -> List[Dict[str, Any]]:
+    def correction_clusters(self, min_count: int = 2, since_days: int = 30) -> List[Dict[str, Any]]:
         """Tools with repeated corrections — prompt_snippet candidates."""
-        cutoff = (datetime.datetime.now(datetime.timezone.utc)
-                  - datetime.timedelta(days=since_days)).isoformat()
+        cutoff = (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=since_days)
+        ).isoformat()
         with self._lock:
             rows = self._conn.execute(
                 """SELECT tool, kind, COUNT(*) AS n
@@ -218,24 +230,26 @@ class LearningStore:
                    GROUP BY tool, kind
                    HAVING COUNT(*) >= ?
                    ORDER BY n DESC""",
-                (cutoff, min_count)).fetchall()
+                (cutoff, min_count),
+            ).fetchall()
         return [dict(r) for r in rows]
 
-    def tool_sequences(self, min_count: int = 3,
-                       since_days: int = 30) -> List[Dict[str, Any]]:
+    def tool_sequences(self, min_count: int = 3, since_days: int = 30) -> List[Dict[str, Any]]:
         """Frequent A->B tool bigrams — skill_variant candidates.
 
         Uses row order (id) as a proxy for temporal adjacency; bigrams are
         only counted when consecutive rows are close in time (< 5 min).
         """
-        cutoff = (datetime.datetime.now(datetime.timezone.utc)
-                  - datetime.timedelta(days=since_days)).isoformat()
+        cutoff = (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=since_days)
+        ).isoformat()
         with self._lock:
             rows = self._conn.execute(
                 """SELECT tool, ts FROM skill_runs
                    WHERE learnable=1 AND decision='allow' AND ts >= ?
                    ORDER BY id ASC""",
-                (cutoff,)).fetchall()
+                (cutoff,),
+            ).fetchall()
         counts: Dict[str, int] = {}
         prev_tool: Optional[str] = None
         prev_ts: Optional[datetime.datetime] = None
@@ -245,30 +259,41 @@ class LearningStore:
             except ValueError:
                 prev_tool, prev_ts = None, None
                 continue
-            if (prev_tool and prev_tool != r["tool"] and prev_ts
-                    and (ts - prev_ts).total_seconds() < 300):
+            if (
+                prev_tool
+                and prev_tool != r["tool"]
+                and prev_ts
+                and (ts - prev_ts).total_seconds() < 300
+            ):
                 key = f"{prev_tool} -> {r['tool']}"
                 counts[key] = counts.get(key, 0) + 1
             prev_tool, prev_ts = r["tool"], ts
-        return [{"sequence": k, "n": v} for k, v in
-                sorted(counts.items(), key=lambda kv: -kv[1])
-                if v >= min_count]
+        return [
+            {"sequence": k, "n": v}
+            for k, v in sorted(counts.items(), key=lambda kv: -kv[1])
+            if v >= min_count
+        ]
 
     # -- corrections ------------------------------------------------------
-    def add_correction(self, kind: str, tool: str, args_hash: str = "",
-                       note: str = "") -> int:
+    def add_correction(self, kind: str, tool: str, args_hash: str = "", note: str = "") -> int:
         with self._lock:
             cur = self._conn.execute(
-                "INSERT INTO corrections (ts, kind, tool, args_hash, note)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (_utcnow(), kind, tool, args_hash, note[:500]))
+                "INSERT INTO corrections (ts, kind, tool, args_hash, note) VALUES (?, ?, ?, ?, ?)",
+                (_utcnow(), kind, tool, args_hash, note[:500]),
+            )
             self._conn.commit()
             return int(cur.lastrowid)
 
     # -- proposals ---------------------------------------------------------
-    def add_proposal(self, ptype: str, target: str, title: str,
-                     body: Dict[str, Any], evidence: Dict[str, Any],
-                     confidence: float) -> str:
+    def add_proposal(
+        self,
+        ptype: str,
+        target: str,
+        title: str,
+        body: Dict[str, Any],
+        evidence: Dict[str, Any],
+        confidence: float,
+    ) -> str:
         pid = self.next_proposal_id()
         with self._lock:
             self._conn.execute(
@@ -276,17 +301,23 @@ class LearningStore:
                    (id, type, target, title, body, evidence, confidence,
                     status, created_ts)
                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)""",
-                (pid, ptype, target, title,
-                 json.dumps(body, ensure_ascii=False),
-                 json.dumps(evidence, ensure_ascii=False),
-                 confidence, _utcnow()))
+                (
+                    pid,
+                    ptype,
+                    target,
+                    title,
+                    json.dumps(body, ensure_ascii=False),
+                    json.dumps(evidence, ensure_ascii=False),
+                    confidence,
+                    _utcnow(),
+                ),
+            )
             self._conn.commit()
         return pid
 
     def get_proposal(self, pid: str) -> Optional[Dict[str, Any]]:
         with self._lock:
-            row = self._conn.execute(
-                "SELECT * FROM proposals WHERE id=?", (pid,)).fetchone()
+            row = self._conn.execute("SELECT * FROM proposals WHERE id=?", (pid,)).fetchone()
         return dict(row) if row else None
 
     def list_proposals(self, status: str = "") -> List[Dict[str, Any]]:
@@ -301,8 +332,16 @@ class LearningStore:
         return [dict(r) for r in rows]
 
     def update_proposal(self, pid: str, **fields) -> bool:
-        allowed = {"title", "body", "status", "decided_ts", "decided_by",
-                   "decision_reason", "eval_report", "confidence"}
+        allowed = {
+            "title",
+            "body",
+            "status",
+            "decided_ts",
+            "decided_by",
+            "decision_reason",
+            "eval_report",
+            "confidence",
+        }
         sets = {k: v for k, v in fields.items() if k in allowed}
         if not sets:
             return False
@@ -321,28 +360,39 @@ class LearningStore:
             row = self._conn.execute(
                 "SELECT 1 FROM proposals WHERE type=? AND target=? "
                 "AND status IN ('pending','approved') LIMIT 1",
-                (ptype, target)).fetchone()
+                (ptype, target),
+            ).fetchone()
         return row is not None
 
     # -- applied changes ----------------------------------------------------
-    def record_applied(self, proposal_id: str, change_type: str, path: str,
-                       backup: Dict[str, Any],
-                       reversible: bool = True) -> int:
+    def record_applied(
+        self,
+        proposal_id: str,
+        change_type: str,
+        path: str,
+        backup: Dict[str, Any],
+        reversible: bool = True,
+    ) -> int:
         with self._lock:
             cur = self._conn.execute(
                 """INSERT INTO applied
                    (proposal_id, ts, change_type, path, backup, reversible)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (proposal_id, _utcnow(), change_type, path,
-                 json.dumps(backup, ensure_ascii=False),
-                 1 if reversible else 0))
+                (
+                    proposal_id,
+                    _utcnow(),
+                    change_type,
+                    path,
+                    json.dumps(backup, ensure_ascii=False),
+                    1 if reversible else 0,
+                ),
+            )
             self._conn.commit()
             return int(cur.lastrowid)
 
     def get_applied(self, aid: int) -> Optional[Dict[str, Any]]:
         with self._lock:
-            row = self._conn.execute(
-                "SELECT * FROM applied WHERE id=?", (aid,)).fetchone()
+            row = self._conn.execute("SELECT * FROM applied WHERE id=?", (aid,)).fetchone()
         return dict(row) if row else None
 
     def list_applied(self, include_reverted: bool = True) -> List[Dict[str, Any]]:
@@ -357,9 +407,9 @@ class LearningStore:
     def mark_reverted(self, aid: int) -> bool:
         with self._lock:
             cur = self._conn.execute(
-                "UPDATE applied SET reverted_ts=? WHERE id=? "
-                "AND reverted_ts IS NULL",
-                (_utcnow(), aid))
+                "UPDATE applied SET reverted_ts=? WHERE id=? AND reverted_ts IS NULL",
+                (_utcnow(), aid),
+            )
             self._conn.commit()
             return cur.rowcount > 0
 

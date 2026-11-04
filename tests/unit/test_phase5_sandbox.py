@@ -7,13 +7,11 @@ import pytest
 sys.path.insert(0, "src")
 
 from jarvis.perception.sandbox import (  # noqa: E402
-    ContainerSpec,
     SandboxLevel,
     assert_skill_allowed,
     build_container_spec,
     check_skill_allowed,
     current_level,
-    docker_available,
     level_c_guide,
     min_level_for_trust,
     run_in_container,
@@ -74,6 +72,7 @@ def test_docker_args_locked_down(tmp_path, monkeypatch):
 def test_run_in_container_no_docker(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_WORKSPACE", str(tmp_path))
     import jarvis.perception.sandbox as sb
+
     monkeypatch.setattr(sb, "docker_available", lambda: False)
     spec = build_container_spec(["echo", "hi"])
     out = run_in_container(spec)
@@ -94,6 +93,7 @@ def test_tool_registered_system():
 def test_run_action_sandbox_exec_gated(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVIS_WORKSPACE", str(tmp_path))
     from jarvis.tools.actions import run_action
+
     # SYSTEM tier at L1 -> confirm/deny, never silent allow
     verdict, _ = run_action("sandbox_exec", {"command": ["echo", "hi"]})
     assert verdict in ("confirm", "deny"), verdict
@@ -106,13 +106,15 @@ def test_skill_loader_hook(tmp_path):
 
     d = tmp_path / "sk"
     d.mkdir()
-    (d / "SKILL.md").write_text(textwrap.dedent("""\
+    (d / "SKILL.md").write_text(
+        textwrap.dedent("""\
         ---
         name: sk
         description: test skill
         ---
         # sk
-        """))
+        """)
+    )
     # third-party at default Level A -> refused
     with pytest.raises(PermissionError):
         load_skill(d, trust=TrustLevel.THIRD_PARTY)

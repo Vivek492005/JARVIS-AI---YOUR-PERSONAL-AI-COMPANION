@@ -20,8 +20,6 @@ Tool names match the LLM tool definitions in ai_agent.py:
 """
 
 import os
-import sys
-import json
 import time
 import logging
 import datetime
@@ -34,9 +32,14 @@ from typing import Dict, Any, Tuple, Optional, Callable
 logger = logging.getLogger(__name__)
 
 try:
-    from jarvis.policy.command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
+    from jarvis.policy.command_policy import (
+        confirmation_prompt,
+        ALLOW,
+        CONFIRM,
+        DENY,
+    )
 except ImportError:  # direct script execution
-    from command_policy import check_tool_call, confirmation_prompt, ALLOW, CONFIRM, DENY
+    from command_policy import confirmation_prompt, ALLOW, CONFIRM, DENY
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +51,7 @@ except ImportError:  # direct script execution
 # Excludes every cmd.exe metacharacter (& | < > ^ % ! " ') so a
 # tool-arg-controlled name cannot break out of the `start` command line.
 _APP_NAME_SAFE = re.compile(r"^[A-Za-z0-9_\-. ]{1,60}$")
+
 
 def open_application(app_name: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
     if status_callback:
@@ -95,9 +99,11 @@ def open_application(app_name: str, status_callback: Optional[Callable[[str], No
                 # injection-proof. `start` is a cmd.exe builtin, hence
                 # the explicit `cmd /c` for those entries.
                 if cmd[0].lower() == "start":
-                    subprocess.Popen(["cmd", "/c"] + cmd)
+                    # noqa: S603 — argv comes from the hardcoded app_mappings
+                    # above; list-form, no shell, injection-proof (A-02).
+                    subprocess.Popen(["cmd", "/c"] + cmd)  # noqa: S603
                 else:
-                    subprocess.Popen(cmd)
+                    subprocess.Popen(cmd)  # noqa: S603 — hardcoded argv, no shell (A-02)
                 return f"Successfully opened {app_name}."
             except Exception as e:
                 logger.error(f"Failed to open mapped app {app_name}: {e}")
@@ -108,10 +114,14 @@ def open_application(app_name: str, status_callback: Optional[Callable[[str], No
     # builtin's own argument parsing.
     name = (app_name or "").strip()
     if not _APP_NAME_SAFE.match(name):
-        return (f"Could not launch {app_name}: the name contains unsupported "
-                f"characters. Try the application's full name from the list.")
+        return (
+            f"Could not launch {app_name}: the name contains unsupported "
+            f"characters. Try the application's full name from the list."
+        )
     try:
-        subprocess.Popen(["cmd", "/c", "start", "", name])
+        # noqa: S603,S607 — `name` passed the strict _APP_NAME_SAFE charset
+        # check above (A-02); list-form, no shell.
+        subprocess.Popen(["cmd", "/c", "start", "", name])  # noqa: S603,S607
         return f"Opened {app_name}."
     except Exception as e:
         logger.error(f"Failed to start app {app_name}: {e}")
@@ -165,8 +175,11 @@ def web_search(query: str, status_callback: Optional[Callable[[str], None]] = No
     return f"Searching Google for {query}."
 
 
-def download_media(url_or_query: str, media_type: str = "audio",
-                   status_callback: Optional[Callable[[str], None]] = None) -> str:
+def download_media(
+    url_or_query: str,
+    media_type: str = "audio",
+    status_callback: Optional[Callable[[str], None]] = None,
+) -> str:
     if status_callback:
         status_callback(f"Downloading {media_type} for '{url_or_query}'...")
     try:
@@ -190,11 +203,13 @@ def download_media(url_or_query: str, media_type: str = "audio",
 
         if media_type == "audio":
             ydl_opts["format"] = "bestaudio/best"
-            ydl_opts["postprocessors"] = [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }]
+            ydl_opts["postprocessors"] = [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ]
         else:
             ydl_opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
 
@@ -242,24 +257,31 @@ def system_control(action: str, status_callback: Optional[Callable[[str], None]]
             return f"Screenshot captured and saved to {fn}."
         elif action == "lock_pc":
             # Task 1.4: no os.system — fixed argv, no shell.
-            subprocess.run(["rundll32.exe", "user32.dll,LockWorkStation"],
-                           check=False)
+            # noqa: S607 — Windows system binary, fixed argv (no PATH search risk).
+            subprocess.run(["rundll32.exe", "user32.dll,LockWorkStation"], check=False)  # noqa: S607
             return "Locking the workstation."
         elif action == "empty_recycle_bin":
+            # Fixed Windows system command, no variable input (S607: PATH binary).
             subprocess.run(
-                ["powershell", "-NoProfile", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"],
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                [  # noqa: S607
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "Clear-RecycleBin -Force -ErrorAction SilentlyContinue",
+                ],
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
             return "Recycle Bin has been emptied."
         elif action == "check_battery":
             try:
                 import psutil
+
                 battery = psutil.sensors_battery()
                 if battery:
                     plugged = "plugged in" if battery.power_plugged else "on battery"
                     return f"Battery is at {battery.percent:.0f}% and {plugged}."
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("battery check best-effort failed: %s", e)
             return "Battery status is unavailable."
         return f"Unknown system action: {action}"
     except Exception as e:
@@ -270,11 +292,18 @@ def system_control(action: str, status_callback: Optional[Callable[[str], None]]
 # Task 1.4: typing into (or Enter-ing inside) a terminal, the Run dialog,
 # regedit, taskmgr, … is the classic prompt-injection kill chain
 # (win+r -> type -> enter). These foreground processes are never typed into.
-_TERMINAL_PROCESSES = frozenset({
-    "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe",
-    "wt.exe", "conhost.exe",
-    "regedit.exe", "taskmgr.exe",
-})
+_TERMINAL_PROCESSES = frozenset(
+    {
+        "cmd.exe",
+        "powershell.exe",
+        "pwsh.exe",
+        "windowsterminal.exe",
+        "wt.exe",
+        "conhost.exe",
+        "regedit.exe",
+        "taskmgr.exe",
+    }
+)
 
 
 def get_foreground_process() -> Optional[str]:
@@ -288,6 +317,7 @@ def get_foreground_process() -> Optional[str]:
     try:
         import ctypes
         from ctypes import wintypes
+
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
         hwnd = user32.GetForegroundWindow()
@@ -305,8 +335,8 @@ def get_foreground_process() -> Optional[str]:
                 return os.path.basename(buf.value).lower() or None
         finally:
             kernel32.CloseHandle(hproc)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("close-handle best-effort failed: %s", e)
     return None
 
 
@@ -314,13 +344,16 @@ def _foreground_guard() -> Optional[str]:
     """Returns a block message if the foreground window is a terminal etc."""
     fg = get_foreground_process()
     if fg in _TERMINAL_PROCESSES:
-        return (f"Blocked for safety: the foreground window is {fg} — "
-                f"typing into terminals is disabled (Task 1.4).")
+        return (
+            f"Blocked for safety: the foreground window is {fg} — "
+            f"typing into terminals is disabled (Task 1.4)."
+        )
     return None
 
 
-def keyboard_mouse_action(action: str, value: str,
-                          status_callback: Optional[Callable[[str], None]] = None) -> str:
+def keyboard_mouse_action(
+    action: str, value: str, status_callback: Optional[Callable[[str], None]] = None
+) -> str:
     if status_callback:
         status_callback(f"Performing {action}...")
     # Task 1.4: foreground-window guard runs before any keystroke.
@@ -350,12 +383,19 @@ def keyboard_mouse_action(action: str, value: str,
         return f"Action failed: {e}"
 
 
-def manage_notes(action: str, content: Optional[str] = None, notes_file: str = "notes.txt",
-                 status_callback: Optional[Callable[[str], None]] = None) -> str:
+def manage_notes(
+    action: str,
+    content: Optional[str] = None,
+    notes_file: str = "notes.txt",
+    status_callback: Optional[Callable[[str], None]] = None,
+) -> str:
     # A-06: notes_file is dispatcher-provided and must stay a plain filename
     # inside the working directory — never a path (no traversal).
-    if (os.path.basename(notes_file) != notes_file or ".." in notes_file
-            or os.path.isabs(notes_file)):
+    if (
+        os.path.basename(notes_file) != notes_file
+        or ".." in notes_file
+        or os.path.isabs(notes_file)
+    ):
         return "Invalid notes file."
     if status_callback:
         status_callback("Managing notes...")
@@ -382,17 +422,21 @@ def manage_notes(action: str, content: Optional[str] = None, notes_file: str = "
     return f"Unknown note action: {action}"
 
 
-def run_powershell_command(command: str,
-                           status_callback: Optional[Callable[[str], None]] = None) -> str:
+def run_powershell_command(
+    command: str, status_callback: Optional[Callable[[str], None]] = None
+) -> str:
     if status_callback:
         status_callback(f"Running command: {command}...")
     try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", command or ""],
+        # noqa: S603 — this IS the run_powershell_command tool: the command is
+        # the user's own tool argument by design, gated by the policy engine
+        # (L2/L3 confirmation) before it ever reaches here. List-form, no shell.
+        result = subprocess.run(  # noqa: S603
+            ["powershell", "-NoProfile", "-Command", command or ""],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         output = result.stdout.strip() or result.stderr.strip()
         return output[:300] if output else "Command executed successfully."
@@ -411,23 +455,23 @@ def run_powershell_command(command: str,
 # it never supplies a command string. Fixed argv, shell=False, timeout.
 _ALLOWED_COMMANDS = {
     "ipconfig": ["ipconfig"],
-    "disk_free": ["powershell", "-NoProfile",
-                  "-Command", "Get-PSDrive -PSProvider FileSystem"],
+    "disk_free": ["powershell", "-NoProfile", "-Command", "Get-PSDrive -PSProvider FileSystem"],
 }
 
 
-def run_command(command_key: str,
-                status_callback: Optional[Callable[[str], None]] = None) -> str:
+def run_command(command_key: str, status_callback: Optional[Callable[[str], None]] = None) -> str:
     """Run one allowlisted diagnostic command template (read-only)."""
     argv = _ALLOWED_COMMANDS.get(command_key or "")
     if argv is None:
-        return (f"Unknown command '{command_key}'. "
-                f"Available: {', '.join(sorted(_ALLOWED_COMMANDS))}.")
+        return (
+            f"Unknown command '{command_key}'. Available: {', '.join(sorted(_ALLOWED_COMMANDS))}."
+        )
     if status_callback:
         status_callback(f"Running {command_key}...")
     try:
-        out = subprocess.run(argv, shell=False, capture_output=True,
-                             text=True, timeout=10)
+        # noqa: S603 — argv comes from the _ALLOWED_COMMANDS allowlist above;
+        # the LLM only picks a key, never a command string (Task 1.4.3).
+        out = subprocess.run(argv, shell=False, capture_output=True, text=True, timeout=10)  # noqa: S603
         body = (out.stdout or "").strip()[:2000]
         return body if body else "(no output)"
     except Exception as e:
@@ -462,111 +506,164 @@ def _register_tools():
         # Sub-action specs share the base tool's handler; resolve() picks the
         # right risk tier from the `action` argument.
         base = _BASE_HANDLERS[name.split(".")[0]]
-        _reg(ToolSpec(name=name, description=description, params=params,
-                      risk=risk, handler=base))
+        _reg(ToolSpec(name=name, description=description, params=params, risk=risk, handler=base))
 
-    _reg(ToolSpec(
-        name="open_application", risk=Risk.REVERSIBLE,
-        description="Opens or launches an application or program installed on "
-                    "the Windows PC (e.g. Chrome, Notepad, VS Code, "
-                    "Calculator, Spotify, WhatsApp, Word, Excel, File "
-                    "Explorer, Command Prompt, etc.).",
-        params=OpenApplicationParams,
-        handler=_BASE_HANDLERS["open_application"]))
-    _reg(ToolSpec(
-        name="open_website", risk=Risk.REVERSIBLE,
-        description="Opens a specific website or web portal in the user's "
-                    "default browser.",
-        params=OpenWebsiteParams,
-        handler=_BASE_HANDLERS["open_website"],
-        scopes=frozenset({"network"})))
-    _reg(ToolSpec(
-        name="web_search", risk=Risk.READ,
-        description="Searches Google or the web for real-time information, "
-                    "answers, queries, or news requested by the user.",
-        params=WebSearchParams,
-        handler=_BASE_HANDLERS["web_search"],
-        carries_external_data=True,
-        scopes=frozenset({"network"})))
-    _reg(ToolSpec(
-        name="download_media", risk=Risk.REVERSIBLE,
-        description="Downloads video or audio from YouTube or any media URL, "
-                    "or searches and downloads the requested song or video "
-                    "using yt-dlp.",
-        params=DownloadMediaParams,
-        handler=_BASE_HANDLERS["download_media"],
-        scopes=frozenset({"network"})))
+    _reg(
+        ToolSpec(
+            name="open_application",
+            risk=Risk.REVERSIBLE,
+            description="Opens or launches an application or program installed on "
+            "the Windows PC (e.g. Chrome, Notepad, VS Code, "
+            "Calculator, Spotify, WhatsApp, Word, Excel, File "
+            "Explorer, Command Prompt, etc.).",
+            params=OpenApplicationParams,
+            handler=_BASE_HANDLERS["open_application"],
+        )
+    )
+    _reg(
+        ToolSpec(
+            name="open_website",
+            risk=Risk.REVERSIBLE,
+            description="Opens a specific website or web portal in the user's default browser.",
+            params=OpenWebsiteParams,
+            handler=_BASE_HANDLERS["open_website"],
+            scopes=frozenset({"network"}),
+        )
+    )
+    _reg(
+        ToolSpec(
+            name="web_search",
+            risk=Risk.READ,
+            description="Searches Google or the web for real-time information, "
+            "answers, queries, or news requested by the user.",
+            params=WebSearchParams,
+            handler=_BASE_HANDLERS["web_search"],
+            carries_external_data=True,
+            scopes=frozenset({"network"}),
+        )
+    )
+    _reg(
+        ToolSpec(
+            name="download_media",
+            risk=Risk.REVERSIBLE,
+            description="Downloads video or audio from YouTube or any media URL, "
+            "or searches and downloads the requested song or video "
+            "using yt-dlp.",
+            params=DownloadMediaParams,
+            handler=_BASE_HANDLERS["download_media"],
+            scopes=frozenset({"network"}),
+        )
+    )
     # system_control: per-action risk tiers; base is SYSTEM (fail-closed).
-    _reg(ToolSpec(
-        name="system_control", risk=Risk.SYSTEM,
-        description="Controls Windows OS system functions: volume "
-                    "adjustments, mute, screenshot capture, lock workstation, "
-                    "empty recycle bin, battery check.",
-        params=SystemControlParams,
-        handler=_BASE_HANDLERS["system_control"]))
-    _sub("system_control.take_screenshot", Risk.READ,
-         "Capture a screenshot.", SystemControlParams)
-    _sub("system_control.check_battery", Risk.READ,
-         "Report battery status.", SystemControlParams)
+    _reg(
+        ToolSpec(
+            name="system_control",
+            risk=Risk.SYSTEM,
+            description="Controls Windows OS system functions: volume "
+            "adjustments, mute, screenshot capture, lock workstation, "
+            "empty recycle bin, battery check.",
+            params=SystemControlParams,
+            handler=_BASE_HANDLERS["system_control"],
+        )
+    )
+    _sub("system_control.take_screenshot", Risk.READ, "Capture a screenshot.", SystemControlParams)
+    _sub("system_control.check_battery", Risk.READ, "Report battery status.", SystemControlParams)
     for _vol in ("volume_up", "volume_down", "mute", "unmute"):
-        _sub(f"system_control.{_vol}", Risk.REVERSIBLE,
-             f"System {_vol.replace('_', ' ')}.", SystemControlParams)
-    _sub("system_control.empty_recycle_bin", Risk.DESTRUCTIVE,
-         "Permanently empty the Recycle Bin.", SystemControlParams)
-    _sub("system_control.lock_pc", Risk.SYSTEM,
-         "Lock the workstation.", SystemControlParams)
-    _reg(ToolSpec(
-        # SYSTEM until the Task 1.4 foreground-window guard lands.
-        name="keyboard_mouse_action", risk=Risk.SYSTEM,
-        description="Types text or fires a hotkey. Blocked hotkeys "
-                    "(alt+f4, win+r, …) are denied by the policy gate; "
-                    "typing into terminals is blocked by the foreground "
-                    "guard.",
-        params=KeyboardMouseParams,
-        handler=_BASE_HANDLERS["keyboard_mouse_action"]))
+        _sub(
+            f"system_control.{_vol}",
+            Risk.REVERSIBLE,
+            f"System {_vol.replace('_', ' ')}.",
+            SystemControlParams,
+        )
+    _sub(
+        "system_control.empty_recycle_bin",
+        Risk.DESTRUCTIVE,
+        "Permanently empty the Recycle Bin.",
+        SystemControlParams,
+    )
+    _sub("system_control.lock_pc", Risk.SYSTEM, "Lock the workstation.", SystemControlParams)
+    _reg(
+        ToolSpec(
+            # SYSTEM until the Task 1.4 foreground-window guard lands.
+            name="keyboard_mouse_action",
+            risk=Risk.SYSTEM,
+            description="Types text or fires a hotkey. Blocked hotkeys "
+            "(alt+f4, win+r, …) are denied by the policy gate; "
+            "typing into terminals is blocked by the foreground "
+            "guard.",
+            params=KeyboardMouseParams,
+            handler=_BASE_HANDLERS["keyboard_mouse_action"],
+        )
+    )
     # Task 1.4.2: per-action tiers (the foreground guard in the executor is
     # the last line of defense even when a tier auto-allows).
-    _sub("keyboard_mouse_action.type_text", Risk.REVERSIBLE,
-         "Type text into the foreground window (never a terminal).",
-         KeyboardMouseParams)
-    _sub("keyboard_mouse_action.press_key", Risk.REVERSIBLE,
-         "Press a single key.", KeyboardMouseParams)
-    _sub("keyboard_mouse_action.press_hotkey_safe", Risk.REVERSIBLE,
-         "Press an allowlisted hotkey (ctrl+c/v/x/z/s/f/a/t/w/r, win+d).",
-         KeyboardMouseParams)
-    _sub("keyboard_mouse_action.press_hotkey_other", Risk.SYSTEM,
-         "Press a non-allowlisted hotkey (always confirmed; blocked ones "
-         "are denied outright).", KeyboardMouseParams)
-    _reg(ToolSpec(
-        name="manage_notes", risk=Risk.REVERSIBLE,
-        description="Save, read, or clear the user's persistent notes.",
-        params=ManageNotesParams,
-        handler=_BASE_HANDLERS["manage_notes"],
-        carries_external_data=True))
-    _sub("manage_notes.clear", Risk.DESTRUCTIVE,
-         "Permanently clear all notes.", ManageNotesParams)
-    _reg(ToolSpec(
-        name="run_powershell_command", risk=Risk.SYSTEM,
-        description="Runs a read-only PowerShell command (validated against "
-                    "the allowlist; destructive cmdlets are denied).",
-        params=RunPowershellParams,
-        handler=_BASE_HANDLERS["run_powershell_command"],
-        carries_external_data=True))
-    _reg(ToolSpec(
-        # Task 1.4.3: fixed read-only templates; the LLM picks only a key.
-        name="run_command", risk=Risk.READ,
-        description="Runs one allowlisted read-only diagnostic template "
-                    "(ipconfig, disk_free). No arbitrary commands.",
-        params=RunCommandParams,
-        handler=_BASE_HANDLERS["run_command"],
-        carries_external_data=True))
+    _sub(
+        "keyboard_mouse_action.type_text",
+        Risk.REVERSIBLE,
+        "Type text into the foreground window (never a terminal).",
+        KeyboardMouseParams,
+    )
+    _sub(
+        "keyboard_mouse_action.press_key",
+        Risk.REVERSIBLE,
+        "Press a single key.",
+        KeyboardMouseParams,
+    )
+    _sub(
+        "keyboard_mouse_action.press_hotkey_safe",
+        Risk.REVERSIBLE,
+        "Press an allowlisted hotkey (ctrl+c/v/x/z/s/f/a/t/w/r, win+d).",
+        KeyboardMouseParams,
+    )
+    _sub(
+        "keyboard_mouse_action.press_hotkey_other",
+        Risk.SYSTEM,
+        "Press a non-allowlisted hotkey (always confirmed; blocked ones are denied outright).",
+        KeyboardMouseParams,
+    )
+    _reg(
+        ToolSpec(
+            name="manage_notes",
+            risk=Risk.REVERSIBLE,
+            description="Save, read, or clear the user's persistent notes.",
+            params=ManageNotesParams,
+            handler=_BASE_HANDLERS["manage_notes"],
+            carries_external_data=True,
+        )
+    )
+    _sub("manage_notes.clear", Risk.DESTRUCTIVE, "Permanently clear all notes.", ManageNotesParams)
+    _reg(
+        ToolSpec(
+            name="run_powershell_command",
+            risk=Risk.SYSTEM,
+            description="Runs a read-only PowerShell command (validated against "
+            "the allowlist; destructive cmdlets are denied).",
+            params=RunPowershellParams,
+            handler=_BASE_HANDLERS["run_powershell_command"],
+            carries_external_data=True,
+        )
+    )
+    _reg(
+        ToolSpec(
+            # Task 1.4.3: fixed read-only templates; the LLM picks only a key.
+            name="run_command",
+            risk=Risk.READ,
+            description="Runs one allowlisted read-only diagnostic template "
+            "(ipconfig, disk_free). No arbitrary commands.",
+            params=RunCommandParams,
+            handler=_BASE_HANDLERS["run_command"],
+            carries_external_data=True,
+        )
+    )
 
     # Phase 5: perception/control tools register through the same gate.
     from jarvis.perception.tools import register_perception_tools
+
     register_perception_tools()
 
     # Phase 6: integrations (MCP, PIM, scheduler, heartbeat) — same gate.
     from jarvis.integrations.tools import register_integration_tools
+
     register_integration_tools()
 
 
@@ -575,25 +672,31 @@ _BASE_HANDLERS = {
     "open_website": lambda args, cb, nf: open_website(args.get("url_or_name", ""), cb),
     "web_search": lambda args, cb, nf: web_search(args.get("query", ""), cb),
     "download_media": lambda args, cb, nf: download_media(
-        args.get("url_or_query", ""), args.get("media_type", "audio"), cb),
+        args.get("url_or_query", ""), args.get("media_type", "audio"), cb
+    ),
     "system_control": lambda args, cb, nf: system_control(args.get("action", ""), cb),
     "keyboard_mouse_action": lambda args, cb, nf: keyboard_mouse_action(
-        args.get("action", ""), args.get("value", ""), cb),
+        args.get("action", ""), args.get("value", ""), cb
+    ),
     # A-06: notes_file is dispatcher-provided, never part of the tool schema.
     "manage_notes": lambda args, cb, nf: manage_notes(
-        args.get("action", ""), args.get("content", None), nf, cb),
+        args.get("action", ""), args.get("content", None), nf, cb
+    ),
     "run_powershell_command": lambda args, cb, nf: run_powershell_command(
-        args.get("command", ""), cb),
-    "run_command": lambda args, cb, nf: run_command(
-        args.get("command_key", ""), cb),
+        args.get("command", ""), cb
+    ),
+    "run_command": lambda args, cb, nf: run_command(args.get("command_key", ""), cb),
 }
 
 _register_tools()
 
 
-def execute_tool_raw(tool_name: str, args: Dict[str, Any],
-                     status_callback: Optional[Callable[[str], None]] = None,
-                     notes_file: str = "notes.txt") -> str:
+def execute_tool_raw(
+    tool_name: str,
+    args: Dict[str, Any],
+    status_callback: Optional[Callable[[str], None]] = None,
+    notes_file: str = "notes.txt",
+) -> str:
     """Execute a tool with NO policy gate.
 
     Only call this for tool calls that already passed check_tool_call()
@@ -618,9 +721,14 @@ def execute_tool_raw(tool_name: str, args: Dict[str, Any],
     return spec.handler(validated.model_dump(), status_callback, notes_file)
 
 
-def _audit_log(tool_name: str, args: Dict[str, Any], verdict: str, result: str,
-               audit_file: str = "jarvis_audit.log",
-               latency_ms: Optional[float] = None):
+def _audit_log(
+    tool_name: str,
+    args: Dict[str, Any],
+    verdict: str,
+    result: str,
+    audit_file: str = "jarvis_audit.log",
+    latency_ms: Optional[float] = None,
+):
     """Append one JSON line per tool call (Task 1.7).
 
     All audit output now goes through AuditLogger -> audit/YYYY-MM-DD.jsonl
@@ -628,23 +736,24 @@ def _audit_log(tool_name: str, args: Dict[str, Any], verdict: str, result: str,
     backward compatibility but no longer used.
     """
     from jarvis.policy.audit import AuditLogger
+
     try:
-        AuditLogger().log(tool_name, args, verdict,
-                          reason=str(result)[:300], latency_ms=latency_ms)
-    except Exception:
-        pass
+        AuditLogger().log(tool_name, args, verdict, reason=str(result)[:300], latency_ms=latency_ms)
+    except Exception as e:
+        logger.warning("audit log write failed (best-effort): %s", e)
 
 
-def _engine_decision(tool_name: str, args: Dict[str, Any],
-                   ctx=None) -> Tuple[str, str]:
+def _engine_decision(tool_name: str, args: Dict[str, Any], ctx=None) -> Tuple[str, str]:
     """Task 1.3: the single decision point — registry risk tier × arg rules.
 
     Returns ("allow"/"confirm"/"deny", reason). The level comes from
     Settings (safety.autonomy_level); ctx carries taint/rate-limit state.
     """
     from jarvis.policy import decide_tool_call
+
     try:
         from jarvis.core.config import get_settings
+
         level = get_settings().safety.autonomy_level
     except Exception:
         level = 1
@@ -652,18 +761,20 @@ def _engine_decision(tool_name: str, args: Dict[str, Any],
     # effective settings so --safe / offline mode apply to every entry point.
     if ctx is None:
         from jarvis.policy import context_from_settings
+
         ctx = context_from_settings()
-    decision, reason = decide_tool_call(tool_name, args, ctx,
-                                        level)
-    return ({"ALLOW": ALLOW, "CONFIRM": CONFIRM, "DENY": DENY}[decision.name],
-            reason)
+    decision, reason = decide_tool_call(tool_name, args, ctx, level)
+    return ({"ALLOW": ALLOW, "CONFIRM": CONFIRM, "DENY": DENY}[decision.name], reason)
 
 
-def run_action(tool_name: str, args: Dict[str, Any],
-               status_callback: Optional[Callable[[str], None]] = None,
-               notes_file: str = "notes.txt",
-               audit_file: str = "jarvis_audit.log",
-               ctx=None) -> Tuple[str, str]:
+def run_action(
+    tool_name: str,
+    args: Dict[str, Any],
+    status_callback: Optional[Callable[[str], None]] = None,
+    notes_file: str = "notes.txt",
+    audit_file: str = "jarvis_audit.log",
+    ctx=None,
+) -> Tuple[str, str]:
     """Policy-gated execution for the legacy regex engine (and any other
     non-LLM caller). Returns (verdict, result) where verdict is one of
     "allow" / "confirm" / "deny".
@@ -687,6 +798,5 @@ def run_action(tool_name: str, args: Dict[str, Any],
     _t0 = time.time()
     result = execute_tool_raw(tool_name, args, status_callback, notes_file)
     latency_ms = (time.time() - _t0) * 1000.0
-    _audit_log(tool_name, args, ALLOW, result, audit_file,
-               latency_ms=latency_ms)
+    _audit_log(tool_name, args, ALLOW, result, audit_file, latency_ms=latency_ms)
     return (ALLOW, result)

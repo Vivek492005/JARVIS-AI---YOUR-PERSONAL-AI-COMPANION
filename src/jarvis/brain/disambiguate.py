@@ -11,11 +11,21 @@ import re
 from typing import List, Optional
 
 _ORDINALS = {
-    "pehla": 0, "pehle": 0, "pahla": 0, "first": 0,
-    "dusra": 1, "doosra": 1, "dusre": 1, "second": 1,
-    "teesra": 2, "third": 2,
-    "chautha": 3, "fourth": 3,
-    "akhri": -1, "aakhri": -1, "last": -1,
+    "pehla": 0,
+    "pehle": 0,
+    "pahla": 0,
+    "first": 0,
+    "dusra": 1,
+    "doosra": 1,
+    "dusre": 1,
+    "second": 1,
+    "teesra": 2,
+    "third": 2,
+    "chautha": 3,
+    "fourth": 3,
+    "akhri": -1,
+    "aakhri": -1,
+    "last": -1,
 }
 
 

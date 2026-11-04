@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 for _mod in ("cv2", "mediapipe", "pyautogui"):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 
-import numpy as np
-from access_os.gesture_controller import GestureController, GestureEvent
+import numpy as np  # noqa: E402
+from access_os.gesture_controller import GestureController, GestureEvent  # noqa: E402
 
 
 class TestGestureController(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestGestureController(unittest.TestCase):
         self.gc.cap = MagicMock()
         self.gc.cap.isOpened.return_value = True
         self.gc.cap.read.return_value = (True, np.zeros((480, 640, 3), dtype=np.uint8))
-        
+
         # Mock MediaPipe hands results
         self.hand_landmarks = MagicMock()
         self.hand_landmarks.landmark = [MagicMock() for _ in range(21)]
@@ -36,35 +36,38 @@ class TestGestureController(unittest.TestCase):
         """Test registering a new gesture."""
         callback = MagicMock()
         self.gc.register_gesture("test_gesture", callback, cooldown=1.0)
-        
+
         self.assertIn("test_gesture", self.gc.callbacks)
-        self.assertEqual(self.gc.callbacks["test_gesture"]['callback'], callback)
-        self.assertEqual(self.gc.callbacks["test_gesture"]['cooldown'], 1.0)
+        self.assertEqual(self.gc.callbacks["test_gesture"]["callback"], callback)
+        self.assertEqual(self.gc.callbacks["test_gesture"]["cooldown"], 1.0)
 
     def test_unregister_gesture(self):
         """Test unregistering a gesture."""
         callback = MagicMock()
         self.gc.register_gesture("test_gesture", callback)
         self.gc.unregister_gesture("test_gesture")
-        
+
         self.assertNotIn("test_gesture", self.gc.callbacks)
 
-    @patch('cv2.cvtColor')
-    @patch('cv2.waitKey')
+    @patch("cv2.cvtColor")
+    @patch("cv2.waitKey")
     def test_process_frames(self, mock_wait_key, mock_cvt_color):
         """Test the main processing loop."""
-        mock_wait_key.return_value = ord('q')  # Simulate 'q' key press to exit
+        mock_wait_key.return_value = ord("q")  # Simulate 'q' key press to exit
         mock_cvt_color.return_value = np.zeros((480, 640, 3))
-        
+
         # Mock the _process_frame method to return a valid result
-        with (patch.object(self.gc, '_process_frame',
-                     return_value={'hands': self.hands_result}) as mock_pf,
-              patch.object(self.gc, '_detect_gestures') as mock_dg,
-              patch.object(self.gc, '_draw_landmarks')):
+        with (
+            patch.object(
+                self.gc, "_process_frame", return_value={"hands": self.hands_result}
+            ) as mock_pf,
+            patch.object(self.gc, "_detect_gestures") as mock_dg,
+            patch.object(self.gc, "_draw_landmarks"),
+        ):
             self.gc.is_running = True  # allow the loop to execute one iteration
-            self.gc.config['debug'] = True  # the 'q'-to-quit check only runs in debug mode
+            self.gc.config["debug"] = True  # the 'q'-to-quit check only runs in debug mode
             self.gc._process_frames()
-            
+
         # Verify that the main loop ran (one full pipeline iteration)
         self.gc.cap.read.assert_called()
         mock_pf.assert_called()
@@ -74,18 +77,13 @@ class TestGestureController(unittest.TestCase):
         """Test triggering a gesture callback."""
         callback = MagicMock()
         self.gc.register_gesture("test_gesture", callback)
-        
+
         # Create a test event
-        event = GestureEvent(
-            name="test_gesture",
-            confidence=0.9,
-            hand_landmarks=None,
-            face_landmarks=None
-        )
-        
+        GestureEvent(name="test_gesture", confidence=0.9, hand_landmarks=None, face_landmarks=None)
+
         # Trigger the gesture
         self.gc._trigger_gesture("test_gesture", 1000.0)
-        
+
         # Verify the callback was called
         callback.assert_called_once()
         self.assertEqual(self.gc.last_gesture_time["test_gesture"], 1000.0)
@@ -94,13 +92,13 @@ class TestGestureController(unittest.TestCase):
         """Test that gestures respect the cooldown period."""
         callback = MagicMock()
         self.gc.register_gesture("test_gesture", callback, cooldown=1.0)
-        
+
         # First trigger (should work)
         self.gc._trigger_gesture("test_gesture", 1000.0)
-        
+
         # Second trigger within cooldown (should be ignored)
         self.gc._trigger_gesture("test_gesture", 1000.5)
-        
+
         # Verify the callback was only called once
         callback.assert_called_once()
 
@@ -111,12 +109,9 @@ class TestGestureEvent(unittest.TestCase):
     def test_gesture_event_creation(self):
         """Test creation of GestureEvent objects."""
         event = GestureEvent(
-            name="test_gesture",
-            confidence=0.95,
-            hand_landmarks=[1, 2, 3],
-            face_landmarks=[4, 5, 6]
+            name="test_gesture", confidence=0.95, hand_landmarks=[1, 2, 3], face_landmarks=[4, 5, 6]
         )
-        
+
         self.assertEqual(event.name, "test_gesture")
         self.assertEqual(event.confidence, 0.95)
         self.assertEqual(event.hand_landmarks, [1, 2, 3])

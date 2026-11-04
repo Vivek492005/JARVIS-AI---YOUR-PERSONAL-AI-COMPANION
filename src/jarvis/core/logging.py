@@ -23,8 +23,7 @@ import time
 import uuid
 from typing import Dict
 
-_trace_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "jarvis_trace_id", default="")
+_trace_id: contextvars.ContextVar[str] = contextvars.ContextVar("jarvis_trace_id", default="")
 
 
 def new_trace_id() -> str:
@@ -62,8 +61,7 @@ class _TraceFilter(logging.Filter):
         return True
 
 
-def setup_logging(level: str = "INFO", json_output: bool = False,
-                  stream=None) -> None:
+def setup_logging(level: str = "INFO", json_output: bool = False, stream=None) -> None:
     """Configure the ``jarvis`` root logger (idempotent)."""
     root = logging.getLogger("jarvis")
     if getattr(root, "_jarvis_configured", False):
@@ -73,9 +71,12 @@ def setup_logging(level: str = "INFO", json_output: bool = False,
     if json_output:
         handler.setFormatter(JsonFormatter())
     else:
-        handler.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)-7s %(name)s [%(trace)s] %(message)s",
-            defaults={"trace": "-"}))
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)-7s %(name)s [%(trace)s] %(message)s",
+                defaults={"trace": "-"},
+            )
+        )
     handler.addFilter(_TraceFilter())
     root.addHandler(handler)
     root.propagate = False

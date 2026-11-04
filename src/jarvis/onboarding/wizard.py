@@ -48,7 +48,8 @@ class StepResult:
 @dataclass
 class StepContext:
     """Everything a step may touch — inject fakes in tests."""
-    config: Any                                  # mutable settings object
+
+    config: Any  # mutable settings object
     workspace: Path
     ask: Callable[[str, str], str] = lambda q, d="": input(f"{q} [{d}]: ") or d
     ask_secret: Callable[[str], str] = lambda q: getpass.getpass(f"{q}: ")
@@ -93,8 +94,10 @@ def _step_wakeword(ctx: StepContext) -> StepResult:
 def _step_api_keys(ctx: StepContext) -> StepResult:
     ctx.say("API keys (khali chhodo to skip — free/local options kaam karenge).")
     saved = []
-    for env_name, label in [("RUMIK_API_KEY", "Rumik TTS key"),
-                            ("TELEGRAM_BOT_TOKEN", "Telegram bot token")]:
+    for env_name, label in [
+        ("RUMIK_API_KEY", "Rumik TTS key"),
+        ("TELEGRAM_BOT_TOKEN", "Telegram bot token"),
+    ]:
         val = ctx.ask_secret(f"{label} (Enter=skip)").strip()
         if val and ctx.store_secret(env_name, val):
             saved.append(env_name)
@@ -104,17 +107,20 @@ def _step_api_keys(ctx: StepContext) -> StepResult:
 def _step_privacy(ctx: StepContext) -> StepResult:
     ctx.say("Privacy: kaunsi cheez cloud ja sakti hai?")
     choices = {}
-    for key, label in [("allow_google_stt", "Speech-to-text (Google)"),
-                       ("allow_huggingface", "AI brain (HuggingFace)"),
-                       ("allow_deepseek", "AI brain (DeepSeek)"),
-                       ("allow_rumik_tts", "Rumik TTS")]:
+    for key, label in [
+        ("allow_google_stt", "Speech-to-text (Google)"),
+        ("allow_huggingface", "AI brain (HuggingFace)"),
+        ("allow_deepseek", "AI brain (DeepSeek)"),
+        ("allow_rumik_tts", "Rumik TTS"),
+    ]:
         ans = ctx.ask(f"{label} cloud use kare? (haan/nahi)", "haan").strip().lower()
         val = ans in ("haan", "ha", "yes", "y", "")
         choices[key] = val
         if hasattr(ctx.config, "privacy"):
             setattr(ctx.config.privacy, key, val)
-    return StepResult(ok=True, data=choices,
-                      detail="cloud: " + ", ".join(k for k, v in choices.items() if v))
+    return StepResult(
+        ok=True, data=choices, detail="cloud: " + ", ".join(k for k, v in choices.items() if v)
+    )
 
 
 def _step_autonomy(ctx: StepContext) -> StepResult:
@@ -134,12 +140,12 @@ def _step_autonomy(ctx: StepContext) -> StepResult:
             target.autonomy_level = level
         except Exception as e:
             logger.debug("onboarding: autonomy_level not set: %s", e)
-    return StepResult(ok=True, data={"autonomy_level": level},
-                      detail=AUTONOMY_EXPLAIN[level])
+    return StepResult(ok=True, data={"autonomy_level": level}, detail=AUTONOMY_EXPLAIN[level])
 
 
 def _step_persona(ctx: StepContext) -> StepResult:
     from jarvis.brain.persona import PERSONA_TEMPLATE
+
     dest = ctx.workspace / "PERSONA.md"
     if not dest.exists():
         ctx.workspace.mkdir(parents=True, exist_ok=True)
@@ -204,8 +210,7 @@ class OnboardingWizard:
     def _save(self) -> None:
         try:
             self.state_dir.mkdir(parents=True, exist_ok=True)
-            self._state_path().write_text(json.dumps(self.done, indent=2),
-                                          encoding="utf-8")
+            self._state_path().write_text(json.dumps(self.done, indent=2), encoding="utf-8")
         except OSError as e:
             logger.warning("onboarding state not saved: %s", e)
 
@@ -226,11 +231,13 @@ class OnboardingWizard:
                 logger.exception("onboarding step %s failed", step.id)
                 res = StepResult(ok=False, detail=f"error: {e}")
             results[step.id] = res
-            self.done[step.id] = {"ok": res.ok, "skipped": res.skipped,
-                                  "detail": res.detail}
+            self.done[step.id] = {"ok": res.ok, "skipped": res.skipped, "detail": res.detail}
             self._save()
             status = "skip" if res.skipped else ("ok" if res.ok else "fail")
             self.ctx.say(f"[{status}] {res.detail}")
-        self.ctx.say("\nOnboarding complete!" if self.complete
-                     else "\nKuch steps baaki hain — dobara chalao to resume hoga.")
+        self.ctx.say(
+            "\nOnboarding complete!"
+            if self.complete
+            else "\nKuch steps baaki hain — dobara chalao to resume hoga."
+        )
         return results

@@ -11,9 +11,7 @@ from jarvis.perception import backends as B  # noqa: E402
 from jarvis.perception.backends import ElementNode  # noqa: E402
 from jarvis.perception.privacy import SensitiveWindowError  # noqa: E402
 from jarvis.perception.uia import (  # noqa: E402
-    DESTRUCTIVE_LABELS,
     UIAController,
-    controller,
     invoke_risk_for_label,
 )
 from jarvis.tools.registry import REGISTRY, Risk, resolve  # noqa: E402
@@ -24,11 +22,15 @@ from fakes.fake_desktop import install_fake_desktop, uninstall_fake_desktop  # n
 def desktop():
     made = install_fake_desktop()
     uia = made["uia"]
-    handle = uia.add_window("Untitled - Notepad", "notepad.exe", children=[
-        ElementNode(element_id="e0", role="menu", name="File"),
-        ElementNode(element_id="e1", role="button", name="Save"),
-        ElementNode(element_id="e2", role="button", name="Delete all"),
-    ])
+    handle = uia.add_window(
+        "Untitled - Notepad",
+        "notepad.exe",
+        children=[
+            ElementNode(element_id="e0", role="menu", name="File"),
+            ElementNode(element_id="e1", role="button", name="Save"),
+            ElementNode(element_id="e2", role="button", name="Delete all"),
+        ],
+    )
     # Re-index children added via constructor
     uia._index(uia.trees[handle])
     yield made, uia, handle
@@ -116,8 +118,7 @@ def test_resolve_uia_invoke_fails_closed_no_backend():
 
 
 def test_tools_registered():
-    for name in ("describe_screen", "uia_find", "uia_invoke",
-                 "uia_get_text", "uia_set_text"):
+    for name in ("describe_screen", "uia_find", "uia_invoke", "uia_get_text", "uia_set_text"):
         assert name in REGISTRY, name
     assert REGISTRY["describe_screen"].risk == Risk.READ
     assert REGISTRY["describe_screen"].carries_external_data is True
@@ -126,6 +127,7 @@ def test_tools_registered():
 
 def test_run_action_gates_uia(desktop):
     from jarvis.tools.actions import run_action
+
     made, uia, handle = desktop
     # describe_screen via the real gate (FakeContext active window = Notepad)
     verdict, result = run_action("describe_screen", {})
@@ -135,6 +137,7 @@ def test_run_action_gates_uia(desktop):
 
 def test_run_action_uia_invoke_destructive_needs_confirm(desktop):
     from jarvis.tools.actions import run_action
+
     made, uia, handle = desktop
     verdict, result = run_action("uia_invoke", {"element_id": "e2"})
     # DESTRUCTIVE at autonomy L1 -> confirm (or deny); never silent allow

@@ -5,15 +5,14 @@ Launches the floating JARVIS companion widget.
 
 import os
 import sys
-import queue
 import signal
 import logging
-import threading
 from logging.handlers import RotatingFileHandler
 
 from access_os.voice_interface import VoiceInterface, VoiceCommand
 from access_os.first_run import ensure_api_keys
 from gui import JARVISGUI
+
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 # F-15: rotating logs (was unbounded FileHandler) + signal import actually used.
@@ -22,8 +21,7 @@ def _setup_logging():
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
-            RotatingFileHandler("jarvis.log", maxBytes=5_000_000, backupCount=3,
-                                encoding="utf-8"),
+            RotatingFileHandler("jarvis.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"),
             logging.StreamHandler(sys.stdout),
         ],
         force=True,
@@ -43,13 +41,13 @@ class JARVISAssistant:
         # Task 2.3: the 0.8 single command queue is now a LaneQueue —
         # serial execution with priorities and interrupt support.
         from jarvis.core.lanes import LaneQueue, Priority
+
         self._lanes = LaneQueue()
         self._Priority = Priority
 
         logger.info("Initializing JARVIS Voice Companion…")
         self.voice = VoiceInterface(
-            config_file="voice_config.json",
-            status_callback=self._on_ai_status
+            config_file="voice_config.json", status_callback=self._on_ai_status
         )
         # Task 2.3: interrupt stops in-flight TTS too.
         self._lanes.on_interrupt(self.voice.stop_speaking)
@@ -57,6 +55,7 @@ class JARVISAssistant:
         # Task 2.2 (F-14): no more monkey-patching voice.speak — the GUI
         # subscribes to SpeechStarted events on the bus instead.
         from jarvis.core.events import get_bus, SpeechStarted
+
         get_bus().on(SpeechStarted, self._on_speech_started)
 
     def _on_speech_started(self, ev):
@@ -84,8 +83,9 @@ class JARVISAssistant:
             return
         if self.gui is not None:
             self.gui.set_user_text(text)
-        self._lanes.submit(lambda token: self._run_command(text),
-                           priority=self._Priority.TASK, name=text[:40])
+        self._lanes.submit(
+            lambda token: self._run_command(text), priority=self._Priority.TASK, name=text[:40]
+        )
 
     def _run_command(self, text: str):
         """One command, run on the lane worker; status always restored."""
@@ -117,9 +117,10 @@ class JARVISAssistant:
         self.voice.start_listening(callback=self.on_voice_command)
 
         # Initial welcome greeting slightly after start
-        self.gui.root.after(600, lambda: self.voice.speak(
-            "JARVIS is online and ready for your commands.", wait=False
-        ))
+        self.gui.root.after(
+            600,
+            lambda: self.voice.speak("JARVIS is online and ready for your commands.", wait=False),
+        )
 
         # Enter GUI event loop (blocks main thread until window closed)
         self.gui.show()
@@ -140,6 +141,7 @@ class JARVISAssistant:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
 def _self_test() -> int:
     """Smoke test for the packaged build (CI runs `JARVIS.exe --self-test`).
 
@@ -149,16 +151,14 @@ def _self_test() -> int:
     from access_os.command_policy import check_tool_call
     from access_os.actions import run_action
 
-    assert check_tool_call(
-        "run_powershell_command", {"command": "Remove-Item x"})[0] == "deny"
-    assert check_tool_call(
-        "run_powershell_command", {"command": "Get-Date"})[0] == "allow"
-    assert check_tool_call(
-        "keyboard_mouse_action",
-        {"action": "press_hotkey", "value": "alt+f4"})[0] == "deny"
+    assert check_tool_call("run_powershell_command", {"command": "Remove-Item x"})[0] == "deny"
+    assert check_tool_call("run_powershell_command", {"command": "Get-Date"})[0] == "allow"
+    assert (
+        check_tool_call("keyboard_mouse_action", {"action": "press_hotkey", "value": "alt+f4"})[0]
+        == "deny"
+    )
 
-    verdict, result = run_action(
-        "manage_notes", {"action": "save", "content": "self-test"})
+    verdict, result = run_action("manage_notes", {"action": "save", "content": "self-test"})
     assert verdict == "allow", result
     assert os.path.exists("notes.txt")
     os.remove("notes.txt")
@@ -195,6 +195,7 @@ def main():
     # Task 1.9: scrub secret values out of every log record from here on.
     try:
         from access_os.secrets import install_secret_redaction
+
         install_secret_redaction()
     except Exception as e:
         logger.warning(f"Secret log-redaction unavailable: {e}")
@@ -202,6 +203,7 @@ def main():
     # Task 1.8: kill switch — Ctrl+Alt+Shift+J stops everything, now.
     try:
         from access_os.safety import KillSwitch
+
         _kill = KillSwitch()
         _kill.on_trigger(lambda: assistant.stop())
         _kill.install_hotkey()  # best-effort; False on Linux / no package

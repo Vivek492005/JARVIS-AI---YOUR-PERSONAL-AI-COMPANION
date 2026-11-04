@@ -53,11 +53,12 @@ def sanitize_description(text: str) -> str:
 # Server config
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class MCPServerConfig:
     name: str
-    command: List[str] = field(default_factory=list)   # stdio server
-    url: str = ""                                        # remote (SSE/HTTP)
+    command: List[str] = field(default_factory=list)  # stdio server
+    url: str = ""  # remote (SSE/HTTP)
     default_risk: str = "DESTRUCTIVE"
     risk_overrides: Dict[str, str] = field(default_factory=dict)
     version_pin: str = ""  # e.g. "@modelcontextprotocol/server-filesystem@1.2.3"
@@ -67,26 +68,30 @@ class MCPServerConfig:
 def load_server_configs(path: str) -> List[MCPServerConfig]:
     """Parse ``mcp_servers.toml``. Unknown/malformed entries are skipped."""
     import tomllib
+
     with open(path, "rb") as f:
         data = tomllib.load(f)
     configs: List[MCPServerConfig] = []
     for name, entry in (data.get("servers") or {}).items():
         try:
             command = entry.get("command", []) or []
-            if not isinstance(command, list) or not all(
-                    isinstance(x, str) for x in command):
+            if not isinstance(command, list) or not all(isinstance(x, str) for x in command):
                 raise ValueError("command must be a list of strings")
-            configs.append(MCPServerConfig(
-                name=name,
-                command=list(command),
-                url=str(entry.get("url", "") or ""),
-                default_risk=str(entry.get("default_risk", "DESTRUCTIVE") or "DESTRUCTIVE").upper(),
-                risk_overrides={k: str(v).upper()
-                              for k, v in (entry.get("risk_overrides")
-                                            or {}).items()},
-                version_pin=str(entry.get("version_pin", "") or ""),
-                enabled=bool(entry.get("enabled", True)),
-            ))
+            configs.append(
+                MCPServerConfig(
+                    name=name,
+                    command=list(command),
+                    url=str(entry.get("url", "") or ""),
+                    default_risk=str(
+                        entry.get("default_risk", "DESTRUCTIVE") or "DESTRUCTIVE"
+                    ).upper(),
+                    risk_overrides={
+                        k: str(v).upper() for k, v in (entry.get("risk_overrides") or {}).items()
+                    },
+                    version_pin=str(entry.get("version_pin", "") or ""),
+                    enabled=bool(entry.get("enabled", True)),
+                )
+            )
         except Exception as e:  # malformed entry: skip, don't crash
             logger.warning(f"Skipping malformed MCP server entry {name!r}: {e}")
     return [c for c in configs if c.enabled]
@@ -95,6 +100,7 @@ def load_server_configs(path: str) -> List[MCPServerConfig]:
 # ---------------------------------------------------------------------------
 # Minimal MCP JSON-RPC client over stdio
 # ---------------------------------------------------------------------------
+
 
 class MCPError(RuntimeError):
     pass
@@ -116,23 +122,32 @@ class MCPClient:
         if self._proc is not None:
             return
         if self.config.url and not self.config.command:
-            raise MCPError("remote (URL) MCP servers need an explicit "
-                           "bridge; configure a stdio command instead")
+            raise MCPError(
+                "remote (URL) MCP servers need an explicit "
+                "bridge; configure a stdio command instead"
+            )
         if not self.config.command:
             raise MCPError(f"server {self.config.name!r} has no command")
         # S603: command comes from the admin-written allowlist config
         # (mcp_servers.toml), never from user/LLM input.
         self._proc = subprocess.Popen(  # noqa: S603
             self.config.command,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, text=True, bufsize=1,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
         )
         try:
-            result = self._request("initialize", {
-                "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
-            }, timeout_s=timeout_s)
+            result = self._request(
+                "initialize",
+                {
+                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
+                },
+                timeout_s=timeout_s,
+            )
             self.server_info = result.get("serverInfo", {})
             self._notify("notifications/initialized", {})
         except Exception:
@@ -149,8 +164,7 @@ class MCPClient:
                 try:
                     proc.kill()
                 except Exception as e:
-                    logger.debug(f"mcp server {self.config.name!r} kill "
-                                 f"failed: {e}")
+                    logger.debug(f"mcp server {self.config.name!r} kill failed: {e}")
 
     def __enter__(self) -> "MCPClient":
         self.connect()
@@ -160,12 +174,12 @@ class MCPClient:
         self.close()
 
     # -- protocol -------------------------------------------------------
-    def _request(self, method: str, params: Dict[str, Any],
-                 timeout_s: float = 10.0) -> Dict[str, Any]:
+    def _request(
+        self, method: str, params: Dict[str, Any], timeout_s: float = 10.0
+    ) -> Dict[str, Any]:
         assert self._proc and self._proc.stdin and self._proc.stdout
         rid = next(self._id)
-        payload = json.dumps({"jsonrpc": "2.0", "id": rid,
-                              "method": method, "params": params})
+        payload = json.dumps({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
         with self._lock:
             try:
                 self._proc.stdin.write(payload + "\n")
@@ -188,8 +202,7 @@ class MCPClient:
 
     def _notify(self, method: str, params: Dict[str, Any]) -> None:
         assert self._proc and self._proc.stdin
-        payload = json.dumps({"jsonrpc": "2.0", "method": method,
-                              "params": params})
+        payload = json.dumps({"jsonrpc": "2.0", "method": method, "params": params})
         with self._lock:
             self._proc.stdin.write(payload + "\n")
             self._proc.stdin.flush()
@@ -198,17 +211,16 @@ class MCPClient:
         result = self._request("tools/list", {})
         return result.get("tools", [])
 
-    def call_tool(self, name: str, arguments: Dict[str, Any],
-                  timeout_s: float = 30.0) -> str:
+    def call_tool(self, name: str, arguments: Dict[str, Any], timeout_s: float = 30.0) -> str:
         """Call a tool. Returns concatenated text content.
 
         Raises MCPError on protocol errors; a tool-level error
         (``isError: true``) is returned as text prefixed with
         ``MCP_TOOL_ERROR:`` so the policy layer can see it.
         """
-        result = self._request("tools/call",
-                               {"name": name, "arguments": arguments or {}},
-                               timeout_s=timeout_s)
+        result = self._request(
+            "tools/call", {"name": name, "arguments": arguments or {}}, timeout_s=timeout_s
+        )
         parts = []
         for block in result.get("content", []):
             if isinstance(block, dict) and block.get("type") == "text":
@@ -226,8 +238,12 @@ class MCPClient:
 # ---------------------------------------------------------------------------
 
 _JSON_TYPE_MAP = {
-    "string": str, "integer": int, "number": float,
-    "boolean": bool, "array": list, "object": dict,
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list,
+    "object": dict,
 }
 
 
@@ -243,9 +259,8 @@ def _params_model(tool_name: str, schema: Dict[str, Any]) -> type[BaseModel]:
     # Extra args are forbidden: MCP servers must not receive surprise params.
     safe = re.sub(r"\W", "_", tool_name) or "tool"
     from pydantic import ConfigDict
-    return create_model(f"MCP_{safe}_Params",
-                        __config__=ConfigDict(extra="forbid"),
-                        **fields)  # type: ignore[call-overload]
+
+    return create_model(f"MCP_{safe}_Params", __config__=ConfigDict(extra="forbid"), **fields)  # type: ignore[call-overload]
 
 
 def _risk_for(cfg: MCPServerConfig, tool_name: str) -> Risk:
@@ -253,8 +268,9 @@ def _risk_for(cfg: MCPServerConfig, tool_name: str) -> Risk:
     try:
         return Risk[name]
     except KeyError:
-        logger.warning(f"Unknown risk {name!r} for MCP tool {tool_name}; "
-                       f"falling back to DESTRUCTIVE")
+        logger.warning(
+            f"Unknown risk {name!r} for MCP tool {tool_name}; falling back to DESTRUCTIVE"
+        )
         return Risk.DESTRUCTIVE
 
 
@@ -275,9 +291,13 @@ def discover_tools(client: MCPClient) -> List[ToolSpec]:
         model = _params_model(tname, t.get("inputSchema") or {})
         risk = _risk_for(cfg, tname)
 
-        def _handler(args: Dict[str, Any], _ctx: Any = None,
-                     _raw: str = "", _tname: str = tname,
-                     _client: MCPClient = client) -> str:
+        def _handler(
+            args: Dict[str, Any],
+            _ctx: Any = None,
+            _raw: str = "",
+            _tname: str = tname,
+            _client: MCPClient = client,
+        ) -> str:
             return _client.call_tool(_tname, args)
 
         spec = ToolSpec(
@@ -288,7 +308,7 @@ def discover_tools(client: MCPClient) -> List[ToolSpec]:
             handler=_handler,
             timeout_s=30.0,
             scopes=frozenset({"mcp", cfg.name}),
-            carries_external_data=True,   # Task 1.5: MCP output is untrusted
+            carries_external_data=True,  # Task 1.5: MCP output is untrusted
         )
         specs.append(spec)
     return specs

@@ -39,14 +39,12 @@ def test_vscode_task(desktop):
 
 
 def test_office_adapter(desktop):
-    made = desktop
     assert "opened" in OfficeAdapter().open_document("doc.docx")
     assert "A1" in OfficeAdapter().read("s.xlsx", "Sheet1", "A1:B2")
     assert "saved" in OfficeAdapter().save("doc.docx")
 
 
 def test_spotify_adapter(desktop):
-    made = desktop
     assert "spotify play" in SpotifyAdapter().control("play")
     assert "unknown spotify action" in SpotifyAdapter().control("explode")
 
@@ -78,5 +76,6 @@ def test_tools_registered():
 
 def test_run_action_spotify_gated(desktop):
     from jarvis.tools.actions import run_action
+
     verdict, result = run_action("spotify", {"action": "pause"})
     assert verdict in ("allow", "confirm"), (verdict, result)

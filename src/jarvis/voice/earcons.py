@@ -67,7 +67,6 @@ def _tone(freq: int, ms: int, volume: float) -> bytes:
     return bytes(out)
 
 
-
 def synth_earcon(name: str, volume: float = 0.25) -> bytes:
     """Render an earcon score to 16-bit mono PCM bytes.
 
@@ -86,10 +85,10 @@ def synth_earcon(name: str, volume: float = 0.25) -> bytes:
             j = start + i
             if j + 2 > len(buf):
                 break
-            a = struct.unpack("<h", buf[j:j + 2])[0]
-            b = struct.unpack("<h", tone[i:i + 2])[0]
+            a = struct.unpack("<h", buf[j : j + 2])[0]
+            b = struct.unpack("<h", tone[i : i + 2])[0]
             v = max(-32768, min(32767, a + b))
-            buf[j:j + 2] = struct.pack("<h", v)
+            buf[j : j + 2] = struct.pack("<h", v)
     return bytes(buf)
 
 
@@ -105,8 +104,8 @@ def write_wav(path: Path, pcm: bytes) -> None:
 @dataclass
 class EarconConfig:
     muted: bool = False
-    volume: float = 0.25          # master, 0.0..1.0 (small by design)
-    quiet_hours_start: str = ""   # "23:00" or ""
+    volume: float = 0.25  # master, 0.0..1.0 (small by design)
+    quiet_hours_start: str = ""  # "23:00" or ""
     quiet_hours_end: str = ""
     data_dir: Optional[Path] = None
 
@@ -141,13 +140,11 @@ class EarconPlayer:
             return
         if self.config.muted:
             return
-        quiet = _in_quiet_hours(self.config.quiet_hours_start,
-                                self.config.quiet_hours_end)
+        quiet = _in_quiet_hours(self.config.quiet_hours_start, self.config.quiet_hours_end)
         if quiet and canonical not in URGENT:
             return  # silence is the point of quiet hours
         volume = self.config.volume * (0.5 if quiet else 1.0)
-        threading.Thread(target=self._play_async, args=(canonical, volume),
-                         daemon=True).start()
+        threading.Thread(target=self._play_async, args=(canonical, volume), daemon=True).start()
 
     def set_muted(self, muted: bool) -> None:
         self.config.muted = muted
@@ -171,7 +168,6 @@ class EarconPlayer:
             return
         try:
             with self._lock:
-                winsound.PlaySound(str(self._wav_path(name, volume)),
-                                   winsound.SND_FILENAME)
+                winsound.PlaySound(str(self._wav_path(name, volume)), winsound.SND_FILENAME)
         except Exception as e:
             logger.debug("earcon %r failed: %s", name, e)

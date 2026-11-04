@@ -51,6 +51,7 @@ _DEFAULTS: Dict[str, str] = {
 @dataclass
 class Persona:
     """Parsed persona with safe defaults for every field."""
+
     name: str = _DEFAULTS["name"]
     tone: str = _DEFAULTS["tone"]
     address: str = _DEFAULTS["address"]
@@ -84,8 +85,7 @@ class Persona:
         except (TypeError, ValueError):
             rate = 0
         rate = max(-10, min(10, rate))
-        return {"tts_voice": self.tts_voice or _DEFAULTS["tts_voice"],
-                "tts_rate": rate}
+        return {"tts_voice": self.tts_voice or _DEFAULTS["tts_voice"], "tts_rate": rate}
 
 
 _BULLET_RE = re.compile(r"^\s*-\s*([^:]+):\s*(.+?)\s*$")
@@ -116,11 +116,9 @@ def load_persona(workspace: Optional[Path] = None) -> Persona:
         return Persona()
     fields = _parse_persona_file(text)
     if not fields:
-        logger.warning("persona file %s had no recognized fields; using defaults",
-                       path)
+        logger.warning("persona file %s had no recognized fields; using defaults", path)
         return Persona(source=str(path))
-    kwargs: Dict[str, object] = {"source": str(path),
-                                 "raw_lines": text.splitlines()}
+    kwargs: Dict[str, object] = {"source": str(path), "raw_lines": text.splitlines()}
     for key, value in fields.items():
         if key == "tts_rate":
             try:

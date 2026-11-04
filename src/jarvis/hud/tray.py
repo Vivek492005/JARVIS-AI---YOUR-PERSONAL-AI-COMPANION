@@ -41,6 +41,7 @@ class PystrayBackend(TrayBackend):
         try:
             import pystray  # noqa: F401
             from PIL import Image  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -48,15 +49,17 @@ class PystrayBackend(TrayBackend):
     def run(self, title: str, menu: List[tuple]) -> None:
         import pystray
         from PIL import Image, ImageDraw
+
         # Reuse the HUD orb look: dark rounded square + blue ring.
         img = Image.new("RGB", (64, 64), (11, 15, 20))
         d = ImageDraw.Draw(img)
         d.ellipse([10, 10, 54, 54], outline=(110, 168, 254), width=5)
-        icon = pystray.Icon(title, img, title,
-                            menu=pystray.Menu(*[
-                                pystray.MenuItem(label, action)
-                                for label, action in menu
-                            ]))
+        icon = pystray.Icon(
+            title,
+            img,
+            title,
+            menu=pystray.Menu(*[pystray.MenuItem(label, action) for label, action in menu]),
+        )
         self._icon = icon
         icon.run()
 
@@ -88,11 +91,13 @@ class FakeTrayBackend(TrayBackend):
 class TrayController:
     """Tray icon driving HUD visibility + summon + quit."""
 
-    def __init__(self,
-                 backend: Optional[TrayBackend] = None,
-                 on_show: Optional[OnAction] = None,
-                 on_summon: Optional[OnAction] = None,
-                 on_quit: Optional[OnAction] = None) -> None:
+    def __init__(
+        self,
+        backend: Optional[TrayBackend] = None,
+        on_show: Optional[OnAction] = None,
+        on_summon: Optional[OnAction] = None,
+        on_quit: Optional[OnAction] = None,
+    ) -> None:
         self.backend = backend or PystrayBackend()
         self.on_show = on_show or (lambda: None)
         self.on_summon = on_summon or (lambda: None)
@@ -106,11 +111,14 @@ class TrayController:
         if not self.available:
             logger.warning("tray: pystray/Pillow not installed — tray disabled")
             return
-        self.backend.run("JARVIS", [
-            ("Open chat", lambda: self.on_show()),
-            ("Summon (wake)", lambda: self.on_summon()),
-            ("Quit", lambda: (self.on_quit(), self.backend.stop())),
-        ])
+        self.backend.run(
+            "JARVIS",
+            [
+                ("Open chat", lambda: self.on_show()),
+                ("Summon (wake)", lambda: self.on_summon()),
+                ("Quit", lambda: (self.on_quit(), self.backend.stop())),
+            ],
+        )
 
     def stop(self) -> None:
         self.backend.stop()
@@ -130,18 +138,21 @@ class KeyboardBackend(HotkeyBackend):
     def available(self) -> bool:
         try:
             import keyboard  # noqa: F401
+
             return True
         except ImportError:
             return False
 
     def register(self, hotkey: str, callback: OnAction) -> None:
         import keyboard
+
         keyboard.add_hotkey(hotkey, callback)
 
     def unregister_all(self) -> None:
         if not self.available():
             return
         import keyboard
+
         keyboard.unhook_all_hotkeys()
 
 
@@ -169,10 +180,12 @@ class FakeHotkeyBackend(HotkeyBackend):
 class HotkeySummon:
     """Global hotkey → on_summon. Default from voice.push_to_talk_hotkey."""
 
-    def __init__(self,
-                 on_summon: OnAction,
-                 hotkey: Optional[str] = None,
-                 backend: Optional[HotkeyBackend] = None) -> None:
+    def __init__(
+        self,
+        on_summon: OnAction,
+        hotkey: Optional[str] = None,
+        backend: Optional[HotkeyBackend] = None,
+    ) -> None:
         self.on_summon = on_summon
         self.backend = backend or KeyboardBackend()
         self.hotkey = hotkey or self._default_hotkey()
@@ -181,6 +194,7 @@ class HotkeySummon:
     def _default_hotkey() -> str:
         try:
             from jarvis.core.config import get_settings
+
             return get_settings().voice.push_to_talk_hotkey or "ctrl+alt+j"
         except Exception:
             return "ctrl+alt+j"
@@ -191,8 +205,7 @@ class HotkeySummon:
 
     def start(self) -> None:
         if not self.available:
-            logger.warning("hotkey: 'keyboard' package not installed — "
-                           "global summon disabled")
+            logger.warning("hotkey: 'keyboard' package not installed — global summon disabled")
             return
         self.backend.register(self.hotkey, self.on_summon)
 

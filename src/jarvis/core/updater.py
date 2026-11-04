@@ -5,6 +5,7 @@ verifies its SHA256 against the published SHA256SUMS.txt before handing the
 file to the user. Never auto-installs: the user always confirms, and the
 hash check fails closed (mismatch = abort + warn).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -17,8 +18,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-REPO_API = ("https://api.github.com/repos/Vivek492005/"
-            "JARVIS-AI---YOUR-PERSONAL-AI-COMPANION/releases/latest")
+REPO_API = (
+    "https://api.github.com/repos/Vivek492005/"
+    "JARVIS-AI---YOUR-PERSONAL-AI-COMPANION/releases/latest"
+)
 
 
 @dataclass
@@ -31,6 +34,7 @@ class ReleaseInfo:
 def _https_only(url: str) -> str:
     """Allow only https URLs (update assets come from GitHub)."""
     from urllib.parse import urlparse
+
     if urlparse(url).scheme != "https":
         raise ValueError(f"refusing non-https URL: {url!r}")
     return url
@@ -38,13 +42,13 @@ def _https_only(url: str) -> str:
 
 def _get_json(url: str) -> dict:
     req = urllib.request.Request(  # noqa: S310 — https-validated below
-        _https_only(url), headers={"User-Agent": "jarvis-updater"})
+        _https_only(url), headers={"User-Agent": "jarvis-updater"}
+    )
     with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
         return json.load(resp)
 
 
-def check_for_update(current_version: str,
-                     api_url: str = REPO_API) -> Optional[ReleaseInfo]:
+def check_for_update(current_version: str, api_url: str = REPO_API) -> Optional[ReleaseInfo]:
     """Return ReleaseInfo if a newer release exists, else None.
 
     `current_version` like "0.9.0" (no leading v). Network failures return
@@ -58,11 +62,10 @@ def check_for_update(current_version: str,
     tag = str(data.get("tag_name", "")).lstrip("v")
     if not tag or tag == current_version:
         return None
-    assets = {a.get("name", ""): a.get("browser_download_url", "")
-              for a in data.get("assets", [])}
-    installer = next((u for n, u in assets.items()
-                      if n.startswith("JARVIS-Setup-v") and n.endswith(".exe")),
-                     "")
+    assets = {a.get("name", ""): a.get("browser_download_url", "") for a in data.get("assets", [])}
+    installer = next(
+        (u for n, u in assets.items() if n.startswith("JARVIS-Setup-v") and n.endswith(".exe")), ""
+    )
     sums = assets.get("SHA256SUMS.txt", "")
     if not installer or not sums:
         logger.warning("release %s missing installer/checksums", tag)
@@ -95,7 +98,8 @@ def verify_sha256(file_path: str, sums_text: str) -> bool:
 def download(url: str, dest: str) -> str:
     """Download url to dest. Returns dest."""
     req = urllib.request.Request(  # noqa: S310 — https-validated asset URL
-        _https_only(url), headers={"User-Agent": "jarvis-updater"})
+        _https_only(url), headers={"User-Agent": "jarvis-updater"}
+    )
     with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
         with open(dest, "wb") as f:
             while True:

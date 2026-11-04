@@ -1,8 +1,14 @@
 """Tests for perception privacy blocklist (5.2/5.3 foundation)."""
+
 import sys
+
 sys.path.insert(0, "src")
 from jarvis.perception.privacy import (
-    SensitiveWindowError, check_window, is_sensitive_window, redact_text)
+    SensitiveWindowError,
+    check_window,
+    is_sensitive_window,
+    redact_text,
+)
 
 
 def test_password_manager_blocked():

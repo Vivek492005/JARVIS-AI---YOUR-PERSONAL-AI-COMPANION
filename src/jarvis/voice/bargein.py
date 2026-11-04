@@ -33,20 +33,23 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BargeInConfig:
     enabled: bool = True
-    min_speech_ms: int = 300      # sustained speech before interrupt
-    stop_budget_ms: int = 250     # TTS must stop within this
+    min_speech_ms: int = 300  # sustained speech before interrupt
+    stop_budget_ms: int = 250  # TTS must stop within this
     duck_multiplier: float = 2.0  # harder to trigger while ducked
 
 
 class BargeInController:
     """Feeds VAD decisions during TTS; fires interrupts."""
 
-    def __init__(self, config: Optional[BargeInConfig] = None,
-                 stop_tts: Optional[Callable[[], None]] = None,
-                 on_interrupt: Optional[Callable[[str], None]] = None,
-                 on_cancel_llm: Optional[Callable[[], None]] = None,
-                 on_cancel_lane: Optional[Callable[[], None]] = None,
-                 clock: Optional[Callable[[], float]] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[BargeInConfig] = None,
+        stop_tts: Optional[Callable[[], None]] = None,
+        on_interrupt: Optional[Callable[[str], None]] = None,
+        on_cancel_llm: Optional[Callable[[], None]] = None,
+        on_cancel_lane: Optional[Callable[[], None]] = None,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> None:
         self.config = config or BargeInConfig()
         self.stop_tts = stop_tts or (lambda: None)
         self.on_interrupt = on_interrupt or (lambda reason: None)
@@ -127,8 +130,8 @@ class BargeInController:
         self.last_stop_latency_ms = latency_ms
         if latency_ms > self.config.stop_budget_ms:
             logger.warning(
-                f"barge-in stop took {latency_ms:.0f} ms "
-                f"(budget {self.config.stop_budget_ms} ms)")
+                f"barge-in stop took {latency_ms:.0f} ms (budget {self.config.stop_budget_ms} ms)"
+            )
         try:
             self.on_cancel_llm()
         except Exception:

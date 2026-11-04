@@ -12,6 +12,7 @@ Exit 0 = all checks pass. This does NOT prove the installer works — the
 first real build happens on Windows from the v1.0.0 tag (see
 docs/PACKAGING.md).
 """
+
 from __future__ import annotations
 
 import ast
@@ -103,7 +104,7 @@ def check_release_workflow() -> None:
         fail(f"release.yml is not valid YAML: {e}")
         return
     print("ok: release.yml is valid YAML")
-    jobs = (wf.get("jobs") or {})
+    jobs = wf.get("jobs") or {}
     if "build-windows" not in jobs:
         fail("release.yml missing build-windows job")
         return

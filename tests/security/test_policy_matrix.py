@@ -12,15 +12,19 @@ for _mod in ("speech_recognition", "pyttsx3"):
 
 
 from access_os.policy import (  # noqa: E402
-    Decision, PolicyContext, decide, decide_tool_call,
+    Decision,
+    PolicyContext,
+    decide,
+    decide_tool_call,
 )
 from access_os.tools.registry import Risk, ToolSpec  # noqa: E402
 from access_os.tools.registry import WebSearchParams  # noqa: E402
 
 
 def _spec(risk):
-    return ToolSpec(name="t", description="t", params=WebSearchParams,
-                    risk=risk, handler=lambda a, c, n: "")
+    return ToolSpec(
+        name="t", description="t", params=WebSearchParams, risk=risk, handler=lambda a, c, n: ""
+    )
 
 
 def test_system_never_auto_even_l3_untainted():
@@ -39,17 +43,15 @@ def test_rate_limited_beats_l3_destructive():
 
 def test_arg_rules_beat_l3_tier():
     # PowerShell destructive: DENY even at max autonomy.
-    d, _ = decide_tool_call("run_powershell_command",
-                            {"command": "Remove-Item C:\\x"}, level=3)
+    d, _ = decide_tool_call("run_powershell_command", {"command": "Remove-Item C:\\x"}, level=3)
     assert d == Decision.DENY
     # Blocked hotkey: DENY even at max autonomy.
-    d, _ = decide_tool_call("keyboard_mouse_action",
-                            {"action": "press_hotkey", "value": "alt+f4"},
-                            level=3)
+    d, _ = decide_tool_call(
+        "keyboard_mouse_action", {"action": "press_hotkey", "value": "alt+f4"}, level=3
+    )
     assert d == Decision.DENY
     # Bad URL scheme: DENY even at max autonomy.
-    d, _ = decide_tool_call("open_website",
-                            {"url_or_name": "file:///etc/passwd"}, level=3)
+    d, _ = decide_tool_call("open_website", {"url_or_name": "file:///etc/passwd"}, level=3)
     assert d == Decision.DENY
 
 
@@ -59,8 +61,7 @@ def test_invalid_level_fails_restrictive():
     for bad_level in (-1, 4, 99):
         d, _ = decide_tool_call("web_search", {"query": "x"}, level=bad_level)
         assert d == Decision.ALLOW, f"level {bad_level}: READ should auto"
-        d, _ = decide_tool_call("open_application", {"app_name": "x"},
-                                level=bad_level)
+        d, _ = decide_tool_call("open_application", {"app_name": "x"}, level=bad_level)
         assert d == Decision.CONFIRM, f"level {bad_level}: must confirm"
 
 

@@ -5,20 +5,19 @@ from unittest.mock import MagicMock
 
 sys.modules.setdefault("pyautogui", MagicMock(name="pyautogui"))
 
-from jarvis.brain.context import (
+from jarvis.brain.context import (  # noqa: E402
     ContextManager,
     LastEntities,
     estimate_tokens,
     truncate_tool_output,
 )
-from jarvis.brain.prompts import PROMPT_VERSION, PromptBuilder
+from jarvis.brain.prompts import PROMPT_VERSION, PromptBuilder  # noqa: E402
 
 
 class TestPromptBuilder:
     def test_all_six_layers_present(self):
         pb = PromptBuilder()
-        sp = pb.build(memory_facts=["default browser: Chrome"],
-                      live_extra={"mode": "test"})
+        sp = pb.build(memory_facts=["default browser: Chrome"], live_extra={"mode": "test"})
         assert "JARVIS" in sp  # identity
         assert "Chrome" in sp  # user profile / memory facts
         assert "Untrusted data" in sp or "untrusted_data" in sp  # safety
@@ -30,6 +29,7 @@ class TestPromptBuilder:
     def test_tool_catalog_lists_all_tools(self):
         from jarvis.brain.prompts.builder import tool_catalog
         from jarvis.tools.registry import REGISTRY
+
         cat = tool_catalog()
         for name in REGISTRY:
             if "." not in name:
@@ -50,7 +50,7 @@ class TestContextManager:
 
     def test_token_budget_triggers_summary(self):
         cm = ContextManager(max_turns=1000, token_budget=50)
-        for i in range(10):
+        for _ in range(10):
             cm.add_turn("user", "x" * 100)
         assert len(cm.summaries) >= 1
 

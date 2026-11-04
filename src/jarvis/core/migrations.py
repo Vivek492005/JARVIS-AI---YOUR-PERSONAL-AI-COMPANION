@@ -6,6 +6,7 @@ through every migration — old installs keep working after an update, and
 unknown future versions are left untouched (fail-open for the user's own
 keys, never destructive).
 """
+
 from __future__ import annotations
 
 from typing import Any, Callable, Dict

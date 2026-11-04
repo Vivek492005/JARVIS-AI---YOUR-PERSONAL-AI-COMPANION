@@ -30,9 +30,17 @@ from jarvis.server.token import bearer_ok
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import (Depends, FastAPI, Header, HTTPException, Query,
-                         WebSocket, WebSocketDisconnect)
+    from fastapi import (
+        Depends,
+        FastAPI,
+        Header,
+        HTTPException,
+        Query,
+        WebSocket,
+        WebSocketDisconnect,
+    )
     from fastapi.responses import FileResponse, JSONResponse
+
     _FASTAPI_AVAILABLE = True
 except ImportError:  # the 'server' extra is optional
     _FASTAPI_AVAILABLE = False
@@ -40,14 +48,14 @@ except ImportError:  # the 'server' extra is optional
 
 class CommandIn(BaseModel):
     """POST /command body."""
+
     text: str
     priority: str = "TASK"
 
 
 def event_to_dict(ev: Event) -> Dict[str, Any]:
     """Serialize an event to the v1 JSON protocol."""
-    d: Dict[str, Any] = {"v": 1, "type": type(ev).__name__,
-                         "trace": ev.trace, "ts": ev.ts}
+    d: Dict[str, Any] = {"v": 1, "type": type(ev).__name__, "trace": ev.trace, "ts": ev.ts}
     for f in dataclasses.fields(ev):
         if f.name in ("trace", "ts"):
             continue
@@ -59,8 +67,8 @@ def create_app(service: JarvisService, token: str):
     """Build the jarvisd FastAPI application."""
     if not _FASTAPI_AVAILABLE:
         raise RuntimeError(
-            "jarvisd HTTP API needs the 'server' extra: "
-            "pip install jarvis-assistant[server]")
+            "jarvisd HTTP API needs the 'server' extra: pip install jarvis-assistant[server]"
+        )
 
     app = FastAPI(title="jarvisd", version="1")
 
@@ -70,6 +78,7 @@ def create_app(service: JarvisService, token: str):
 
     # --- HUD (Task 7.2): event-driven state machine + static web UI --------
     from jarvis.hud.state import HUDStateMachine
+
     hud = HUDStateMachine()
     service.bus.on_all(hud.on_event)
 
@@ -112,8 +121,7 @@ def create_app(service: JarvisService, token: str):
     async def hud_snapshot():
         return JSONResponse(hud.snapshot())
 
-    @app.get("/hud/{name}", dependencies=[Depends(verify)],
-             include_in_schema=False)
+    @app.get("/hud/{name}", dependencies=[Depends(verify)], include_in_schema=False)
     async def hud_static(name: str):
         return _hud_file(name)
 
@@ -124,6 +132,7 @@ def create_app(service: JarvisService, token: str):
     @app.get("/health")
     async def health():
         from jarvis import __version__
+
         return {"v": 1, "status": "ok", "version": __version__}
 
     @app.get("/state", dependencies=[Depends(verify)])
@@ -135,8 +144,9 @@ def create_app(service: JarvisService, token: str):
         try:
             prio = Priority[cmd.priority.upper()]
         except KeyError:
-            raise HTTPException(status_code=400,
-                                detail=f"unknown priority {cmd.priority!r}") from None
+            raise HTTPException(
+                status_code=400, detail=f"unknown priority {cmd.priority!r}"
+            ) from None
         try:
             service.submit_command(cmd.text, priority=prio)
         except ValueError as e:
@@ -151,8 +161,7 @@ def create_app(service: JarvisService, token: str):
         try:
             service.interrupt(reason="chat-stop")
         except AttributeError as e:
-            raise HTTPException(status_code=501,
-                                detail="interrupt not supported") from e
+            raise HTTPException(status_code=501, detail="interrupt not supported") from e
         return {"v": 1, "interrupted": True}
 
     @app.websocket("/events")
@@ -161,7 +170,8 @@ def create_app(service: JarvisService, token: str):
         # headers on a WS handshake, hence the query param).
         auth_header = ws.headers.get("authorization")
         ok = bearer_ok(auth_header, token) or (
-            token_q is not None and bearer_ok(f"Bearer {token_q}", token))
+            token_q is not None and bearer_ok(f"Bearer {token_q}", token)
+        )
         if not ok:
             await ws.close(code=4401)
             return
@@ -187,7 +197,8 @@ def create_app(service: JarvisService, token: str):
             while True:
                 get_task = asyncio.create_task(aq.get())
                 done, _pending = await asyncio.wait(
-                    {get_task, reader}, return_when=asyncio.FIRST_COMPLETED)
+                    {get_task, reader}, return_when=asyncio.FIRST_COMPLETED
+                )
                 if reader in done:
                     get_task.cancel()
                     # Surface close errors (but not the normal disconnect).
@@ -203,6 +214,7 @@ def create_app(service: JarvisService, token: str):
 
     # Task 7.7: control center (settings, audit, memory, skills, providers, costs)
     from jarvis.server.control import build_control_router, notify_push
+
     app.include_router(build_control_router(service, verify))
 
     # Task 7.9: push important events (confirmations, errors) to stored
@@ -213,8 +225,7 @@ def create_app(service: JarvisService, token: str):
     def _on_important(ev) -> None:
         try:
             if isinstance(ev, ConfirmationRequested):
-                notify_push("JARVIS confirmation",
-                            ev.question or f"Allow {ev.tool}?")
+                notify_push("JARVIS confirmation", ev.question or f"Allow {ev.tool}?")
             elif isinstance(ev, ErrorEvent):
                 notify_push("JARVIS error", ev.message or "error")
         except Exception:

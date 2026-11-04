@@ -13,7 +13,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 
 from jarvis.brain.memory.store import MemoryStore
 from jarvis.brain.memory.write_policy import WriteRequest, validate_write
@@ -72,14 +71,16 @@ class MemoryCommands:
             return self._remember(cmd.payload)
         if cmd.kind == "forget":
             n = self.store.delete_facts_like(cmd.payload)
-            return f"Bhool gaya. {n} yaadein delete ki." if n else \
-                "Us baare mein kuch yaad nahi tha."
+            return (
+                f"Bhool gaya. {n} yaadein delete ki." if n else "Us baare mein kuch yaad nahi tha."
+            )
         if cmd.kind == "list":
             facts = self.store.all_facts()
             if not facts:
                 return "Mujhe abhi kuch khaas yaad nahi hai."
             return "Mujhe ye yaad hai:\n" + "\n".join(
-                f"{i+1}. {f.key}: {f.value}" for i, f in enumerate(facts[:20]))
+                f"{i + 1}. {f.key}: {f.value}" for i, f in enumerate(facts[:20])
+            )
         if cmd.kind == "export":
             facts = self.store.all_facts()
             eps = self.store.recent_episodes(50)
@@ -92,8 +93,10 @@ class MemoryCommands:
             # The caller must confirm first; this method only wipes when the
             # confirmed flag flows through the policy gate. We return the
             # confirmation question here and wipe on explicit yes.
-            return ("CONFIRM_WIPE: Saari yaadein (facts + episodes) delete ho "
-                    "jayengi. Pakka? 'haan' bolo.")
+            return (
+                "CONFIRM_WIPE: Saari yaadein (facts + episodes) delete ho "
+                "jayengi. Pakka? 'haan' bolo."
+            )
         return ""
 
     def _remember(self, payload: str) -> str:

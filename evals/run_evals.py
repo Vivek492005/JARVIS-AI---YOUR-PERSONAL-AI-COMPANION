@@ -28,6 +28,7 @@ from typing import Any, Dict, List
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # tests.fakes
 from unittest.mock import MagicMock
+
 sys.modules.setdefault("pyautogui", MagicMock(name="pyautogui"))
 
 EVALS_DIR = Path(__file__).resolve().parent
@@ -56,6 +57,7 @@ def load_cases(subset: str = "") -> List[Dict[str, Any]]:
 # Per-category checkers
 # ---------------------------------------------------------------------------
 
+
 def check_reflex(case: Dict[str, Any]) -> bool:
     """Reflex fast-path: correct tool at high confidence.
 
@@ -63,6 +65,7 @@ def check_reflex(case: Dict[str, Any]) -> bool:
     (e.g. "calculator" -> app_name "calc") and not part of the contract.
     """
     from jarvis.brain.reflex import ReflexMatcher
+
     m = ReflexMatcher()
     hit = m.match(case["utterance"])
     expect = case.get("expect", {})
@@ -96,8 +99,9 @@ def _fixture_for(case: Dict[str, Any]) -> List[Dict[str, Any]]:
     expect = case.get("expect", {})
     script = [{"text": json.dumps({"type": "finish", "reply": "PLAN: eval plan"})}]
     if expect.get("clarify"):
-        script.append({"text": json.dumps({"type": "clarify", "question": "Kaunsa?",
-                                            "options": ["a", "b"]})})
+        script.append(
+            {"text": json.dumps({"type": "clarify", "question": "Kaunsa?", "options": ["a", "b"]})}
+        )
         return script
     tools = expect.get("tools") or ([expect["tool"]] if expect.get("tool") else [])
     raw_args = expect.get("args") or []
@@ -119,8 +123,7 @@ def check_loop(case: Dict[str, Any]) -> bool:
     from tests.fakes.fake_os import FakeOS
 
     planner = LLMPlanner(FakeLLM(script=_fixture_for(case)), system_prompt="eval")
-    loop = AgentLoop(planner, max_steps=8, wall_time_s=20,
-                     confirm_callback=lambda t, a: True)
+    loop = AgentLoop(planner, max_steps=8, wall_time_s=20, confirm_callback=lambda t, a: True)
     expect = case.get("expect", {})
     with FakeOS() as fake:
         out = loop.run_task(case["utterance"], LoopContext())
@@ -128,7 +131,7 @@ def check_loop(case: Dict[str, Any]) -> bool:
         return "1)" in out or "Kaunsa" in out
     tools = expect.get("tools") or ([expect["tool"]] if expect.get("tool") else [])
     executed = [name for name, _ in fake.actions]
-    return executed[:len(tools)] == tools
+    return executed[: len(tools)] == tools
 
 
 def check_safety(case: Dict[str, Any]) -> bool:
@@ -147,6 +150,7 @@ def check_safety(case: Dict[str, Any]) -> bool:
 
 def check_injection(case: Dict[str, Any]) -> bool:
     from jarvis.policy.command_policy import detect_tainted
+
     return detect_tainted(case["input"]) == case["expected"]
 
 
@@ -220,13 +224,19 @@ def main(argv=None) -> int:
     report = {
         "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "model": args.model,
-        "prompt_version": __import__("jarvis.brain.prompts",
-                                     fromlist=["PROMPT_VERSION"]).PROMPT_VERSION,
+        "prompt_version": __import__(
+            "jarvis.brain.prompts", fromlist=["PROMPT_VERSION"]
+        ).PROMPT_VERSION,
         "overall": round(overall, 4),
         "elapsed_s": round(time.time() - t0, 2),
-        "by_category": {k: {"pass": v["pass"], "total": v["total"],
-                            "rate": round(v["pass"] / v["total"], 4) if v["total"] else 0}
-                        for k, v in sorted(by_cat.items())},
+        "by_category": {
+            k: {
+                "pass": v["pass"],
+                "total": v["total"],
+                "rate": round(v["pass"] / v["total"], 4) if v["total"] else 0,
+            }
+            for k, v in sorted(by_cat.items())
+        },
         "failures": failures[:50],
     }
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -235,8 +245,8 @@ def main(argv=None) -> int:
 
     print(f"\n=== eval report ({args.model}) ===")
     for cat, s in sorted(report["by_category"].items()):
-        print(f"  {cat:12s} {s['pass']:3d}/{s['total']:3d}  {s['rate']*100:5.1f}%")
-    print(f"  {'OVERALL':12s} {passed:3d}/{total:3d}  {overall*100:5.1f}%")
+        print(f"  {cat:12s} {s['pass']:3d}/{s['total']:3d}  {s['rate'] * 100:5.1f}%")
+    print(f"  {'OVERALL':12s} {passed:3d}/{total:3d}  {overall * 100:5.1f}%")
     print(f"  report: {rp}")
     if failures:
         print(f"  failures (first 10): {failures[:10]}")

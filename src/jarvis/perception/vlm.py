@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import io
 import logging
-import re
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
 from jarvis.perception import backends as _backends
 from jarvis.perception.backends import ElementNode
-from jarvis.perception.privacy import SensitiveWindowError, check_window
+from jarvis.perception.privacy import check_window
 from jarvis.perception.screen import ScreenCapture, get_shot
 
 logger = logging.getLogger(__name__)
@@ -33,14 +32,24 @@ MAX_CLICK_RETRIES = 2
 
 # Prompts mentioning these hand off to the user immediately.
 HANDOFF_PATTERNS = (
-    "login", "log in", "sign in", "password",
-    "captcha", "2fa", "two-factor", "otp",
-    "payment", "pay ", "checkout", "card number",
-    "uac", "user account control", "administrator permission",
+    "login",
+    "log in",
+    "sign in",
+    "password",
+    "captcha",
+    "2fa",
+    "two-factor",
+    "otp",
+    "payment",
+    "pay ",
+    "checkout",
+    "card number",
+    "uac",
+    "user account control",
+    "administrator permission",
 )
 
-HANDOFF_MESSAGE = ("Mujhse nahi hoga, aap kar do — "
-                   "yeh login/CAPTCHA/payment jaisa step hai.")
+HANDOFF_MESSAGE = "Mujhse nahi hoga, aap kar do — yeh login/CAPTCHA/payment jaisa step hai."
 
 
 class HandoffRequired(Exception):
@@ -49,7 +58,7 @@ class HandoffRequired(Exception):
 
 @dataclass
 class Mark:
-    index: int            # 1-based, shown on the overlay
+    index: int  # 1-based, shown on the overlay
     element_id: str
     bounds: Tuple[int, int, int, int]
     label: str
@@ -60,8 +69,7 @@ def _handoff_triggered(prompt: str) -> bool:
     return any(p in lowered for p in HANDOFF_PATTERNS)
 
 
-def build_marks(handle: Optional[int] = None,
-                max_marks: int = 12) -> Tuple[List[Mark], int]:
+def build_marks(handle: Optional[int] = None, max_marks: int = 12) -> Tuple[List[Mark], int]:
     """Candidate clickable regions from the UIA tree.
 
     Returns (marks, handle). Elements with empty bounds are skipped.
@@ -79,12 +87,20 @@ def build_marks(handle: Optional[int] = None,
         if len(marks) >= max_marks:
             return
         x, y, w, h = node.bounds
-        if node.role in ("button", "link", "menuitem", "checkbox",
-                        "radiobutton", "tabitem") and w > 0 and h > 0 \
-                and node.enabled:
-            marks.append(Mark(index=len(marks) + 1,
-                              element_id=node.element_id,
-                              bounds=(x, y, w, h), label=node.name))
+        if (
+            node.role in ("button", "link", "menuitem", "checkbox", "radiobutton", "tabitem")
+            and w > 0
+            and h > 0
+            and node.enabled
+        ):
+            marks.append(
+                Mark(
+                    index=len(marks) + 1,
+                    element_id=node.element_id,
+                    bounds=(x, y, w, h),
+                    label=node.name,
+                )
+            )
         for child in node.children:
             walk(child)
 
@@ -115,8 +131,12 @@ def overlay_marks(png: bytes, marks: List[Mark]) -> bytes:
 class VLMClicker:
     """Set-of-marks click loop with guards."""
 
-    def __init__(self, vlm_backend=None, max_calls: int = MAX_VLM_CALLS_PER_TASK,
-                 max_retries: int = MAX_CLICK_RETRIES) -> None:
+    def __init__(
+        self,
+        vlm_backend=None,
+        max_calls: int = MAX_VLM_CALLS_PER_TASK,
+        max_retries: int = MAX_CLICK_RETRIES,
+    ) -> None:
         self._vlm = vlm_backend
         self.max_calls = max_calls
         self.max_retries = max_retries
@@ -125,9 +145,13 @@ class VLMClicker:
     def _vlm_be(self):
         return self._vlm or _backends.get_backend("vlm")
 
-    def click_target(self, prompt: str, handle: Optional[int] = None,
-                     verify_fn: Optional[Callable[[], Tuple[bool, str]]] = None,
-                     max_marks: int = 12) -> str:
+    def click_target(
+        self,
+        prompt: str,
+        handle: Optional[int] = None,
+        verify_fn: Optional[Callable[[], Tuple[bool, str]]] = None,
+        max_marks: int = 12,
+    ) -> str:
         """Click the element the VLM picks for ``prompt``.
 
         Raises :class:`HandoffRequired` on handoff triggers, VLM call
@@ -139,25 +163,27 @@ class VLMClicker:
         uia = _backends.get_backend("uia")
 
         last_why = "no attempt yet"
-        for attempt in range(1 + self.max_retries):
+        for _ in range(1 + self.max_retries):
             if self.calls_made >= self.max_calls:
                 raise HandoffRequired(
-                    f"VLM call budget exhausted ({self.max_calls}/task). "
-                    + HANDOFF_MESSAGE)
+                    f"VLM call budget exhausted ({self.max_calls}/task). " + HANDOFF_MESSAGE
+                )
             marks, used_handle = build_marks(handle, max_marks)
             if not marks:
-                raise HandoffRequired("koi clickable element nahi mila. "
-                                      + HANDOFF_MESSAGE)
+                raise HandoffRequired("koi clickable element nahi mila. " + HANDOFF_MESSAGE)
             info = cap.capture(handle=used_handle)
             png = get_shot(str(info["shot_id"]))
             marked = overlay_marks(png or b"", marks)
             # VLM output is untrusted: ONLY the integer index is used.
             self.calls_made += 1
             try:
-                idx = int(self._vlm_be().pick_element(
-                    marked, f"Which numbered box matches: {prompt}? "
-                            f"Reply with the number only.",
-                    max_marks=len(marks)))
+                idx = int(
+                    self._vlm_be().pick_element(
+                        marked,
+                        f"Which numbered box matches: {prompt}? Reply with the number only.",
+                        max_marks=len(marks),
+                    )
+                )
             except (TypeError, ValueError):
                 last_why = "VLM did not return a number"
                 continue
@@ -169,11 +195,9 @@ class VLMClicker:
                 last_why = f"invoke failed for {mark.element_id}"
                 continue
             if verify_fn is None:
-                return (f"clicked '{mark.label}' "
-                        f"(mark {idx}; unverified — no postcondition)")
+                return f"clicked '{mark.label}' (mark {idx}; unverified — no postcondition)"
             ok, evidence = verify_fn()
             if ok:
                 return f"clicked '{mark.label}' (mark {idx}); verified: {evidence}"
             last_why = f"verify failed: {evidence}"
-        raise HandoffRequired(f"VLM click failed after retries: {last_why}. "
-                              + HANDOFF_MESSAGE)
+        raise HandoffRequired(f"VLM click failed after retries: {last_why}. " + HANDOFF_MESSAGE)

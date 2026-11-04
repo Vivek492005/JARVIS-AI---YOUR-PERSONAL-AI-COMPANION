@@ -64,7 +64,7 @@ class SentenceSplitter:
             sent = m.group(1).strip()
             if sent:
                 out.append(sent)
-            self._buf = self._buf[m.end():]
+            self._buf = self._buf[m.end() :]
         return out
 
     def flush(self) -> List[str]:
@@ -119,11 +119,12 @@ def speak_style(text: str, max_sentences: int = 2) -> str:
 # Provider interface + engines
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AudioChunk:
-    data: bytes           # encoded audio (mp3/wav), ready to play
-    index: int            # sentence index
-    text: str = ""        # source sentence (for the HUD)
+    data: bytes  # encoded audio (mp3/wav), ready to play
+    index: int  # sentence index
+    text: str = ""  # source sentence (for the HUD)
     engine: str = ""
 
 
@@ -140,8 +141,9 @@ class TTSProvider(Protocol):
         """Synthesize one sentence; returns encoded audio bytes."""
         ...
 
-    def synth_stream(self, sentences: Iterator[str],
-                     voice: Optional[str] = None) -> Iterator[AudioChunk]:
+    def synth_stream(
+        self, sentences: Iterator[str], voice: Optional[str] = None
+    ) -> Iterator[AudioChunk]:
         """Default: synth each sentence sequentially."""
         ...
 
@@ -151,8 +153,9 @@ class _BaseTTS:
     def offline_capable(self) -> bool:
         return False
 
-    def synth_stream(self, sentences: Iterator[str],
-                     voice: Optional[str] = None) -> Iterator[AudioChunk]:
+    def synth_stream(
+        self, sentences: Iterator[str], voice: Optional[str] = None
+    ) -> Iterator[AudioChunk]:
         for i, s in enumerate(sentences):
             data = self.synth(s, voice)
             if data:
@@ -188,8 +191,9 @@ def _save_edge_tts(text: str, voice: str) -> bytes:
 class EdgeTTSEngine(_BaseTTS):
     """Microsoft Edge neural voices. Free, no key, no quota."""
 
-    def __init__(self, voice_en: str = "en-IN-NeerjaNeural",
-                 voice_hi: str = "hi-IN-SwaraNeural") -> None:
+    def __init__(
+        self, voice_en: str = "en-IN-NeerjaNeural", voice_hi: str = "hi-IN-SwaraNeural"
+    ) -> None:
         self.voice_en = voice_en
         self.voice_hi = voice_hi
 
@@ -201,12 +205,11 @@ class EdgeTTSEngine(_BaseTTS):
         try:
             import edge_tts  # noqa: F401
         except ImportError as e:
-            raise RuntimeError(
-                "edge-tts is not installed (`pip install edge-tts`).") from e
+            raise RuntimeError("edge-tts is not installed (`pip install edge-tts`).") from e
         v = voice or (self.voice_hi if detect_script(text) == "hi" else self.voice_en)
         t0 = time.monotonic()
         data = _save_edge_tts(text, v)
-        logger.debug(f"edge-tts synth {len(text)} chars in {time.monotonic()-t0:.2f}s")
+        logger.debug(f"edge-tts synth {len(text)} chars in {time.monotonic() - t0:.2f}s")
         return data
 
 
@@ -224,6 +227,7 @@ class RumikTTSEngine(_BaseTTS):
         if self._api_key:
             return self._api_key
         from jarvis.core.secrets import get_secret
+
         key = get_secret("RUMIK_API_KEY")
         if not key:
             raise RuntimeError("RUMIK_API_KEY not set (secrets/env).")
@@ -235,11 +239,12 @@ class RumikTTSEngine(_BaseTTS):
         except ImportError as e:
             raise RuntimeError("httpx is not installed") from e
         url = os.getenv("RUMIK_API_URL", "https://silk-api.rumik.ai/v1/tts")
-        resp = httpx.post(url,
-                          headers={"Authorization": f"Bearer {self._key()}",
-                                   "Content-Type": "application/json"},
-                          json={"text": text, "voice": voice or "default"},
-                          timeout=30.0)
+        resp = httpx.post(
+            url,
+            headers={"Authorization": f"Bearer {self._key()}", "Content-Type": "application/json"},
+            json={"text": text, "voice": voice or "default"},
+            timeout=30.0,
+        )
         resp.raise_for_status()
         return resp.content
 
@@ -275,6 +280,7 @@ class Pyttsx3Engine(_BaseTTS):
 # ---------------------------------------------------------------------------
 # Phrase cache
 # ---------------------------------------------------------------------------
+
 
 class PhraseCache:
     """Pre-synthesized audio for repeated phrases ("Done", ...)."""
@@ -312,6 +318,7 @@ class PhraseCache:
 # Streaming TTS orchestrator
 # ---------------------------------------------------------------------------
 
+
 class StreamingTTS:
     """Token stream -> sentences -> synth queue -> player callback.
 
@@ -321,10 +328,13 @@ class StreamingTTS:
     replies; measured, not guaranteed — depends on the provider).
     """
 
-    def __init__(self, provider: TTSProvider,
-                 on_audio: Callable[[AudioChunk], None],
-                 cache: Optional[PhraseCache] = None,
-                 max_queue: int = 8) -> None:
+    def __init__(
+        self,
+        provider: TTSProvider,
+        on_audio: Callable[[AudioChunk], None],
+        cache: Optional[PhraseCache] = None,
+        max_queue: int = 8,
+    ) -> None:
         self.provider = provider
         self.on_audio = on_audio
         self.cache = cache
@@ -333,8 +343,7 @@ class StreamingTTS:
         self.first_audio_latency_s: Optional[float] = None
         self._t0: float = 0.0
 
-    def speak_stream(self, tokens: Iterator[str],
-                     voice: Optional[str] = None) -> None:
+    def speak_stream(self, tokens: Iterator[str], voice: Optional[str] = None) -> None:
         """Consume tokens; synth+emit per sentence. Blocks until done."""
         self._t0 = time.monotonic()
         self.first_audio_latency_s = None
@@ -346,8 +355,7 @@ class StreamingTTS:
             data = self._cached_synth(text, voice)
             if data is None:
                 return
-            chunk = AudioChunk(data=data, index=idx, text=text,
-                               engine=self.provider.name)
+            chunk = AudioChunk(data=data, index=idx, text=text, engine=self.provider.name)
             idx += 1
             if self.first_audio_latency_s is None:
                 self.first_audio_latency_s = time.monotonic() - self._t0
@@ -390,6 +398,7 @@ def list_tts_engines() -> List[str]:
     # xtts registers itself on import (optional extra).
     try:
         import jarvis.voice.tts_xtts  # noqa: F401
+
         names.append("xtts")
     except ImportError:
         pass

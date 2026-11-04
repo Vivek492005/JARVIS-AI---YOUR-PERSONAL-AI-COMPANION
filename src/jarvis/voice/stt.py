@@ -60,13 +60,15 @@ class STTEngine(Protocol):
     @property
     def supports_streaming(self) -> bool: ...
 
-    def transcribe(self, audio: bytes, language: str = "hi-en",
-                   sample_rate: int = 16000) -> Transcription:
+    def transcribe(
+        self, audio: bytes, language: str = "hi-en", sample_rate: int = 16000
+    ) -> Transcription:
         """Batch transcription of one utterance."""
         ...
 
-    def stream(self, frames: Iterator[bytes], language: str = "hi-en",
-               sample_rate: int = 16000) -> Iterator[Transcription]:
+    def stream(
+        self, frames: Iterator[bytes], language: str = "hi-en", sample_rate: int = 16000
+    ) -> Iterator[Transcription]:
         """Yield partials (is_final=False), then exactly one final."""
         ...
 
@@ -78,8 +80,9 @@ class _BaseEngine:
     def supports_streaming(self) -> bool:
         return False
 
-    def stream(self, frames: Iterator[bytes], language: str = "hi-en",
-               sample_rate: int = 16000) -> Iterator[Transcription]:
+    def stream(
+        self, frames: Iterator[bytes], language: str = "hi-en", sample_rate: int = 16000
+    ) -> Iterator[Transcription]:
         audio = b"".join(frames)
         if audio:
             yield self.transcribe(audio, language, sample_rate)
@@ -101,9 +104,11 @@ class GoogleSTTEngine(_BaseEngine):
     name = "google"
     offline_capable = False
 
-    def transcribe(self, audio: bytes, language: str = "hi-en",
-                   sample_rate: int = 16000) -> Transcription:
+    def transcribe(
+        self, audio: bytes, language: str = "hi-en", sample_rate: int = 16000
+    ) -> Transcription:
         import speech_recognition as sr
+
         t0 = time.monotonic()
         rec = sr.Recognizer()
         wav = _pcm_to_wav(audio, sample_rate)
@@ -117,17 +122,22 @@ class GoogleSTTEngine(_BaseEngine):
         except Exception as e:
             logger.warning(f"Google STT failed: {e}")
             text = ""
-        return Transcription(text=text, confidence=0.8 if text else 0.0,
-                             latency_s=time.monotonic() - t0,
-                             language=language, engine=self.name)
+        return Transcription(
+            text=text,
+            confidence=0.8 if text else 0.0,
+            latency_s=time.monotonic() - t0,
+            language=language,
+            engine=self.name,
+        )
 
 
 class FasterWhisperEngine(_BaseEngine):
     """Local faster-whisper. ``model`` may be a size or a local path
     (e.g. a Hinglish-tuned checkpoint)."""
 
-    def __init__(self, model: str = "large-v3", device: str = "auto",
-                 compute_type: str = "int8") -> None:
+    def __init__(
+        self, model: str = "large-v3", device: str = "auto", compute_type: str = "int8"
+    ) -> None:
         self._model_name = model
         self._device = device
         self._compute_type = compute_type
@@ -153,29 +163,38 @@ class FasterWhisperEngine(_BaseEngine):
             device = self._device
             if device == "auto":
                 device = "cuda" if _cuda_available() else "cpu"
-            self._model = WhisperModel(self._model_name, device=device,
-                                       compute_type=self._compute_type)
+            self._model = WhisperModel(
+                self._model_name, device=device, compute_type=self._compute_type
+            )
         return self._model
 
-    def transcribe(self, audio: bytes, language: str = "hi-en",
-                   sample_rate: int = 16000) -> Transcription:
+    def transcribe(
+        self, audio: bytes, language: str = "hi-en", sample_rate: int = 16000
+    ) -> Transcription:
         import numpy as np
+
         t0 = time.monotonic()
         model = self._load()
         pcm = np.frombuffer(audio, dtype=np.int16).astype("float32") / 32768.0
         # faster-whisper takes file paths or arrays; feed float array.
-        segments, info = model.transcribe(pcm, language="hi" if language.startswith("hi") else "en",
-                                          vad_filter=True)
+        segments, info = model.transcribe(
+            pcm, language="hi" if language.startswith("hi") else "en", vad_filter=True
+        )
         text = " ".join(s.text.strip() for s in segments).strip()
         conf = float(info.language_probability) if info else 0.0
-        return Transcription(text=text, confidence=conf,
-                             latency_s=time.monotonic() - t0,
-                             language=language, engine=self.name)
+        return Transcription(
+            text=text,
+            confidence=conf,
+            latency_s=time.monotonic() - t0,
+            language=language,
+            engine=self.name,
+        )
 
 
 def _cuda_available() -> bool:
     try:
         import torch
+
         return torch.cuda.is_available()
     except ImportError:
         return False
@@ -184,14 +203,14 @@ def _cuda_available() -> bool:
 class _HttpEngine(_BaseEngine):
     """Shared bits for cloud HTTP STT APIs (key via secrets, never code)."""
 
-    def _post(self, url: str, headers: Dict[str, str], files=None,
-              data=None, timeout: float = 30.0) -> dict:
+    def _post(
+        self, url: str, headers: Dict[str, str], files=None, data=None, timeout: float = 30.0
+    ) -> dict:
         try:
             import httpx
         except ImportError as e:
             raise RuntimeError("httpx is not installed") from e
-        resp = httpx.post(url, headers=headers, files=files, data=data,
-                          timeout=timeout)
+        resp = httpx.post(url, headers=headers, files=files, data=data, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -210,13 +229,15 @@ class SarvamEngine(_HttpEngine):
         if self._api_key:
             return self._api_key
         from jarvis.core.secrets import get_secret
+
         key = get_secret("SARVAM_API_KEY")
         if not key:
             raise RuntimeError("SARVAM_API_KEY not set (secrets/env).")
         return key
 
-    def transcribe(self, audio: bytes, language: str = "hi-en",
-                   sample_rate: int = 16000) -> Transcription:
+    def transcribe(
+        self, audio: bytes, language: str = "hi-en", sample_rate: int = 16000
+    ) -> Transcription:
         t0 = time.monotonic()
         data = self._post(
             "https://api.sarvam.ai/speech-to-text",
@@ -225,9 +246,13 @@ class SarvamEngine(_HttpEngine):
             data={"language_code": "hi-IN", "model": "saaras:v2"},
         )
         text = data.get("transcript", "")
-        return Transcription(text=text, confidence=0.85 if text else 0.0,
-                             latency_s=time.monotonic() - t0,
-                             language=language, engine=self.name)
+        return Transcription(
+            text=text,
+            confidence=0.85 if text else 0.0,
+            latency_s=time.monotonic() - t0,
+            language=language,
+            engine=self.name,
+        )
 
 
 class DeepgramEngine(_HttpEngine):
@@ -243,13 +268,15 @@ class DeepgramEngine(_HttpEngine):
         if self._api_key:
             return self._api_key
         from jarvis.core.secrets import get_secret
+
         key = get_secret("DEEPGRAM_API_KEY")
         if not key:
             raise RuntimeError("DEEPGRAM_API_KEY not set (secrets/env).")
         return key
 
-    def transcribe(self, audio: bytes, language: str = "hi-en",
-                   sample_rate: int = 16000) -> Transcription:
+    def transcribe(
+        self, audio: bytes, language: str = "hi-en", sample_rate: int = 16000
+    ) -> Transcription:
         t0 = time.monotonic()
         try:
             import httpx
@@ -257,9 +284,10 @@ class DeepgramEngine(_HttpEngine):
             raise RuntimeError("httpx is not installed") from e
         resp = httpx.post(
             "https://api.deepgram.com/v1/listen?model=nova-3&language=multi",
-            headers={"Authorization": f"Token {self._key()}",
-                     "Content-Type": "audio/wav"},
-            content=_pcm_to_wav(audio, sample_rate), timeout=30.0)
+            headers={"Authorization": f"Token {self._key()}", "Content-Type": "audio/wav"},
+            content=_pcm_to_wav(audio, sample_rate),
+            timeout=30.0,
+        )
         resp.raise_for_status()
         data = resp.json()
         try:
@@ -267,9 +295,13 @@ class DeepgramEngine(_HttpEngine):
             text, conf = alt.get("transcript", ""), float(alt.get("confidence", 0.0))
         except (KeyError, IndexError):
             text, conf = "", 0.0
-        return Transcription(text=text, confidence=conf,
-                             latency_s=time.monotonic() - t0,
-                             language=language, engine=self.name)
+        return Transcription(
+            text=text,
+            confidence=conf,
+            latency_s=time.monotonic() - t0,
+            language=language,
+            engine=self.name,
+        )
 
 
 class ScribeEngine(_HttpEngine):
@@ -285,13 +317,15 @@ class ScribeEngine(_HttpEngine):
         if self._api_key:
             return self._api_key
         from jarvis.core.secrets import get_secret
+
         key = get_secret("ELEVENLABS_API_KEY")
         if not key:
             raise RuntimeError("ELEVENLABS_API_KEY not set (secrets/env).")
         return key
 
-    def transcribe(self, audio: bytes, language: str = "hi-en",
-                   sample_rate: int = 16000) -> Transcription:
+    def transcribe(
+        self, audio: bytes, language: str = "hi-en", sample_rate: int = 16000
+    ) -> Transcription:
         t0 = time.monotonic()
         data = self._post(
             "https://api.elevenlabs.io/v1/speech-to-text",
@@ -300,9 +334,13 @@ class ScribeEngine(_HttpEngine):
             data={"model_id": "scribe_v1"},
         )
         text = data.get("text", "")
-        return Transcription(text=text, confidence=0.85 if text else 0.0,
-                             latency_s=time.monotonic() - t0,
-                             language=language, engine=self.name)
+        return Transcription(
+            text=text,
+            confidence=0.85 if text else 0.0,
+            latency_s=time.monotonic() - t0,
+            language=language,
+            engine=self.name,
+        )
 
 
 # ---------------------------------------------------------------------------

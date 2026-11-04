@@ -13,24 +13,29 @@ _ROOT = os.path.dirname(_TEST_DIR)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from access_os.actions import run_action, execute_tool_raw
-from access_os.ai_agent import AIAgent
+from access_os.actions import run_action  # noqa: E402
+from access_os.ai_agent import AIAgent  # noqa: E402
 
 
 def test_notes_roundtrip(tmp_path, monkeypatch):
     # L1 (default autonomy): REVERSIBLE tools confirm instead of auto-run.
     monkeypatch.chdir(tmp_path)
-    v, r = run_action("manage_notes",
-                      {"action": "save", "content": "Discuss production deployment tomorrow at 10 AM"})
+    v, r = run_action(
+        "manage_notes",
+        {"action": "save", "content": "Discuss production deployment tomorrow at 10 AM"},
+    )
     assert v == "confirm"
 
     # L2: READ + REVERSIBLE auto-execute — the roundtrip works.
     monkeypatch.setenv("SAFETY__AUTONOMY_LEVEL", "2")
     from access_os.config import reset_settings_cache
+
     reset_settings_cache()
     try:
-        v, r = run_action("manage_notes",
-                          {"action": "save", "content": "Discuss production deployment tomorrow at 10 AM"})
+        v, r = run_action(
+            "manage_notes",
+            {"action": "save", "content": "Discuss production deployment tomorrow at 10 AM"},
+        )
         assert v == "allow"
         assert "saved" in r.lower()
 

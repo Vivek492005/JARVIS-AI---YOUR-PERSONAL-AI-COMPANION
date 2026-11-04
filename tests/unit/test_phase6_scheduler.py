@@ -5,7 +5,10 @@ from datetime import datetime, timedelta
 import pytest
 
 from jarvis.integrations.scheduler import (
-    CronSpec, Job, Scheduler, _cron_matches,
+    CronSpec,
+    Job,
+    Scheduler,
+    _cron_matches,
 )
 
 
@@ -37,7 +40,7 @@ def test_job_due_cron_fires_once_per_minute():
     now = dt(mi=5)
     assert job.due(now) is True
     job.last_run = now
-    assert job.due(now) is False                      # same minute: no refire
+    assert job.due(now) is False  # same minute: no refire
     assert job.due(now + timedelta(minutes=1)) is True
 
 
@@ -52,11 +55,12 @@ def test_job_due_every_and_at():
     assert job2.due(dt(h=12)) is False
     assert job2.due(dt(h=13)) is True
     job2.last_run = dt(h=13)
-    assert job2.due(dt(h=14)) is False                 # one-shot
+    assert job2.due(dt(h=14)) is False  # one-shot
 
 
 def test_scheduler_runs_read_tool_silently(monkeypatch):
     from jarvis.tools import actions as actmod
+
     calls = []
 
     def fake_run(tool, args):
@@ -66,8 +70,7 @@ def test_scheduler_runs_read_tool_silently(monkeypatch):
     monkeypatch.setattr(actmod, "run_action", fake_run)
     notes = []
     sched = Scheduler(notify=notes.append)
-    sched.add_job(Job(id="j", name="n", tool="calendar_list",
-                      every_s=10))
+    sched.add_job(Job(id="j", name="n", tool="calendar_list", every_s=10))
     sched.tick(dt())
     assert calls == [("calendar_list", {})]
     assert notes == []
@@ -75,17 +78,23 @@ def test_scheduler_runs_read_tool_silently(monkeypatch):
 
 def test_scheduler_never_silently_runs_above_read(monkeypatch):
     from jarvis.tools import actions as actmod
+
     calls = []
-    monkeypatch.setattr(actmod, "run_action",
-                        lambda t, a: calls.append(t) or ("allow", "x"))
+    monkeypatch.setattr(actmod, "run_action", lambda t, a: calls.append(t) or ("allow", "x"))
     notes = []
     sched = Scheduler(notify=notes.append)
     # mail_send is DESTRUCTIVE
-    sched.add_job(Job(id="j", name="evil", tool="mail_send",
-                      args={"to": "a", "subject": "s", "body": "b"},
-                      every_s=10))
+    sched.add_job(
+        Job(
+            id="j",
+            name="evil",
+            tool="mail_send",
+            args={"to": "a", "subject": "s", "body": "b"},
+            every_s=10,
+        )
+    )
     sched.tick(dt())
-    assert calls == []                                 # NOT executed
+    assert calls == []  # NOT executed
     assert len(notes) == 1 and "Confirm" in notes[0].body
 
 
@@ -99,8 +108,8 @@ def test_scheduler_unknown_tool_notifies():
 
 def test_scheduler_blocked_verdict_notifies(monkeypatch):
     from jarvis.tools import actions as actmod
-    monkeypatch.setattr(actmod, "run_action",
-                        lambda t, a: ("deny", "Blocked for safety: x"))
+
+    monkeypatch.setattr(actmod, "run_action", lambda t, a: ("deny", "Blocked for safety: x"))
     notes = []
     sched = Scheduler(notify=notes.append)
     sched.add_job(Job(id="j", name="n", tool="calendar_list", every_s=10))
@@ -115,13 +124,11 @@ def test_file_watch_triggers_on_change(tmp_path):
     p.write_text("v1")
     fired = []
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(Scheduler, "_fire",
-                        lambda self, job, now: fired.append(job.id))
+    monkeypatch.setattr(Scheduler, "_fire", lambda self, job, now: fired.append(job.id))
     try:
-        sched.add_job(Job(id="w", name="watch", tool="calendar_list",
-                          watch_file=str(p)))
+        sched.add_job(Job(id="w", name="watch", tool="calendar_list", watch_file=str(p)))
         sched.tick(dt())
-        assert fired == []                             # baseline hash only
+        assert fired == []  # baseline hash only
         p.write_text("v2")
         sched.tick(dt())
         assert fired == ["w"]

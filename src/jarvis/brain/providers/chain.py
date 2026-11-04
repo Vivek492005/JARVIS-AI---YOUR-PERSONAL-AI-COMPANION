@@ -42,16 +42,18 @@ class ChainResult:
 class ProviderChain:
     """Ordered providers with resilience policy."""
 
-    def __init__(self,
-                 providers: List[LLMProvider],
-                 local_provider: Optional[LLMProvider] = None,
-                 on_degraded: Optional[Callable[[str], None]] = None,
-                 max_retries: int = 2,
-                 base_backoff_s: float = 0.5,
-                 max_failures: int = 5,
-                 cooldown_s: float = 60.0,
-                 sleep: Callable[[float], None] = time.sleep,
-                 rng: Optional[random.Random] = None) -> None:
+    def __init__(
+        self,
+        providers: List[LLMProvider],
+        local_provider: Optional[LLMProvider] = None,
+        on_degraded: Optional[Callable[[str], None]] = None,
+        max_retries: int = 2,
+        base_backoff_s: float = 0.5,
+        max_failures: int = 5,
+        cooldown_s: float = 60.0,
+        sleep: Callable[[float], None] = time.sleep,
+        rng: Optional[random.Random] = None,
+    ) -> None:
         self._providers = list(providers)
         self._local = local_provider
         self._on_degraded = on_degraded
@@ -61,8 +63,7 @@ class ProviderChain:
         # Jitter only — not cryptographic; stdlib random is fine.
         self._rng = rng or random.Random()  # noqa: S311
         self._breakers: Dict[str, CircuitBreaker] = {
-            p.name: CircuitBreaker(max_failures=max_failures,
-                                   cooldown_s=cooldown_s)
+            p.name: CircuitBreaker(max_failures=max_failures, cooldown_s=cooldown_s)
             for p in providers
         }
 
@@ -81,62 +82,68 @@ class ProviderChain:
 
     def _backoff(self, attempt: int) -> float:
         # Exponential backoff + jitter: 0.5, 1.0, 2.0 … + up to 250 ms.
-        return self._base_backoff * (2 ** attempt) + self._rng.uniform(0, 0.25)
+        return self._base_backoff * (2**attempt) + self._rng.uniform(0, 0.25)
 
-    def complete(self, messages: List[Dict[str, Any]],
-                 tools: Optional[List[Dict[str, Any]]] = None,
-                 temperature: float = 0.3) -> ChainResult:
+    def complete(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.3,
+    ) -> ChainResult:
         notices: List[str] = []
         fell_back = False
 
         for provider in self._providers:
             breaker = self._breakers[provider.name]
             if not breaker.allow():
-                logger.debug("provider chain: skipping %s (circuit open)",
-                             provider.name)
+                logger.debug("provider chain: skipping %s (circuit open)", provider.name)
                 continue
             attempt = 0
             while True:
                 try:
-                    comp = provider.complete(messages, tools=tools,
-                                             temperature=temperature)
+                    comp = provider.complete(messages, tools=tools, temperature=temperature)
                 except QuotaExhaustedError:
                     # Quota wall: retrying is pointless — next provider.
                     breaker.record_failure()
-                    self._notice(f"{provider.name}: quota exhausted — "
-                                 f"switching provider", notices)
+                    self._notice(f"{provider.name}: quota exhausted — switching provider", notices)
                     fell_back = True
                     break
                 except Exception as e:
                     if attempt < self._max_retries:
                         delay = self._backoff(attempt)
-                        logger.debug("provider chain: %s failed (attempt %d), "
-                                     "retrying in %.2fs: %s",
-                                     provider.name, attempt + 1, delay, e)
+                        logger.debug(
+                            "provider chain: %s failed (attempt %d), retrying in %.2fs: %s",
+                            provider.name,
+                            attempt + 1,
+                            delay,
+                            e,
+                        )
                         self._sleep(delay)
                         attempt += 1
                         continue
                     breaker.record_failure()
-                    self._notice(f"{provider.name} unreachable ({e}) — "
-                                 f"switching provider", notices)
+                    self._notice(f"{provider.name} unreachable ({e}) — switching provider", notices)
                     fell_back = True
                     break
                 breaker.record_success()
-                return ChainResult(completion=comp, degraded=fell_back,
-                                   notices=notices,
-                                   provider_name=provider.name)
+                return ChainResult(
+                    completion=comp,
+                    degraded=fell_back,
+                    notices=notices,
+                    provider_name=provider.name,
+                )
 
         # Every cloud provider exhausted → honest local mode.
         if self._local is not None:
-            self._notice("Cloud brain unreachable — local mode "
-                         "(limited capabilities, no cloud LLM)", notices)
-            comp = self._local.complete(messages, tools=tools,
-                                        temperature=temperature)
+            self._notice(
+                "Cloud brain unreachable — local mode (limited capabilities, no cloud LLM)", notices
+            )
+            comp = self._local.complete(messages, tools=tools, temperature=temperature)
             comp.provider = self._local.name
-            return ChainResult(completion=comp, degraded=True,
-                               notices=notices,
-                               provider_name=self._local.name)
+            return ChainResult(
+                completion=comp, degraded=True, notices=notices, provider_name=self._local.name
+            )
 
         raise ProviderError(
-            f"all providers failed: {', '.join(self.provider_names)}; "
-            f"notices: {'; '.join(notices)}")
+            f"all providers failed: {', '.join(self.provider_names)}; notices: {'; '.join(notices)}"
+        )

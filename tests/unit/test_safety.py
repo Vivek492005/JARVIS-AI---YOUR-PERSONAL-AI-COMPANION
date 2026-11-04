@@ -5,8 +5,7 @@ import time
 from unittest import mock
 from unittest.mock import MagicMock
 
-for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip",
-             "fuzzywuzzy"):
+for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip", "fuzzywuzzy"):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 sys.modules["fuzzywuzzy"].fuzz = MagicMock()
 
@@ -23,6 +22,7 @@ from access_os.safety import (  # noqa: E402
 # ---------------------------------------------------------------------------
 # Kill switch
 # ---------------------------------------------------------------------------
+
 
 def test_kill_switch_trigger_and_callbacks():
     ks = KillSwitch()
@@ -48,6 +48,7 @@ def test_kill_switch_hotkey_graceful_without_package():
 # Rate limiter
 # ---------------------------------------------------------------------------
 
+
 def test_rate_limiter_budget():
     rl = RateLimiter(max_calls=3, window_s=60)
     assert rl.allow() and rl.allow() and rl.allow()
@@ -61,8 +62,7 @@ def test_rate_limiter_window_slides():
     rl = RateLimiter(max_calls=1, window_s=60)
     assert rl.allow()
     assert not rl.allow()
-    with mock.patch("access_os.safety.time.time",
-                    return_value=time.time() + 61):
+    with mock.patch("access_os.safety.time.time", return_value=time.time() + 61):
         assert not rl.over_budget()
         assert rl.allow()
 
@@ -70,6 +70,7 @@ def test_rate_limiter_window_slides():
 # ---------------------------------------------------------------------------
 # Circuit breaker
 # ---------------------------------------------------------------------------
+
 
 def test_breaker_trips_and_recovers():
     cb = CircuitBreaker(max_failures=3, cooldown_s=60)
@@ -88,8 +89,7 @@ def test_breaker_half_open_after_cooldown():
     cb = CircuitBreaker(max_failures=1, cooldown_s=60)
     cb.record_failure()
     assert cb.state == "open"
-    with mock.patch("access_os.safety.time.time",
-                    return_value=time.time() + 61):
+    with mock.patch("access_os.safety.time.time", return_value=time.time() + 61):
         assert cb.state == "half_open"
         assert cb.allow()
         cb.record_success()
@@ -100,14 +100,15 @@ def test_breaker_half_open_after_cooldown():
 # Stop words
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("w", ["stop", "Stop.", "ruko", "RUK JAO", "bas",
-                               "bas karo", "cancel", "chup"])
+
+@pytest.mark.parametrize(
+    "w", ["stop", "Stop.", "ruko", "RUK JAO", "bas", "bas karo", "cancel", "chup"]
+)
 def test_stop_words_match(w):
     assert is_stop_command(w)
 
 
-@pytest.mark.parametrize("w", ["stop the music", "unstoppable", "",
-                               "please continue", "desktop"])
+@pytest.mark.parametrize("w", ["stop the music", "unstoppable", "", "please continue", "desktop"])
 def test_stop_words_no_false_positive(w):
     assert not is_stop_command(w)
 
@@ -116,18 +117,19 @@ def test_stop_words_no_false_positive(w):
 # Agent wiring
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def agent(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     from access_os.ai_agent import AIAgent
+
     a = AIAgent()
     a._rate_limiter = RateLimiter(max_calls=2, window_s=60)
     return a
 
 
 def test_agent_rate_limit_trips(agent):
-    with mock.patch.object(agent, "_execute_tool",
-                           return_value="ok"):
+    with mock.patch.object(agent, "_execute_tool", return_value="ok"):
         agent._dispatch_tool_call("web_search", {"query": "a"})
         agent._dispatch_tool_call("web_search", {"query": "b"})
         assert agent.rate_limited is False
@@ -136,9 +138,9 @@ def test_agent_rate_limit_trips(agent):
     assert "Rate limit exceeded" in resp
     # policy engine DENYs non-READ while the flag is set
     from access_os.policy import PolicyContext, decide_tool_call, Decision
+
     ctx = PolicyContext(rate_limited=agent.rate_limited)
-    d, _ = decide_tool_call("open_application", {"app_name": "x"}, ctx,
-                            level=3)
+    d, _ = decide_tool_call("open_application", {"app_name": "x"}, ctx, level=3)
     assert d == Decision.DENY
 
 
@@ -151,8 +153,7 @@ def test_agent_breaker_open_pauses_tools(agent):
 
 def test_agent_breaker_counts_crashes(agent):
     agent._rate_limiter = RateLimiter(max_calls=100, window_s=60)
-    with mock.patch.object(agent, "_execute_tool",
-                           side_effect=RuntimeError("boom")):
+    with mock.patch.object(agent, "_execute_tool", side_effect=RuntimeError("boom")):
         for _ in range(5):
             agent._dispatch_tool_call("web_search", {"query": "x"})
     assert agent._breaker.state == "open"

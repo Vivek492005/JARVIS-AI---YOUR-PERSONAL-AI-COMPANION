@@ -25,8 +25,7 @@ class Lesson:
     context: str = ""
 
 
-_LESSON_RE = re.compile(
-    r"(?i)(?:lesson|seekha|seekh)\s*:\s*(.+?)(?:\s*->\s*|\s*[;|]\s*)(.+)$")
+_LESSON_RE = re.compile(r"(?i)(?:lesson|seekha|seekh)\s*:\s*(.+?)(?:\s*->\s*|\s*[;|]\s*)(.+)$")
 
 
 def parse_lesson(text: str) -> Optional[Lesson]:
@@ -43,18 +42,18 @@ class Reflector:
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
 
-    def record_failure(self, tool: str, evidence: str,
-                       lesson_text: str = "") -> Optional[int]:
+    def record_failure(self, tool: str, evidence: str, lesson_text: str = "") -> Optional[int]:
         """Store a failure episode + optional lesson. Returns lesson ep id."""
-        self.store.add_episode("system", f"FAILED: {tool}: {evidence}",
-                               tool=tool, outcome="failed")
+        self.store.add_episode("system", f"FAILED: {tool}: {evidence}", tool=tool, outcome="failed")
         lesson = parse_lesson(lesson_text)
         if lesson is None:
             return None
         eid = self.store.add_episode(
             "system",
             f"LESSON: {lesson.what_failed} -> {lesson.what_to_do}",
-            tool=tool, outcome="lesson")
+            tool=tool,
+            outcome="lesson",
+        )
         logger.info("recorded lesson for %s", tool)
         return eid
 
@@ -70,7 +69,7 @@ class Reflector:
             text = ep["text"] or ""
             if not text.startswith("LESSON:"):
                 continue
-            body = text[len("LESSON:"):].strip()
+            body = text[len("LESSON:") :].strip()
             if body and body not in seen:
                 seen.add(body)
                 proposals.append(f"Seekha gaya: {body}")

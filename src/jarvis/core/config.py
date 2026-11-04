@@ -101,8 +101,7 @@ class VoiceCfg(BaseModel):
 
 class BrainCfg(BaseModel):
     ai_provider: str = "huggingface"
-    provider_chain: List[str] = Field(
-        default_factory=lambda: ["huggingface", "deepseek", "local"])
+    provider_chain: List[str] = Field(default_factory=lambda: ["huggingface", "deepseek", "local"])
     hf_model: str = "Qwen/Qwen2.5-72B-Instruct"
     deepseek_model: str = "deepseek-chat"
     temperature: float = 0.3
@@ -158,10 +157,10 @@ class PrivacyCfg(BaseModel):
     crash_upload_url: str = ""
     # Task 1.10: per-provider egress toggles. Privacy Mode forces every
     # cloud call off regardless of these.
-    allow_huggingface: bool = True   # chat text -> HF router (Qwen)
-    allow_deepseek: bool = True      # chat text -> DeepSeek
-    allow_rumik_tts: bool = True     # TTS text -> Rumik API
-    allow_google_stt: bool = True    # mic audio -> Google Speech Recognition
+    allow_huggingface: bool = True  # chat text -> HF router (Qwen)
+    allow_deepseek: bool = True  # chat text -> DeepSeek
+    allow_rumik_tts: bool = True  # TTS text -> Rumik API
+    allow_google_stt: bool = True  # mic audio -> Google Speech Recognition
 
 
 class Settings(BaseSettings):
@@ -263,14 +262,15 @@ def get_settings() -> Settings:
     # (best-effort; env/.env already handled by pydantic-settings).
     try:
         from jarvis.core.secrets import get_secret
+
         if not s.huggingface_api_key:
             s.huggingface_api_key = get_secret("HUGGINGFACE_API_KEY")
         if not s.deepseek_api_key:
             s.deepseek_api_key = get_secret("DEEPSEEK_API_KEY")
         if not s.rumik_api_key:
             s.rumik_api_key = get_secret("RUMIK_API_KEY")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("keyring secret read best-effort failed: %s", e)
     return s
 
 
@@ -345,8 +345,9 @@ def _write_settings_toml(settings: Settings, path: str = SETTINGS_FILE) -> None:
     Path(path).write_text("\n".join(lines), encoding="utf-8")
 
 
-def migrate_legacy_voice_config(legacy_path: str = "voice_config.json",
-                                dest: str = SETTINGS_FILE) -> bool:
+def migrate_legacy_voice_config(
+    legacy_path: str = "voice_config.json", dest: str = SETTINGS_FILE
+) -> bool:
     """One-time migration: legacy voice_config.json -> settings.toml.
 
     Runs only when ``dest`` does not exist yet and the legacy file does.
@@ -370,8 +371,7 @@ def migrate_legacy_voice_config(legacy_path: str = "voice_config.json",
         settings = Settings()
     _write_settings_toml(settings, dest)
     reset_settings_cache()
-    logger.info(f"Migrated legacy {legacy_path} -> {dest}; "
-                f"{legacy_path} is now ignored.")
+    logger.info(f"Migrated legacy {legacy_path} -> {dest}; {legacy_path} is now ignored.")
     return True
 
 

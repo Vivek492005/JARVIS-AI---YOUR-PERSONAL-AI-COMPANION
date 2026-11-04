@@ -59,12 +59,15 @@ def test_chat_html_never_inlines_unescaped_model_output(monkeypatch):
     h = {"Authorization": "Bearer sekrit"}
     js = c.get("/hud/chat.js", headers=h).text
     assert "escapeHtml" in js
-    assert "innerHTML = renderMarkdown" in js or "innerHTML=renderMarkdown" in js \
-        or 'bubble.innerHTML = renderMarkdown' in js
+    assert (
+        "innerHTML = renderMarkdown" in js
+        or "innerHTML=renderMarkdown" in js
+        or "bubble.innerHTML = renderMarkdown" in js
+    )
 
 
 def test_interrupt_calls_service(monkeypatch):
-    c = _make_client(monkeypatch)
+    _make_client(monkeypatch)
     h = {"Authorization": "Bearer sekrit"}
     # reach back to the mock service via the app is awkward; instead build
     # with an explicit mock and assert on it.
@@ -98,8 +101,7 @@ def _fake_tray_modules(monkeypatch):
     created = {}
 
     class FakeTray:
-        def __init__(self, backend=None, on_show=None, on_summon=None,
-                     on_quit=None):
+        def __init__(self, backend=None, on_show=None, on_summon=None, on_quit=None):
             created["tray"] = self
             self.on_show = on_show
             self.on_summon = on_summon

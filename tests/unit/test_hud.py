@@ -142,11 +142,11 @@ def test_snapshot_structure():
 
 
 def test_states_constant_matches_spec():
-    assert set(STATES) == {"idle", "listening", "thinking",
-                           "speaking", "confirming", "error"}
+    assert set(STATES) == {"idle", "listening", "thinking", "speaking", "confirming", "error"}
 
 
 # --- server routes ------------------------------------------------------
+
 
 def _make_client(monkeypatch):
     pytest.importorskip("fastapi")
@@ -177,11 +177,13 @@ def test_hud_serves_index_and_assets(monkeypatch):
     assert r.status_code == 200
     assert "JARVIS HUD" in r.text
     assert r.headers["content-type"].startswith("text/html")
-    for name, ctype in [("styles.css", "text/css"),
-                        ("app.js", "text/javascript"),
-                        ("control.html", "text/html"),
-                        ("manifest.json", "application/manifest+json"),
-                        ("sw.js", "text/javascript")]:
+    for name, ctype in [
+        ("styles.css", "text/css"),
+        ("app.js", "text/javascript"),
+        ("control.html", "text/html"),
+        ("manifest.json", "application/manifest+json"),
+        ("sw.js", "text/javascript"),
+    ]:
         r = c.get(f"/hud/{name}", headers=h)
         assert r.status_code == 200, name
         assert r.headers["content-type"].startswith(ctype), name

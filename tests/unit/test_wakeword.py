@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +11,6 @@ sys.path.insert(0, "src")
 
 from jarvis.voice.wakeword import (  # noqa: E402
     DummyWakeBackend,
-    WakeConfig,
     WakeWordEngine,
 )
 
@@ -59,6 +57,7 @@ def test_ducking_raises_effective_threshold():
 
 def test_backends_raise_helpful_errors_without_deps(monkeypatch):
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -68,6 +67,7 @@ def test_backends_raise_helpful_errors_without_deps(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     from jarvis.voice.wakeword import OpenWakeWordBackend, PorcupineBackend
+
     try:
         OpenWakeWordBackend()
         raise AssertionError("should have raised")
@@ -82,5 +82,6 @@ def test_backends_raise_helpful_errors_without_deps(monkeypatch):
 
 def test_porcupine_needs_key():
     from jarvis.voice.wakeword import PorcupineBackend
+
     with pytest.raises(RuntimeError, match="access key"):
         PorcupineBackend(access_key="")

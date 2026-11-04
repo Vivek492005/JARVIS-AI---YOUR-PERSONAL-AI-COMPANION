@@ -56,8 +56,9 @@ class RingBuffer:
     moment VAD fires so the utterance starts *before* the trigger frame.
     """
 
-    def __init__(self, sample_rate: int = SAMPLE_RATE, capacity_s: float = 1.5,
-                 frame_ms: int = 20) -> None:
+    def __init__(
+        self, sample_rate: int = SAMPLE_RATE, capacity_s: float = 1.5, frame_ms: int = 20
+    ) -> None:
         self.frame_bytes = int(sample_rate * SAMPLE_WIDTH * CHANNELS * frame_ms / 1000)
         max_frames = max(1, int(capacity_s * 1000 / frame_ms))
         self._buf: Deque[bytes] = collections.deque(maxlen=max_frames)
@@ -98,11 +99,14 @@ def list_input_devices() -> List[AudioDevice]:
     try:
         for i, d in enumerate(sd.query_devices()):
             if d.get("max_input_channels", 0) > 0:
-                devices.append(AudioDevice(
-                    index=i, name=str(d.get("name", f"device-{i}")),
-                    max_input_channels=int(d["max_input_channels"]),
-                    default_samplerate=float(d.get("default_samplerate", SAMPLE_RATE)),
-                ))
+                devices.append(
+                    AudioDevice(
+                        index=i,
+                        name=str(d.get("name", f"device-{i}")),
+                        max_input_channels=int(d["max_input_channels"]),
+                        default_samplerate=float(d.get("default_samplerate", SAMPLE_RATE)),
+                    )
+                )
     except Exception as e:  # PortAudio missing etc.
         logger.warning(f"Could not query audio devices: {e}")
     return devices
@@ -111,8 +115,9 @@ def list_input_devices() -> List[AudioDevice]:
 class SoundDeviceSource:
     """Live mic via sounddevice. Lazy import; raises RuntimeError if missing."""
 
-    def __init__(self, device: Optional[int] = None,
-                 sample_rate: int = SAMPLE_RATE, frame_ms: int = 20) -> None:
+    def __init__(
+        self, device: Optional[int] = None, sample_rate: int = SAMPLE_RATE, frame_ms: int = 20
+    ) -> None:
         try:
             import sounddevice as sd
         except ImportError as e:
@@ -125,8 +130,11 @@ class SoundDeviceSource:
         self.frame_bytes = int(sample_rate * SAMPLE_WIDTH * CHANNELS * frame_ms / 1000)
         self._frames: "queue.Queue[Optional[bytes]]" = queue.Queue(maxsize=200)
         self._stream = sd.InputStream(
-            device=device, channels=CHANNELS, samplerate=sample_rate,
-            dtype="int16", blocksize=self.frame_bytes // 2,
+            device=device,
+            channels=CHANNELS,
+            samplerate=sample_rate,
+            dtype="int16",
+            blocksize=self.frame_bytes // 2,
             callback=self._callback,
         )
 
@@ -212,10 +220,14 @@ class AudioCapture:
         cap.stop()
     """
 
-    def __init__(self, source: AudioSource,
-                 frame_ms: int = 20, preroll_s: float = 1.5,
-                 echo_guard: Optional[EchoGuard] = None,
-                 on_frame: Optional[Callable[[bytes], None]] = None) -> None:
+    def __init__(
+        self,
+        source: AudioSource,
+        frame_ms: int = 20,
+        preroll_s: float = 1.5,
+        echo_guard: Optional[EchoGuard] = None,
+        on_frame: Optional[Callable[[bytes], None]] = None,
+    ) -> None:
         self.source = source
         self.ring = RingBuffer(source.sample_rate, preroll_s, frame_ms)
         self.echo_guard = echo_guard or EchoGuard()
@@ -227,8 +239,7 @@ class AudioCapture:
         if hasattr(self.source, "start"):
             self.source.start()  # type: ignore[attr-defined]
         self._running.set()
-        self._thread = threading.Thread(target=self._pump, daemon=True,
-                                        name="audio-capture")
+        self._thread = threading.Thread(target=self._pump, daemon=True, name="audio-capture")
         self._thread.start()
 
     def _pump(self) -> None:
@@ -259,6 +270,7 @@ class AudioCapture:
 # jarvis doctor integration
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AudioCheck:
     ok: bool
@@ -271,6 +283,7 @@ def check_audio() -> AudioCheck:
     devices = list_input_devices()
     try:
         import sounddevice  # noqa: F401
+
         has_sd = True
     except ImportError:
         has_sd = False

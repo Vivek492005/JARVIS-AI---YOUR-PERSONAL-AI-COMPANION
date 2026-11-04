@@ -28,7 +28,7 @@ class Decision(Enum):
 #   L0: ask for everything · L1 (default): READ auto · L2: READ+REVERSIBLE auto
 #   L3: DESTRUCTIVE auto too — SYSTEM always confirms, no exceptions.
 AUTO_UP_TO = {
-    0: Risk.READ - 1,      # nothing is auto (READ=0 > -1)
+    0: Risk.READ - 1,  # nothing is auto (READ=0 > -1)
     1: Risk.READ,
     2: Risk.REVERSIBLE,
     3: Risk.DESTRUCTIVE,
@@ -38,13 +38,14 @@ AUTO_UP_TO = {
 @dataclass
 class PolicyContext:
     """Everything about the current turn that affects the decision."""
-    tainted: bool = False          # untrusted content in context (Task 1.5)
-    rate_limited: bool = False     # set by the Task 1.8 rate limiter
+
+    tainted: bool = False  # untrusted content in context (Task 1.5)
+    rate_limited: bool = False  # set by the Task 1.8 rate limiter
     provenance: Dict[str, str] = field(default_factory=dict)  # arg -> source
-    remote: bool = False           # came from Telegram remote (Task 6.5)
+    remote: bool = False  # came from Telegram remote (Task 6.5)
     remote_system_tools: bool = False  # explicit opt-in for SYSTEM remotely
-    safe_mode: bool = False       # Task 8.3: `jarvis --safe` — READ only
-    offline: bool = False         # Task 8.3: deny tools with "network" scope
+    safe_mode: bool = False  # Task 8.3: `jarvis --safe` — READ only
+    offline: bool = False  # Task 8.3: deny tools with "network" scope
 
 
 def context_from_settings() -> "PolicyContext":
@@ -54,9 +55,9 @@ def context_from_settings() -> "PolicyContext":
     """
     try:
         from jarvis.core.config import get_settings
+
         s = get_settings()
-        return PolicyContext(safe_mode=s.safety.safe_mode,
-                             offline=s.privacy.offline)
+        return PolicyContext(safe_mode=s.safety.safe_mode, offline=s.privacy.offline)
     except Exception:
         return PolicyContext()
 
@@ -65,15 +66,44 @@ def context_from_settings() -> "PolicyContext":
 # A confirmation is only valid as the user's *own* next turn / GUI click —
 # never from ambient audio (see THREAT_MODEL.md).
 
-CONFIRM_YES = frozenset({
-    "haan", "ha", "han", "yes", "yeah", "yep", "confirm", "confirmed",
-    "haan kar de", "kar do", "kar de", "ok", "okay", "do it", "go ahead",
-    "sure", "thik hai", "theek hai",
-})
-CONFIRM_NO = frozenset({
-    "nahi", "nahin", "na", "no", "nope", "ruko", "ruk", "cancel", "stop",
-    "mat karo", "rehn do", "rehen do",
-})
+CONFIRM_YES = frozenset(
+    {
+        "haan",
+        "ha",
+        "han",
+        "yes",
+        "yeah",
+        "yep",
+        "confirm",
+        "confirmed",
+        "haan kar de",
+        "kar do",
+        "kar de",
+        "ok",
+        "okay",
+        "do it",
+        "go ahead",
+        "sure",
+        "thik hai",
+        "theek hai",
+    }
+)
+CONFIRM_NO = frozenset(
+    {
+        "nahi",
+        "nahin",
+        "na",
+        "no",
+        "nope",
+        "ruko",
+        "ruk",
+        "cancel",
+        "stop",
+        "mat karo",
+        "rehn do",
+        "rehen do",
+    }
+)
 
 #: Unanswered confirmations fail closed after this many seconds.
 CONFIRM_TIMEOUT_S = 10.0
@@ -94,9 +124,9 @@ def decide(spec: ToolSpec, ctx: PolicyContext, level: int) -> Decision:
         # default (fail-closed); explicit opt-in restores CONFIRM.
         if ctx.remote and not ctx.remote_system_tools:
             return Decision.DENY
-        return Decision.CONFIRM                       # always
+        return Decision.CONFIRM  # always
     if ctx.tainted and spec.risk > Risk.READ:
-        return Decision.CONFIRM                       # Task 1.5
+        return Decision.CONFIRM  # Task 1.5
     if ctx.rate_limited:
         return Decision.DENY
     auto_up_to = AUTO_UP_TO.get(level, Risk.READ)
@@ -107,13 +137,10 @@ def _stricter(a: Decision, b: Decision) -> Decision:
     return a if a.value >= b.value else b
 
 
-_CP_TO_DECISION = {"allow": Decision.ALLOW,
-                   "confirm": Decision.CONFIRM,
-                   "deny": Decision.DENY}
+_CP_TO_DECISION = {"allow": Decision.ALLOW, "confirm": Decision.CONFIRM, "deny": Decision.DENY}
 
 
-def describe_action(tool_name: str, args: Dict[str, Any],
-                    spec: Optional[ToolSpec]) -> str:
+def describe_action(tool_name: str, args: Dict[str, Any], spec: Optional[ToolSpec]) -> str:
     """Exact action + arguments for the confirmation prompt (Task 1.3.5).
 
     Never a vague 'delete files' — always what + where + how many.
@@ -121,12 +148,15 @@ def describe_action(tool_name: str, args: Dict[str, Any],
     args = args or {}
     if tool_name == "system_control":
         action = args.get("action", "?")
-        detail = {"empty_recycle_bin": "permanently empty the Recycle Bin",
-                  "lock_pc": "lock the workstation"}.get(action, action)
+        detail = {
+            "empty_recycle_bin": "permanently empty the Recycle Bin",
+            "lock_pc": "lock the workstation",
+        }.get(action, action)
         return f"system action: {detail}"
     if tool_name == "manage_notes":
         return f"notes: {args.get('action', '?')}" + (
-            f" ({len(args.get('content') or '')} chars)" if args.get("action") == "save" else "")
+            f" ({len(args.get('content') or '')} chars)" if args.get("action") == "save" else ""
+        )
     if tool_name == "run_powershell_command":
         return f"run PowerShell: {args.get('command', '?')}"
     if tool_name == "keyboard_mouse_action":
@@ -141,9 +171,12 @@ def describe_action(tool_name: str, args: Dict[str, Any],
     return f"{tool_name} {str(args)[:120]}"
 
 
-def decide_tool_call(tool_name: str, args: Optional[Dict[str, Any]],
-                     ctx: Optional[PolicyContext] = None,
-                     level: int = 1) -> Tuple[Decision, str]:
+def decide_tool_call(
+    tool_name: str,
+    args: Optional[Dict[str, Any]],
+    ctx: Optional[PolicyContext] = None,
+    level: int = 1,
+) -> Tuple[Decision, str]:
     """Full decision for one tool call: registry tier × arg rules.
 
     Returns (Decision, reason). Unknown tools are DENY (fail-closed).
@@ -169,22 +202,30 @@ def decide_tool_call(tool_name: str, args: Optional[Dict[str, Any]],
 
     final = _stricter(tier_decision, arg_decision)
     if final == Decision.DENY:
-        reason = cp_reason if arg_decision == Decision.DENY else \
-            f"{describe_action(tool_name, args, spec)} is not allowed."
+        reason = (
+            cp_reason
+            if arg_decision == Decision.DENY
+            else f"{describe_action(tool_name, args, spec)} is not allowed."
+        )
     elif final == Decision.CONFIRM:
         if arg_decision == Decision.CONFIRM:
             reason = cp_reason  # e.g. "destructive action needs confirmation"
         else:
-            reason = (f"{describe_action(tool_name, args, spec)} needs "
-                      f"confirmation (risk {spec.risk.name}, autonomy L{level}).")
+            reason = (
+                f"{describe_action(tool_name, args, spec)} needs "
+                f"confirmation (risk {spec.risk.name}, autonomy L{level})."
+            )
     else:
         reason = "allowed"
     return final, reason
 
 
-def confirmation_question(tool_name: str, args: Optional[Dict[str, Any]],
-                          spec: Optional[ToolSpec] = None,
-                          tainted_args: bool = False) -> str:
+def confirmation_question(
+    tool_name: str,
+    args: Optional[Dict[str, Any]],
+    spec: Optional[ToolSpec] = None,
+    tainted_args: bool = False,
+) -> str:
     """The spoken/GUI confirmation prompt: exact action + args."""
     q = f"{describe_action(tool_name, args or {}, spec)} — kar doon? (haan / nahi)"
     if tainted_args:

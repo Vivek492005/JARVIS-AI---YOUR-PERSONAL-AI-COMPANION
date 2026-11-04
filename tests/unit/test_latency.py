@@ -50,7 +50,7 @@ def test_latency_summary_from_csv(tmp_path):
             w.writerow({"total_ms": total, "reflex_match_ms": 50, "stt_final_ms": 100})
     reports = {r.stage: r for r in latency_summary(d)}
     assert reports["total"].p50_ms == 1200.0
-    assert reports["total"].status == "ok"      # <= 1500
+    assert reports["total"].status == "ok"  # <= 1500
     assert reports["reflex"].p50_ms == 50.0
     assert reports["vad_endpoint"].status == "nodata"
     assert reports["vad_endpoint"].n == 0
@@ -74,9 +74,9 @@ def test_format_report(tmp_path):
 
 
 def test_doctor_latency_flag(capsys):
-    import argparse
     sys.path.insert(0, "src")
     from jarvis.cli import build_parser, _cmd_doctor
+
     args = build_parser().parse_args(["doctor", "--latency"])
     assert args.latency is True
     rc = _cmd_doctor(args)

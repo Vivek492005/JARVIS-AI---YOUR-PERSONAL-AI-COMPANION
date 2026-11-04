@@ -63,6 +63,7 @@ def exposed_tools() -> List[Dict[str, Any]]:
     uses the same fail-closed resolution the gate applies.
     """
     from jarvis.tools.registry import resolve
+
     seen = set()
     tools = []
     for name in REGISTRY:
@@ -76,29 +77,37 @@ def exposed_tools() -> List[Dict[str, Any]]:
             schema = spec.params.model_json_schema()
         except Exception:
             schema = {"type": "object"}
-        tools.append({
-            "name": name,
-            "description": spec.description,
-            "inputSchema": schema,
-        })
+        tools.append(
+            {
+                "name": name,
+                "description": spec.description,
+                "inputSchema": schema,
+            }
+        )
     return sorted(tools, key=lambda t: t["name"])
 
 
 def call_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """Execute via the policy gate. Returns an MCP result dict."""
     from jarvis.tools.actions import run_action
+
     verdict, result = run_action(name, arguments or {})
     if verdict == "deny":
-        return {"content": [{"type": "text", "text": result}],
-                "isError": True}
+        return {"content": [{"type": "text", "text": result}], "isError": True}
     if verdict == "confirm":
         # An external client cannot answer our confirmation prompt, so a
         # CONFIRM verdict is a refusal, not a question.
-        return {"content": [{"type": "text",
-                             "text": "REFUSED: this tool needs interactive "
-                                     "confirmation, which MCP clients cannot "
-                                     "provide."}],
-                "isError": True}
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": "REFUSED: this tool needs interactive "
+                    "confirmation, which MCP clients cannot "
+                    "provide.",
+                }
+            ],
+            "isError": True,
+        }
     return {"content": [{"type": "text", "text": result}]}
 
 
@@ -112,39 +121,55 @@ def handle(msg: Dict[str, Any], authed: List[bool]) -> Any:
             check_token(params.get("token"))
         except AuthError as e:
             if mid is not None:
-                return {"jsonrpc": "2.0", "id": mid,
-                        "error": {"code": -32000, "message": str(e)}}
+                return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32000, "message": str(e)}}
             return None
         authed.append(True)
-        return {"jsonrpc": "2.0", "id": mid, "result": {
-            "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {"tools": {}},
-            "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-        }}
+        return {
+            "jsonrpc": "2.0",
+            "id": mid,
+            "result": {
+                "protocolVersion": PROTOCOL_VERSION,
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
+            },
+        }
 
     if not authed:
         if mid is not None:
-            return {"jsonrpc": "2.0", "id": mid,
-                    "error": {"code": -32000,
-                              "message": "not authenticated: call initialize with a token first"}}
+            return {
+                "jsonrpc": "2.0",
+                "id": mid,
+                "error": {
+                    "code": -32000,
+                    "message": "not authenticated: call initialize with a token first",
+                },
+            }
         return None
 
     if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": mid,
-                "result": {"tools": exposed_tools()}}
+        return {"jsonrpc": "2.0", "id": mid, "result": {"tools": exposed_tools()}}
     if method == "tools/call":
         name = params.get("name", "")
-        if name not in REGISTRY or not any(
-                t["name"] == name for t in exposed_tools()):
-            return {"jsonrpc": "2.0", "id": mid, "result": {
-                "isError": True,
-                "content": [{"type": "text",
-                             "text": f"tool not exposed: {name}"}]}}
-        return {"jsonrpc": "2.0", "id": mid,
-                "result": call_tool(name, params.get("arguments") or {})}
+        if name not in REGISTRY or not any(t["name"] == name for t in exposed_tools()):
+            return {
+                "jsonrpc": "2.0",
+                "id": mid,
+                "result": {
+                    "isError": True,
+                    "content": [{"type": "text", "text": f"tool not exposed: {name}"}],
+                },
+            }
+        return {
+            "jsonrpc": "2.0",
+            "id": mid,
+            "result": call_tool(name, params.get("arguments") or {}),
+        }
     if mid is not None:
-        return {"jsonrpc": "2.0", "id": mid,
-                "error": {"code": -32601, "message": "Method not found"}}
+        return {
+            "jsonrpc": "2.0",
+            "id": mid,
+            "error": {"code": -32601, "message": "Method not found"},
+        }
     return None
 
 
@@ -152,6 +177,7 @@ def main() -> None:
     # Register every ToolSpec (base + perception + integrations) so the
     # policy gate sees the full surface.
     from jarvis.tools.actions import _register_tools
+
     _register_tools()
     authed: List[bool] = []
     for line in sys.stdin:

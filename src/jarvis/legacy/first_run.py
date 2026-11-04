@@ -21,15 +21,17 @@ import os
 
 # (env var, label shown in the dialog, free-tier hint)
 KEY_FIELDS = [
-    ("HUGGINGFACE_API_KEY",
-     "Hugging Face token",
-     "free at huggingface.co/settings/tokens — main AI brain"),
-    ("DEEPSEEK_API_KEY",
-     "DeepSeek key (optional)",
-     "backup brain if Hugging Face is down"),
-    ("RUMIK_API_KEY",
-     "Rumik key (optional)",
-     "premium human-like voice (falls back to free voices)"),
+    (
+        "HUGGINGFACE_API_KEY",
+        "Hugging Face token",
+        "free at huggingface.co/settings/tokens — main AI brain",
+    ),
+    ("DEEPSEEK_API_KEY", "DeepSeek key (optional)", "backup brain if Hugging Face is down"),
+    (
+        "RUMIK_API_KEY",
+        "Rumik key (optional)",
+        "premium human-like voice (falls back to free voices)",
+    ),
 ]
 
 ENV_FILE = ".env"
@@ -45,8 +47,7 @@ def _write_env_file(values: dict):
     if os.path.exists(ENV_FILE):
         with open(ENV_FILE, "r", encoding="utf-8") as f:
             existing = f.readlines()
-    existing = [ln for ln in existing
-                if not any(ln.startswith(f"{k}=") for k in values)]
+    existing = [ln for ln in existing if not any(ln.startswith(f"{k}=") for k in values)]
     with open(ENV_FILE, "w", encoding="utf-8") as f:
         f.writelines(existing)
         if existing and not existing[-1].endswith("\n"):
@@ -67,6 +68,7 @@ def ensure_api_keys() -> bool:
         return True
     try:
         import tkinter as tk
+
         root = tk.Tk()
     except Exception:
         return False  # headless / no display server / no Tk build
@@ -75,10 +77,15 @@ def ensure_api_keys() -> bool:
     root.resizable(False, False)
     saved = {"ok": False}
 
-    tk.Label(root, text="Paste your API keys to unlock the full AI brain.\n"
-                        "All three services have a free tier. You can skip —\n"
-                        "basic voice commands still work offline.",
-             justify="left", padx=16, pady=12).pack()
+    tk.Label(
+        root,
+        text="Paste your API keys to unlock the full AI brain.\n"
+        "All three services have a free tier. You can skip —\n"
+        "basic voice commands still work offline.",
+        justify="left",
+        padx=16,
+        pady=12,
+    ).pack()
 
     entries = {}
     for name, label, hint in KEY_FIELDS:
@@ -97,7 +104,7 @@ def ensure_api_keys() -> bool:
         values = {name: entry.get().strip() for name, entry in entries.items()}
         try:
             _write_env_file(values)
-        except Exception:
+        except Exception:  # noqa: S110 — first-run wizard: failure surfaces via saved['ok']
             pass
         saved["ok"] = _any_key_present()
         root.destroy()
@@ -105,10 +112,12 @@ def ensure_api_keys() -> bool:
     def _skip():
         root.destroy()
 
-    tk.Button(btn_frame, text="Save & Start JARVIS", command=_save,
-              padx=12, pady=4).pack(side="left", padx=8)
-    tk.Button(btn_frame, text="Skip for now", command=_skip,
-              padx=12, pady=4).pack(side="left", padx=8)
+    tk.Button(btn_frame, text="Save & Start JARVIS", command=_save, padx=12, pady=4).pack(
+        side="left", padx=8
+    )
+    tk.Button(btn_frame, text="Skip for now", command=_skip, padx=12, pady=4).pack(
+        side="left", padx=8
+    )
 
     # Center on screen
     root.update_idletasks()

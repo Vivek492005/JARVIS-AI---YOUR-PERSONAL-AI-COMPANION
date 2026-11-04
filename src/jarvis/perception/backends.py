@@ -40,8 +40,7 @@ def get_backend(name: str) -> Any:
         return _BACKENDS[name]
     except KeyError:
         raise BackendUnavailable(
-            f"no backend registered for {name!r} "
-            f"(Windows + optional dependency required)"
+            f"no backend registered for {name!r} (Windows + optional dependency required)"
         ) from None
 
 
@@ -53,6 +52,7 @@ def clear_backends() -> None:
 # ---------------------------------------------------------------------------
 # Data shapes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class WindowInfo:
@@ -77,14 +77,19 @@ class ElementNode:
 # Protocols (duck-typed; real backends implement these methods)
 # ---------------------------------------------------------------------------
 
+
 class UIABackend:
     """pywinauto/UIA shim interface."""
 
     def list_windows(self) -> List[WindowInfo]: ...
     def get_tree(self, handle: int, depth: int = 3) -> ElementNode: ...
-    def find(self, handle: int, name: Optional[str] = None,
-             role: Optional[str] = None,
-             automation_id: Optional[str] = None) -> Optional[ElementNode]: ...
+    def find(
+        self,
+        handle: int,
+        name: Optional[str] = None,
+        role: Optional[str] = None,
+        automation_id: Optional[str] = None,
+    ) -> Optional[ElementNode]: ...
     def invoke(self, element_id: str) -> bool: ...
     def get_text(self, element_id: str) -> str: ...
     def set_text(self, element_id: str, value: str) -> bool: ...
@@ -104,8 +109,8 @@ class OCRBackend:
 class BrowserBackend:
     """Playwright-style DOM automation shim (dedicated profile)."""
 
-    def open(self, url: str) -> str: ...            # -> page title / status
-    def snapshot(self) -> str: ...                 # accessibility tree text
+    def open(self, url: str) -> str: ...  # -> page title / status
+    def snapshot(self) -> str: ...  # accessibility tree text
     def click(self, ref: str) -> str: ...
     def fill(self, ref: str, value: str) -> str: ...
     def submit(self, ref: Optional[str] = None) -> str: ...
@@ -116,8 +121,7 @@ class BrowserBackend:
 class VLMBackend:
     """Set-of-marks VLM shim: returns the chosen mark index (1-based)."""
 
-    def pick_element(self, image_png: bytes, prompt: str,
-                     max_marks: int = 12) -> int: ...
+    def pick_element(self, image_png: bytes, prompt: str, max_marks: int = 12) -> int: ...
 
 
 class ContextBackend:
@@ -129,6 +133,7 @@ class ContextBackend:
 
 # App adapters ---------------------------------------------------------------
 
+
 class VSCodeBackend:
     def open_path(self, path: str) -> str: ...
     def run_task(self, task: str, folder: str) -> str: ...
@@ -136,8 +141,7 @@ class VSCodeBackend:
 
 class OfficeBackend:
     def open_document(self, path: str) -> str: ...
-    def read_cells(self, path: str, sheet: str = "",
-                   cell_range: str = "") -> str: ...
+    def read_cells(self, path: str, sheet: str = "", cell_range: str = "") -> str: ...
     def save_document(self, path: str) -> str: ...
 
 
@@ -149,10 +153,11 @@ class SpotifyBackend:
 # Real-backend loaders (lazy; Windows-only)
 # ---------------------------------------------------------------------------
 
+
 def _missing(dep: str) -> Callable[[], Any]:
     def _raise(*a: Any, **k: Any) -> Any:
-        raise BackendUnavailable(
-            f"real backend needs {dep} on Windows; nothing registered")
+        raise BackendUnavailable(f"real backend needs {dep} on Windows; nothing registered")
+
     return _raise
 
 

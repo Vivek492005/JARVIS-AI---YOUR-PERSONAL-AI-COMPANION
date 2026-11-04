@@ -63,8 +63,8 @@ def test_secrets_from_env_only(isolated, monkeypatch):
 def test_legacy_migration(isolated):
     legacy = {
         "wake_word": "JARVIS",
-        "require_wake_word": False,   # explicit user choice is preserved
-        "phrase_time_limit": 6.0,     # mapped -> max_utterance_s
+        "require_wake_word": False,  # explicit user choice is preserved
+        "phrase_time_limit": 6.0,  # mapped -> max_utterance_s
         "voice_rate": 175,
         "ai_temperature": 0.5,
     }
@@ -90,6 +90,7 @@ def test_no_migration_without_legacy_file(isolated):
 def test_show_masks_secrets(isolated, monkeypatch, capsys):
     monkeypatch.setenv("HUGGINGFACE_API_KEY", "hf_super_secret_value")
     from access_os.config import main
+
     assert main(["show"]) == 0
     out = capsys.readouterr().out
     assert "hf_super_secret_value" not in out
@@ -99,9 +100,17 @@ def test_show_masks_secrets(isolated, monkeypatch, capsys):
 
 def test_legacy_voice_dict_shape(isolated):
     d = get_settings().legacy_voice_dict()
-    for key in ("wake_word", "require_wake_word", "max_utterance_s",
-                "phrase_time_limit", "energy_threshold", "tts_engine",
-                "hf_model", "ai_temperature", "enable_ai_agent"):
+    for key in (
+        "wake_word",
+        "require_wake_word",
+        "max_utterance_s",
+        "phrase_time_limit",
+        "energy_threshold",
+        "tts_engine",
+        "hf_model",
+        "ai_temperature",
+        "enable_ai_agent",
+    ):
         assert key in d, key
 
 

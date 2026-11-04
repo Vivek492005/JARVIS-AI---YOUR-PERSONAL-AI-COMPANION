@@ -4,8 +4,7 @@ import sys
 from unittest import mock
 from unittest.mock import MagicMock
 
-for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip",
-             "fuzzywuzzy"):
+for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip", "fuzzywuzzy"):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 sys.modules["fuzzywuzzy"].fuzz = MagicMock()
 
@@ -16,14 +15,19 @@ from access_os.config import PrivacyCfg, reset_settings_cache  # noqa: E402
 
 def _fresh_settings(tmp_path, monkeypatch, **env):
     monkeypatch.chdir(tmp_path)
-    for k in ("PRIVACY__PRIVACY_MODE", "PRIVACY__ALLOW_HUGGINGFACE",
-              "PRIVACY__ALLOW_DEEPSEEK", "PRIVACY__ALLOW_RUMIK_TTS",
-              "PRIVACY__ALLOW_GOOGLE_STT"):
+    for k in (
+        "PRIVACY__PRIVACY_MODE",
+        "PRIVACY__ALLOW_HUGGINGFACE",
+        "PRIVACY__ALLOW_DEEPSEEK",
+        "PRIVACY__ALLOW_RUMIK_TTS",
+        "PRIVACY__ALLOW_GOOGLE_STT",
+    ):
         monkeypatch.delenv(k, raising=False)
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     reset_settings_cache()
     from access_os.config import get_settings
+
     try:
         return get_settings()
     finally:
@@ -51,6 +55,7 @@ def test_egress_toggle_blocks_client_creation(clean, tmp_path, monkeypatch):
     monkeypatch.setenv("HUGGINGFACE_API_KEY", "k")
     reset_settings_cache()
     from access_os.ai_agent import AIAgent
+
     a = AIAgent.__new__(AIAgent)
     a.hf_api_key = "k"
     a.ds_api_key = ""
@@ -69,14 +74,14 @@ def test_privacy_mode_skips_cloud(clean, tmp_path, monkeypatch):
     monkeypatch.setenv("PRIVACY__PRIVACY_MODE", "true")
     reset_settings_cache()
     from access_os.ai_agent import AIAgent
+
     a = AIAgent.__new__(AIAgent)
     a.tainted = False
     a.pending_confirmation = None
     a.client = MagicMock()
     a.backup_client = None
     a._notify_status = lambda m: None
-    with mock.patch.object(AIAgent, "_local_fallback_process",
-                           return_value="local") as m:
+    with mock.patch.object(AIAgent, "_local_fallback_process", return_value="local") as m:
         resp = AIAgent.process(a, "hello")
     m.assert_called_once()
     a.client.chat.completions.create.assert_not_called()
@@ -87,6 +92,7 @@ def test_egress_denied_under_privacy_mode(clean, tmp_path, monkeypatch):
     monkeypatch.setenv("PRIVACY__PRIVACY_MODE", "true")
     reset_settings_cache()
     from access_os.ai_agent import AIAgent
+
     a = AIAgent.__new__(AIAgent)
     assert AIAgent._privacy_on(a) is True
     assert AIAgent._egress(a, "huggingface") is False
@@ -97,6 +103,7 @@ def test_tts_local_only_under_privacy(clean, tmp_path, monkeypatch):
     monkeypatch.setenv("PRIVACY__PRIVACY_MODE", "true")
     reset_settings_cache()
     from access_os.voice_interface import VoiceInterface
+
     v = VoiceInterface.__new__(VoiceInterface)
     v.config = {"tts_engine": "rumik"}
     assert VoiceInterface._privacy_tts_only_local(v) is True
@@ -108,6 +115,7 @@ def test_rumik_toggle_off_skips_rumik(clean, tmp_path, monkeypatch):
     monkeypatch.setenv("PRIVACY__ALLOW_RUMIK_TTS", "false")
     reset_settings_cache()
     from access_os.voice_interface import VoiceInterface
+
     v = VoiceInterface.__new__(VoiceInterface)
     v.config = {"tts_engine": "rumik"}
     assert VoiceInterface._privacy_tts_only_local(v) is True

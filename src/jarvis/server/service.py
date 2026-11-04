@@ -24,8 +24,9 @@ CommandHandler = Callable[[str, CancelToken, "JarvisService"], str]
 class JarvisService:
     """In-process jarvisd core. Transport-agnostic; see server.api."""
 
-    def __init__(self, bus=None, handler: Optional[CommandHandler] = None,
-                 flush_on_interrupt: bool = True) -> None:
+    def __init__(
+        self, bus=None, handler: Optional[CommandHandler] = None, flush_on_interrupt: bool = True
+    ) -> None:
         self.bus = bus or get_bus()
         self.lanes = LaneQueue(bus=self.bus, flush_on_interrupt=flush_on_interrupt)
         self.handler: CommandHandler = handler or self._agent_handler
@@ -51,14 +52,15 @@ class JarvisService:
         return self.lanes.running
 
     # -- commands ------------------------------------------------------
-    def submit_command(self, text: str,
-                       priority: Priority = Priority.TASK) -> CancelToken:
+    def submit_command(self, text: str, priority: Priority = Priority.TASK) -> CancelToken:
         """Enqueue a command; returns its CancelToken."""
         if not text or not text.strip():
             raise ValueError("empty command")
         return self.lanes.submit(
             lambda token: self._run_command(text.strip(), token),
-            priority=priority, name=text.strip()[:40])
+            priority=priority,
+            name=text.strip()[:40],
+        )
 
     def _run_command(self, text: str, token: CancelToken) -> str:
         trace = new_trace()
@@ -82,6 +84,7 @@ class JarvisService:
     # -- state / events ------------------------------------------------
     def get_state(self) -> dict:
         from jarvis import __version__
+
         uptime = (time() - self.started_at) if self.started_at else 0.0
         return {
             "v": 1,
@@ -102,11 +105,11 @@ class JarvisService:
         # Lazy: constructing the agent reads settings/secrets.
         if self._agent is None:
             from jarvis.brain.agent import AIAgent
+
             self._agent = AIAgent(bus=self.bus)
         return self._agent
 
-    def _agent_handler(self, text: str, token: CancelToken,
-                       service: "JarvisService") -> str:
+    def _agent_handler(self, text: str, token: CancelToken, service: "JarvisService") -> str:
         """Default handler: reflex router (System-1) + LLM agent (System-2).
 
         Built lazily so a service that never receives a command never pays
@@ -115,5 +118,6 @@ class JarvisService:
         """
         if self._router is None:
             from jarvis.brain.router import Router
+
             self._router = Router()
         return self._router.handle(text)

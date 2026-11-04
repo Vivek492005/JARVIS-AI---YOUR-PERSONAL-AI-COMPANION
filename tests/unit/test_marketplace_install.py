@@ -13,11 +13,17 @@ import pytest
 from jarvis.brain.skills.trust import TrustLevel
 from jarvis.marketplace import ed25519
 from jarvis.marketplace.installer import (
-    install_package, read_installed_record, trust_for_installed,
+    install_package,
+    read_installed_record,
+    trust_for_installed,
 )
 from jarvis.marketplace.package import build_package, pack_zip
 from jarvis.marketplace.revocation import (
-    RevocationList, load_local, save_local, sign_feed, update_from_feed,
+    RevocationList,
+    load_local,
+    save_local,
+    sign_feed,
+    update_from_feed,
 )
 from jarvis.marketplace.signing import CuratorStore, sign_package
 from jarvis.perception.sandbox import SandboxLevel
@@ -62,30 +68,28 @@ def skill_dir(tmp_path):
 
 @pytest.fixture()
 def package_path(tmp_path, skill_dir, author):
-    staging = build_package(skill_dir, author="tester",
-                            author_key_id=author["key_id"],
-                            min_jarvis="0.1.0")
+    staging = build_package(
+        skill_dir, author="tester", author_key_id=author["key_id"], min_jarvis="0.1.0"
+    )
     sign_package(staging, author["seed"])
     return pack_zip(staging, tmp_path / "demo-skill-1.2.0.jskill")
 
 
 @pytest.fixture()
 def sandbox_b(monkeypatch):
-    monkeypatch.setattr("jarvis.perception.sandbox.current_level",
-                        lambda: SandboxLevel.B)
+    monkeypatch.setattr("jarvis.perception.sandbox.current_level", lambda: SandboxLevel.B)
 
 
 @pytest.fixture()
 def sandbox_a(monkeypatch):
-    monkeypatch.setattr("jarvis.perception.sandbox.current_level",
-                        lambda: SandboxLevel.A)
+    monkeypatch.setattr("jarvis.perception.sandbox.current_level", lambda: SandboxLevel.A)
 
 
 @pytest.fixture()
 def no_audit(monkeypatch):
     import jarvis.policy.audit as audit_mod
-    monkeypatch.setattr(audit_mod, "AuditLogger",
-                        lambda *a, **k: _NullAudit())
+
+    monkeypatch.setattr(audit_mod, "AuditLogger", lambda *a, **k: _NullAudit())
 
 
 class _NullAudit:
@@ -102,8 +106,8 @@ def _install(pkg, skills_dir, **kw):
 # Happy paths
 # ---------------------------------------------------------------------------
 
-def test_install_self_signed(home, package_path, tmp_path, sandbox_b,
-                             no_audit, author):
+
+def test_install_self_signed(home, package_path, tmp_path, sandbox_b, no_audit, author):
     skills = tmp_path / "skills"
     skills.mkdir()
     res = _install(package_path, skills)
@@ -119,8 +123,7 @@ def test_install_self_signed(home, package_path, tmp_path, sandbox_b,
     assert "TRIPWIRE" in (skills / "demo-skill" / "tool.py").read_text()
 
 
-def test_install_curator_trust(home, package_path, tmp_path, sandbox_b,
-                               no_audit, author):
+def test_install_curator_trust(home, package_path, tmp_path, sandbox_b, no_audit, author):
     store = CuratorStore()
     store.add(author["pub"].hex(), name="tester")
     skills = tmp_path / "skills"
@@ -131,8 +134,7 @@ def test_install_curator_trust(home, package_path, tmp_path, sandbox_b,
     assert read_installed_record(skills / "demo-skill")["trust"] == "curator"
 
 
-def test_trust_for_installed_verified(home, package_path, tmp_path, sandbox_b,
-                                      no_audit, author):
+def test_trust_for_installed_verified(home, package_path, tmp_path, sandbox_b, no_audit, author):
     store = CuratorStore()
     store.add(author["pub"].hex(), name="tester")
     skills = tmp_path / "skills"
@@ -142,8 +144,7 @@ def test_trust_for_installed_verified(home, package_path, tmp_path, sandbox_b,
     assert trust_for_installed(skills / "demo-skill") == TrustLevel.VERIFIED
 
 
-def test_trust_for_installed_self_signed(home, package_path, tmp_path,
-                                         sandbox_b, no_audit):
+def test_trust_for_installed_self_signed(home, package_path, tmp_path, sandbox_b, no_audit):
     skills = tmp_path / "skills"
     skills.mkdir()
     res = _install(package_path, skills)
@@ -151,8 +152,7 @@ def test_trust_for_installed_self_signed(home, package_path, tmp_path,
     assert trust_for_installed(skills / "demo-skill") == TrustLevel.THIRD_PARTY
 
 
-def test_trust_downgrades_on_tamper(home, package_path, tmp_path, sandbox_b,
-                                    no_audit):
+def test_trust_downgrades_on_tamper(home, package_path, tmp_path, sandbox_b, no_audit):
     skills = tmp_path / "skills"
     skills.mkdir()
     res = _install(package_path, skills)
@@ -171,30 +171,26 @@ def test_trust_for_missing_record_is_third_party(tmp_path):
 # Refusals (fail-closed)
 # ---------------------------------------------------------------------------
 
-def test_install_refused_at_sandbox_level_a(home, package_path, tmp_path,
-                                            sandbox_a, no_audit):
+
+def test_install_refused_at_sandbox_level_a(home, package_path, tmp_path, sandbox_a, no_audit):
     skills = tmp_path / "skills"
     skills.mkdir()
     res = _install(package_path, skills)
     assert not res.ok
-    assert any("sandbox" in e.lower() or "level" in e.lower()
-               for e in res.errors)
+    assert any("sandbox" in e.lower() or "level" in e.lower() for e in res.errors)
     assert not (skills / "demo-skill").exists()
 
 
-def test_install_refused_without_confirmation(home, package_path, tmp_path,
-                                              sandbox_b, no_audit):
+def test_install_refused_without_confirmation(home, package_path, tmp_path, sandbox_b, no_audit):
     skills = tmp_path / "skills"
     skills.mkdir()
-    res = install_package(package_path, skills,
-                          confirm=lambda summary: False)
+    res = install_package(package_path, skills, confirm=lambda summary: False)
     assert not res.ok
     assert any("confirm" in e.lower() for e in res.errors)
     assert not (skills / "demo-skill").exists()
 
 
-def test_install_refused_on_name_collision(home, package_path, tmp_path,
-                                           sandbox_b, no_audit):
+def test_install_refused_on_name_collision(home, package_path, tmp_path, sandbox_b, no_audit):
     skills = tmp_path / "skills"
     skills.mkdir()
     assert _install(package_path, skills).ok
@@ -203,12 +199,11 @@ def test_install_refused_on_name_collision(home, package_path, tmp_path,
     assert any("already installed" in e for e in res.errors)
 
 
-def test_install_refused_on_tampered_sig(home, package_path, tmp_path,
-                                         sandbox_b, no_audit):
+def test_install_refused_on_tampered_sig(home, package_path, tmp_path, sandbox_b, no_audit):
     import zipfile
+
     evil = tmp_path / "evil.jskill"
-    with zipfile.ZipFile(package_path) as zin, \
-            zipfile.ZipFile(evil, "w") as zout:
+    with zipfile.ZipFile(package_path) as zin, zipfile.ZipFile(evil, "w") as zout:
         for info in zin.infolist():
             data = zin.read(info.filename)
             if info.filename == "SIGNATURE.json":
@@ -223,8 +218,7 @@ def test_install_refused_on_tampered_sig(home, package_path, tmp_path,
     assert not (skills / "demo-skill").exists()
 
 
-def test_install_never_executes_package_code(home, package_path, tmp_path,
-                                             sandbox_b, no_audit):
+def test_install_never_executes_package_code(home, package_path, tmp_path, sandbox_b, no_audit):
     # tool.py raises at import; install must succeed regardless.
     skills = tmp_path / "skills"
     skills.mkdir()
@@ -236,8 +230,8 @@ def test_install_never_executes_package_code(home, package_path, tmp_path,
 # Revocation
 # ---------------------------------------------------------------------------
 
-def test_revoked_key_refused(home, package_path, tmp_path, sandbox_b,
-                             no_audit, author):
+
+def test_revoked_key_refused(home, package_path, tmp_path, sandbox_b, no_audit, author):
     save_local(RevocationList(revoked_keys=[author["key_id"]]))
     skills = tmp_path / "skills"
     skills.mkdir()
@@ -246,8 +240,7 @@ def test_revoked_key_refused(home, package_path, tmp_path, sandbox_b,
     assert any("revoked" in e for e in res.errors)
 
 
-def test_revoked_package_refused(home, package_path, tmp_path, sandbox_b,
-                                 no_audit):
+def test_revoked_package_refused(home, package_path, tmp_path, sandbox_b, no_audit):
     save_local(RevocationList(revoked_packages=["demo-skill@1.2.0"]))
     skills = tmp_path / "skills"
     skills.mkdir()

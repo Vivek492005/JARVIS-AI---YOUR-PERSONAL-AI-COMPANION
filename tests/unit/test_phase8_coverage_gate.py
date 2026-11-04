@@ -1,10 +1,10 @@
 """Tests for scripts/check_coverage.py (Task 8.1 gate plumbing)."""
+
 import importlib.util
 import os
 
 # tests/unit/<this file> -> repo root
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _load_script():

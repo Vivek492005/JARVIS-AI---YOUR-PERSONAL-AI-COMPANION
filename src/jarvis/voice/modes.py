@@ -34,7 +34,7 @@ class InputMode(Enum):
 @dataclass
 class QuietHours:
     start: str = ""  # "HH:MM"
-    end: str = ""    # "HH:MM"
+    end: str = ""  # "HH:MM"
 
     def enabled(self) -> bool:
         return bool(self.start and self.end)
@@ -54,10 +54,12 @@ class QuietHours:
 class InputModeManager:
     """Owns the current input mode + quiet-hours automation."""
 
-    def __init__(self,
-                 initial: InputMode = InputMode.WAKEWORD,
-                 quiet_hours: Optional[QuietHours] = None,
-                 on_change: Optional[Callable[[InputMode, str], None]] = None) -> None:
+    def __init__(
+        self,
+        initial: InputMode = InputMode.WAKEWORD,
+        quiet_hours: Optional[QuietHours] = None,
+        on_change: Optional[Callable[[InputMode, str], None]] = None,
+    ) -> None:
         self._mode = initial
         self.quiet_hours = quiet_hours or QuietHours()
         self._on_change = on_change or (lambda mode, reason: None)
@@ -106,6 +108,7 @@ class InputModeManager:
             changed = active != self._quiet_override
             self._quiet_override = active
         if changed:
-            logger.info(f"quiet hours {'started' if active else 'ended'}: "
-                        f"mic {'off' if active else 'on'}")
+            logger.info(
+                f"quiet hours {'started' if active else 'ended'}: mic {'off' if active else 'on'}"
+            )
         return changed

@@ -51,7 +51,8 @@ def guard_write_source(source: str) -> None:
     if source in _BANNED_SOURCES:
         raise ValueError(
             f"memory write from {source!r} rejected: web/file content can "
-            "never write memory directly (poisoning defense)")
+            "never write memory directly (poisoning defense)"
+        )
 
 
 @dataclass

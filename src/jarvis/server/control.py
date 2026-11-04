@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 # --- settings -------------------------------------------------------------
 
+
 # section.attr -> (coerce, validate)
 def _int_range(lo: int, hi: int):
     def f(v):
@@ -33,6 +34,7 @@ def _int_range(lo: int, hi: int):
         if not lo <= v <= hi:
             raise ValueError(f"must be {lo}..{hi}")
         return v
+
     return f
 
 
@@ -64,10 +66,12 @@ def _redact_settings(settings) -> Dict[str, Any]:
     """
     import re
     from jarvis.policy.audit import _REDACT_VALUE_PATTERNS
+
     cred_re = re.compile(
         r"(api_key|_secret|_token|password|passwd|auth|credential|"
         r"private_key|access_key|bearer)$",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     out = {}
     for section in ("voice", "brain", "safety", "privacy"):
         part = settings.model_dump().get(section, {})
@@ -82,6 +86,7 @@ def _redact_settings(settings) -> Dict[str, Any]:
 
 
 # --- request models --------------------------------------------------------
+
 
 class SettingsUpdate(BaseModel):
     updates: Dict[str, Any]
@@ -99,6 +104,7 @@ class FactCreate(BaseModel):
 # (JARVIS_VAPID_PRIVATE_KEY / JARVIS_VAPID_PUBLIC_KEY env). Without them the
 # endpoints still store subscriptions and notify_push() logs instead of
 # sending — the in-page Notification API (app.js) covers the HUD-open case.
+
 
 class PushSubscription(BaseModel):
     endpoint: str
@@ -123,6 +129,7 @@ def _learning_service(service):
     svc = getattr(service, "learning", None)
     if svc is None:
         from jarvis.learning.service import LearningService
+
         svc = LearningService.default()
         try:
             service.learning = svc
@@ -133,6 +140,7 @@ def _learning_service(service):
 
 def _push_store_path() -> Path:
     from jarvis.core.config import get_settings
+
     try:
         base = Path(get_settings().brain.memory_workspace or "~/.jarvis")
     except Exception:
@@ -162,14 +170,16 @@ def notify_push(title: str, body: str) -> int:
     or the VAPID keys aren't configured (logged, not raised).
     """
     import os
+
     subs = _load_subscriptions()
     if not subs:
         return 0
     priv = os.environ.get("JARVIS_VAPID_PRIVATE_KEY", "")
     pub = os.environ.get("JARVIS_VAPID_PUBLIC_KEY", "")
     if not (priv and pub):
-        logger.info("push: %d subscription(s) stored but no VAPID keys — "
-                    "skipping (%s)", len(subs), title)
+        logger.info(
+            "push: %d subscription(s) stored but no VAPID keys — skipping (%s)", len(subs), title
+        )
         return 0
     try:
         from pywebpush import webpush
@@ -179,18 +189,20 @@ def notify_push(title: str, body: str) -> int:
     sent = 0
     for sub in subs:
         try:
-            webpush(subscription_info=sub,
-                    data=json.dumps({"title": title, "body": body}),
-                    vapid_private_key=priv,
-                    vapid_claims={"sub": "mailto:jarvis@localhost"})
+            webpush(
+                subscription_info=sub,
+                data=json.dumps({"title": title, "body": body}),
+                vapid_private_key=priv,
+                vapid_claims={"sub": "mailto:jarvis@localhost"},
+            )
             sent += 1
         except Exception as e:  # WebPushException and friends
-            logger.warning("push to %s failed: %s",
-                           str(sub.get("endpoint", ""))[:60], e)
+            logger.warning("push to %s failed: %s", str(sub.get("endpoint", ""))[:60], e)
     return sent
 
 
 # --- router factory --------------------------------------------------------
+
 
 def build_control_router(service, verify) -> APIRouter:
     """Build the control-center router. `verify` is the auth dependency."""
@@ -199,11 +211,13 @@ def build_control_router(service, verify) -> APIRouter:
     @r.get("/settings")
     def get_settings():
         from jarvis.core.config import get_settings
+
         return _redact_settings(get_settings())
 
     @r.put("/settings")
     def put_settings(body: SettingsUpdate):
         from jarvis.core.config import get_settings, _write_settings_toml
+
         settings = get_settings()
         applied, rejected = [], []
         for dotted, raw in body.updates.items():
@@ -229,23 +243,29 @@ def build_control_router(service, verify) -> APIRouter:
         return {"applied": applied, "rejected": rejected}
 
     @r.get("/audit")
-    def audit_query(day: Optional[str] = None, tool: Optional[str] = None,
-                    decision: Optional[str] = None, limit: int = 50):
+    def audit_query(
+        day: Optional[str] = None,
+        tool: Optional[str] = None,
+        decision: Optional[str] = None,
+        limit: int = 50,
+    ):
         from jarvis.policy import audit
-        return audit.query(day=day, tool=tool, decision=decision,
-                           limit=min(limit, 500))
+
+        return audit.query(day=day, tool=tool, decision=decision, limit=min(limit, 500))
 
     @r.get("/audit/stats")
     def audit_stats(day: Optional[str] = None):
         from jarvis.policy import audit
+
         return audit.stats(day=day)
 
     @r.get("/memory/facts")
     def memory_facts():
         store = _memory_store(service)
-        return [dict(id=f.id, key=f.key, value=f.value,
-                     source=f.source, importance=f.importance)
-                for f in store.all_facts()]
+        return [
+            dict(id=f.id, key=f.key, value=f.value, source=f.source, importance=f.importance)
+            for f in store.all_facts()
+        ]
 
     @r.post("/memory/facts")
     def memory_add(body: FactCreate):
@@ -264,6 +284,7 @@ def build_control_router(service, verify) -> APIRouter:
     def skills_list():
         from jarvis.core.config import get_settings
         from jarvis.brain.skills import load_manifest
+
         try:
             d = Path(get_settings().brain.skills_dir)
         except Exception:
@@ -275,15 +296,17 @@ def build_control_router(service, verify) -> APIRouter:
                     continue
                 try:
                     m = load_manifest(child)
-                    out.append({
-                        "name": m.name,
-                        "version": m.version,
-                        "description": m.description,
-                        "trust": m.trust.value if hasattr(m.trust, "value") else str(m.trust),
-                        "tools": [{"name": t.name, "risk": str(t.risk)} for t in m.tools],
-                        "permissions": list(m.permissions or []),
-                        "enabled": not (child / ".disabled").exists(),
-                    })
+                    out.append(
+                        {
+                            "name": m.name,
+                            "version": m.version,
+                            "description": m.description,
+                            "trust": m.trust.value if hasattr(m.trust, "value") else str(m.trust),
+                            "tools": [{"name": t.name, "risk": str(t.risk)} for t in m.tools],
+                            "permissions": list(m.permissions or []),
+                            "enabled": not (child / ".disabled").exists(),
+                        }
+                    )
                 except Exception as e:
                     out.append({"name": child.name, "error": str(e)})
         return out
@@ -331,6 +354,7 @@ def build_control_router(service, verify) -> APIRouter:
     @r.get("/push/vapid-key")
     def vapid_key():
         import os
+
         pub = os.environ.get("JARVIS_VAPID_PUBLIC_KEY", "")
         if not pub:
             raise HTTPException(404, "push not configured (no VAPID public key)")
@@ -346,8 +370,7 @@ def build_control_router(service, verify) -> APIRouter:
 
     @r.delete("/push/subscribe")
     def push_unsubscribe(endpoint: str):
-        subs = [s for s in _load_subscriptions()
-                if s.get("endpoint") != endpoint]
+        subs = [s for s in _load_subscriptions() if s.get("endpoint") != endpoint]
         _save_subscriptions(subs)
         return {"ok": True, "subscriptions": len(subs)}
 
@@ -371,8 +394,7 @@ def build_control_router(service, verify) -> APIRouter:
     @r.post("/learning/analyze")
     def learning_analyze(min_evidence: int = 3):
         svc = _learning_service(service)
-        return {"new_proposals": svc.analyze(
-            min_evidence=max(2, min(min_evidence, 50)))}
+        return {"new_proposals": svc.analyze(min_evidence=max(2, min(min_evidence, 50)))}
 
     @r.post("/learning/ingest-audit")
     def learning_ingest_audit(limit: int = 2000):
@@ -398,14 +420,17 @@ def build_control_router(service, verify) -> APIRouter:
         out = svc.approve(pid, reviewer="control-center")
         if not out.ok:
             raise HTTPException(409, out.message)
-        return {"ok": True, "proposal": out.proposal_id,
-                "applied_id": out.applied_id, "message": out.message}
+        return {
+            "ok": True,
+            "proposal": out.proposal_id,
+            "applied_id": out.applied_id,
+            "message": out.message,
+        }
 
     @r.post("/learning/proposals/{pid}/reject")
     def learning_reject(pid: str, body: ProposalReject):
         svc = _learning_service(service)
-        out = svc.reviewer.reject(pid, reason=body.reason,
-                                  reviewer="control-center")
+        out = svc.reviewer.reject(pid, reason=body.reason, reviewer="control-center")
         if not out.ok:
             raise HTTPException(409, out.message)
         return {"ok": True, "message": out.message}
@@ -413,8 +438,7 @@ def build_control_router(service, verify) -> APIRouter:
     @r.put("/learning/proposals/{pid}")
     def learning_edit(pid: str, body: ProposalEdit):
         svc = _learning_service(service)
-        out = svc.reviewer.edit(pid, title=body.title, body=body.body,
-                                reviewer="control-center")
+        out = svc.reviewer.edit(pid, title=body.title, body=body.body, reviewer="control-center")
         if not out.ok:
             raise HTTPException(409, out.message)
         return {"ok": True, "message": out.message}
@@ -435,26 +459,31 @@ def build_control_router(service, verify) -> APIRouter:
     @r.get("/learning/runs")
     def learning_runs(limit: int = 50):
         svc = _learning_service(service)
-        return svc.reviewer.store.recent_runs(
-            limit=max(1, min(limit, 500)), learnable_only=False)
+        return svc.reviewer.store.recent_runs(limit=max(1, min(limit, 500)), learnable_only=False)
 
     return r
 
 
 def _memory_store(service):
     from jarvis.brain.memory.store import MemoryStore
+
     store = getattr(service, "memory", None)
     if store is None:
         from jarvis.core.config import get_settings
+
         s = get_settings()
-        ws = (getattr(getattr(s, "brain", None), "memory_workspace", None)
-              or getattr(s, "memory_workspace", None) or "~/.jarvis")
+        ws = (
+            getattr(getattr(s, "brain", None), "memory_workspace", None)
+            or getattr(s, "memory_workspace", None)
+            or "~/.jarvis"
+        )
         store = MemoryStore(Path(ws).expanduser() / "memory.db")
     return store
 
 
 def _skill_flag(name: str, enable: bool) -> None:
     from jarvis.core.config import get_settings
+
     try:
         d = Path(get_settings().brain.skills_dir)
     except Exception:

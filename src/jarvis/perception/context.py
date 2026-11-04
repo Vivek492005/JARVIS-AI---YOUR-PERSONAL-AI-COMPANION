@@ -21,7 +21,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 from jarvis.perception import backends as _backends
 from jarvis.perception.privacy import is_sensitive_window, redact_text
@@ -37,14 +36,15 @@ class ContextSnapshot:
     window_process: str
     has_selection: bool
     has_clipboard_text: bool
-    selection_text: str = ""     # only when explicitly requested
-    clipboard_text: str = ""     # only when explicitly requested
+    selection_text: str = ""  # only when explicitly requested
+    clipboard_text: str = ""  # only when explicitly requested
     ts: float = 0.0
 
 
 def _enabled() -> bool:
     try:
         from jarvis.core.config import get_settings
+
         return bool(getattr(get_settings().context, "enabled", True))
     except Exception:
         return True
@@ -63,9 +63,13 @@ def get_context(detail: str = "basic") -> ContextSnapshot:
     """
     now = time.time()
     if not _enabled():
-        return ContextSnapshot(window_title="", window_process="",
-                               has_selection=False, has_clipboard_text=False,
-                               ts=now)
+        return ContextSnapshot(
+            window_title="",
+            window_process="",
+            has_selection=False,
+            has_clipboard_text=False,
+            ts=now,
+        )
     backend = _ctx_backend()
     win = backend.active_window()
     sensitive = is_sensitive_window(win.title, win.process)
@@ -75,35 +79,39 @@ def get_context(detail: str = "basic") -> ContextSnapshot:
     selection = ""
     try:
         selection = backend.selected_text() or ""
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("selected-text read best-effort failed: %s", e)
     has_selection = bool(selection.strip())
 
-    clipboard = ""
     try:
         has_clip = bool(backend.clipboard_has_text())
     except Exception:
         has_clip = False
 
-    snap = ContextSnapshot(window_title=title, window_process=process,
-                           has_selection=has_selection,
-                           has_clipboard_text=has_clip, ts=now)
+    snap = ContextSnapshot(
+        window_title=title,
+        window_process=process,
+        has_selection=has_selection,
+        has_clipboard_text=has_clip,
+        ts=now,
+    )
     if detail == "selection" and has_selection and not sensitive:
         snap.selection_text = redact_text(selection[:4000])
     elif detail == "clipboard" and has_clip and not sensitive:
         try:
-            snap.clipboard_text = redact_text(
-                (backend.clipboard_text() or "")[:4000])
-        except Exception:
-            pass
+            snap.clipboard_text = redact_text((backend.clipboard_text() or "")[:4000])
+        except Exception as e:
+            logger.debug(
+                "best-effort failed: %s",
+                e,
+            )
     return snap
 
 
 def format_snapshot(snap: ContextSnapshot) -> str:
     """One-block text for the prompt (already redacted)."""
     lines = [
-        f"active window: {snap.window_title or '(none)'} "
-        f"[{snap.window_process or '?'}]",
+        f"active window: {snap.window_title or '(none)'} [{snap.window_process or '?'}]",
         f"selection: {'yes' if snap.has_selection else 'no'}",
         f"clipboard text: {'yes' if snap.has_clipboard_text else 'no'}",
     ]

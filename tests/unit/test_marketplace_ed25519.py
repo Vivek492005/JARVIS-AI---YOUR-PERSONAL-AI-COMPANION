@@ -11,22 +11,38 @@ from jarvis.marketplace.ed25519 import key_id, keypair, sign, verify
 
 # seed -> (public_key, {message_name: (message, signature)})
 VECTORS = [
-    ("0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
-     "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
-     {"empty": (b"",
+    (
+        "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+        {
+            "empty": (
+                b"",
                 "d9452bd4cc80bcecf4a18895094646e91a5a9bbf1b2707e05396b2cf67c9c2b7"
-                "d9b847a0d562425ccbb71038c7649fdcbfd76ee0e8247c8ec9326999b6256a0b"),
-      "hello": (b"hello marketplace",
+                "d9b847a0d562425ccbb71038c7649fdcbfd76ee0e8247c8ec9326999b6256a0b",
+            ),
+            "hello": (
+                b"hello marketplace",
                 "786d604ce416adbd54bbfb30a361dfbdb09bf76f2f0ad09ef7d41712963b61d2"
-                "481bb27c493eabc5fc9006c2c0fc6b9309f3f3bfd84d772be0ff3c85eabc2108")}),
-    ("ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
-     "2e4e83fdb2d88f88c5f03e663c39ea3f9c7536312b62a2b09a95712dccf11a40",
-     {"empty": (b"",
+                "481bb27c493eabc5fc9006c2c0fc6b9309f3f3bfd84d772be0ff3c85eabc2108",
+            ),
+        },
+    ),
+    (
+        "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
+        "2e4e83fdb2d88f88c5f03e663c39ea3f9c7536312b62a2b09a95712dccf11a40",
+        {
+            "empty": (
+                b"",
                 "84e4fed906a342aab415a2abc72b9ce9703f616fe850dc3a1ffb1f4873760f25"
-                "bd73bd6881bc495a1a87bf801c044f5516f2380cca43808a9913969552912a00"),
-      "hello": (b"hello marketplace",
+                "bd73bd6881bc495a1a87bf801c044f5516f2380cca43808a9913969552912a00",
+            ),
+            "hello": (
+                b"hello marketplace",
                 "48933195bccf3668bfa9ed0afc55fb3b002208186be083f890f34f3e96a1414e"
-                "2da96b01cb1fb445fd0c8312811b6ea49ab9d467c20f750891e3b0974f42190e")}),
+                "2da96b01cb1fb445fd0c8312811b6ea49ab9d467c20f750891e3b0974f42190e",
+            ),
+        },
+    ),
 ]
 
 

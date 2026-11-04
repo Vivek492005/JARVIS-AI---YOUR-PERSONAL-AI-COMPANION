@@ -9,17 +9,30 @@ import pytest
 for _mod in ("pyautogui",):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 
-from access_os.tools.registry import (
-    REGISTRY, Risk, ToolSpec, function_schemas, resolve, tool,
+from access_os.tools.registry import (  # noqa: E402
+    REGISTRY,
+    Risk,
+    ToolSpec,
+    function_schemas,
+    resolve,
+    tool,
 )
-from access_os.actions import execute_tool_raw, manage_notes
+from access_os.actions import execute_tool_raw, manage_notes  # noqa: E402
 
 
 def test_all_eight_tools_registered():
     base = sorted(n for n in REGISTRY if "." not in n)
-    legacy = ["download_media", "keyboard_mouse_action", "manage_notes",
-              "open_application", "open_website", "run_command",
-              "run_powershell_command", "system_control", "web_search"]
+    legacy = [
+        "download_media",
+        "keyboard_mouse_action",
+        "manage_notes",
+        "open_application",
+        "open_website",
+        "run_command",
+        "run_powershell_command",
+        "system_control",
+        "web_search",
+    ]
     # Phase 5 adds perception tools; legacy set must stay registered.
     assert all(t in base for t in legacy)
 
@@ -31,8 +44,7 @@ def test_unregistered_tool_rejected():
 def test_invalid_args_rejected_cleanly():
     r = execute_tool_raw("manage_notes", {"action": "nuke"})
     assert r.startswith("Invalid arguments for manage_notes")
-    r = execute_tool_raw("download_media",
-                         {"url_or_query": "x", "media_type": "exe"})
+    r = execute_tool_raw("download_media", {"url_or_query": "x", "media_type": "exe"})
     assert r.startswith("Invalid arguments for download_media")
     r = execute_tool_raw("open_application", {"app_name": ""})
     assert r.startswith("Invalid arguments for open_application")
@@ -42,28 +54,24 @@ def test_risk_tiers():
     assert resolve("web_search", {"query": "x"}).risk == Risk.READ
     assert resolve("open_application", {"app_name": "x"}).risk == Risk.REVERSIBLE
     assert resolve("download_media", {"url_or_query": "x"}).risk == Risk.REVERSIBLE
-    assert resolve("system_control",
-                   {"action": "take_screenshot"}).risk == Risk.READ
-    assert resolve("system_control",
-                   {"action": "check_battery"}).risk == Risk.READ
-    assert resolve("system_control",
-                   {"action": "volume_up"}).risk == Risk.REVERSIBLE
-    assert resolve("system_control",
-                   {"action": "empty_recycle_bin"}).risk == Risk.DESTRUCTIVE
-    assert resolve("system_control",
-                   {"action": "lock_pc"}).risk == Risk.SYSTEM
+    assert resolve("system_control", {"action": "take_screenshot"}).risk == Risk.READ
+    assert resolve("system_control", {"action": "check_battery"}).risk == Risk.READ
+    assert resolve("system_control", {"action": "volume_up"}).risk == Risk.REVERSIBLE
+    assert resolve("system_control", {"action": "empty_recycle_bin"}).risk == Risk.DESTRUCTIVE
+    assert resolve("system_control", {"action": "lock_pc"}).risk == Risk.SYSTEM
     assert resolve("manage_notes", {"action": "save"}).risk == Risk.REVERSIBLE
     assert resolve("manage_notes", {"action": "clear"}).risk == Risk.DESTRUCTIVE
-    assert resolve("keyboard_mouse_action",
-                   {"action": "type_text"}).risk == Risk.REVERSIBLE
-    assert resolve("keyboard_mouse_action",
-                   {"action": "press_hotkey", "value": "ctrl+s"}).risk == Risk.REVERSIBLE
-    assert resolve("keyboard_mouse_action",
-                   {"action": "press_hotkey", "value": "ctrl+shift+x"}).risk == Risk.SYSTEM
-    assert resolve("run_command",
-                   {"command_key": "ipconfig"}).risk == Risk.READ
-    assert resolve("run_powershell_command",
-                   {"command": "Get-Date"}).risk == Risk.SYSTEM
+    assert resolve("keyboard_mouse_action", {"action": "type_text"}).risk == Risk.REVERSIBLE
+    assert (
+        resolve("keyboard_mouse_action", {"action": "press_hotkey", "value": "ctrl+s"}).risk
+        == Risk.REVERSIBLE
+    )
+    assert (
+        resolve("keyboard_mouse_action", {"action": "press_hotkey", "value": "ctrl+shift+x"}).risk
+        == Risk.SYSTEM
+    )
+    assert resolve("run_command", {"command_key": "ipconfig"}).risk == Risk.READ
+    assert resolve("run_powershell_command", {"command": "Get-Date"}).risk == Risk.SYSTEM
 
 
 def test_unknown_action_fails_closed_to_system():
@@ -81,15 +89,18 @@ def test_function_schemas_auto_generated():
         assert params["type"] == "object"
         assert "properties" in params
     # schema and executor agree on required fields
-    app_schema = next(s for s in schemas
-                      if s["function"]["name"] == "open_application")
+    app_schema = next(s for s in schemas if s["function"]["name"] == "open_application")
     assert "app_name" in app_schema["function"]["parameters"]["required"]
 
 
 def test_duplicate_registration_rejected():
-    spec = ToolSpec(name="open_application", description="dup",
-                    params=REGISTRY["open_application"].params,
-                    risk=Risk.READ, handler=lambda a, c, n: "")
+    spec = ToolSpec(
+        name="open_application",
+        description="dup",
+        params=REGISTRY["open_application"].params,
+        risk=Risk.READ,
+        handler=lambda a, c, n: "",
+    )
     with pytest.raises(ValueError):
         tool(spec)
 
@@ -111,13 +122,14 @@ class TestCalculator:
     """A-07: AST evaluator — arithmetic works, DoS/injection don't."""
 
     def _calc(self, expr):
-        import re
         from unittest.mock import MagicMock as M
+
         sys.modules.setdefault("speech_recognition", M())
         sys.modules.setdefault("pyttsx3", M())
         sys.modules.setdefault("pyperclip", M())
         sys.modules.setdefault("fuzzywuzzy", M())
         from access_os.voice_interface import VoiceCommandProcessor
+
         proc = VoiceCommandProcessor.__new__(VoiceCommandProcessor)
         m = M()
         m.group = lambda i: expr

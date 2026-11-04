@@ -55,8 +55,9 @@ def _parse_frontmatter(text: str) -> Dict[str, str]:
         if not line.strip():
             continue
         # Continuation line (indented list item) belongs to the current key.
-        if current_key and (line.startswith(" ") or line.startswith("\t") or
-                            line.lstrip().startswith("-")):
+        if current_key and (
+            line.startswith(" ") or line.startswith("\t") or line.lstrip().startswith("-")
+        ):
             out[current_key] += "\n" + line.strip()
             continue
         if ":" in line:
@@ -72,9 +73,10 @@ def _parse_tools(raw: str) -> List[SkillToolDecl]:
     # tools: [{name: x, risk: reversible}, ...]  or  tools: [x, y]
     decls = []
     for m in re.finditer(r"name\s*:\s*([a-z_0-9]+)", raw):
-        risk_m = re.search(r"risk\s*:\s*([a-z_]+)", raw[m.start():m.start() + 120])
-        decls.append(SkillToolDecl(name=m.group(1),
-                                   risk=risk_m.group(1) if risk_m else "reversible"))
+        risk_m = re.search(r"risk\s*:\s*([a-z_]+)", raw[m.start() : m.start() + 120])
+        decls.append(
+            SkillToolDecl(name=m.group(1), risk=risk_m.group(1) if risk_m else "reversible")
+        )
     if not decls:
         for name in re.findall(r"([a-z_0-9]+)", raw):
             if name not in ("tools",):
@@ -106,14 +108,16 @@ def _risk_for(manifest: SkillManifest, decl: SkillToolDecl) -> Risk:
     except KeyError:
         wanted = Risk.REVERSIBLE
     if manifest.trust == TrustLevel.THIRD_PARTY and wanted.value < Risk.DESTRUCTIVE.value:
-        logger.warning("skill %s: third-party tool %s forced to DESTRUCTIVE",
-                       manifest.name, decl.name)
+        logger.warning(
+            "skill %s: third-party tool %s forced to DESTRUCTIVE", manifest.name, decl.name
+        )
         return Risk.DESTRUCTIVE
     return wanted
 
 
-def load_skill(skill_dir: Path, trust: TrustLevel = TrustLevel.THIRD_PARTY,
-               confirm_lower_risk: bool = False) -> SkillManifest:
+def load_skill(
+    skill_dir: Path, trust: TrustLevel = TrustLevel.THIRD_PARTY, confirm_lower_risk: bool = False
+) -> SkillManifest:
     """Load one skill: validate manifest, show permissions, import tool.py.
 
     ``tool.py`` must call ``register_skill_tool(...)`` for each declared
@@ -124,18 +128,20 @@ def load_skill(skill_dir: Path, trust: TrustLevel = TrustLevel.THIRD_PARTY,
     # Phase 5.10: untrusted (third-party) skills need sandbox Level B+.
     try:
         from jarvis.perception.sandbox import assert_skill_allowed
-        assert_skill_allowed(manifest.name, manifest.trust.value
-                             if hasattr(manifest.trust, "value")
-                             else str(manifest.trust))
+
+        assert_skill_allowed(
+            manifest.name,
+            manifest.trust.value if hasattr(manifest.trust, "value") else str(manifest.trust),
+        )
     except PermissionError:
         raise
     if manifest.permissions:
-        logger.info("skill '%s' requests permissions: %s",
-                    manifest.name, ", ".join(manifest.permissions))
+        logger.info(
+            "skill '%s' requests permissions: %s", manifest.name, ", ".join(manifest.permissions)
+        )
     tool_py = skill_dir / "tool.py"
     if tool_py.exists():
-        spec = importlib.util.spec_from_file_location(
-            f"jarvis_skill_{manifest.name}", str(tool_py))
+        spec = importlib.util.spec_from_file_location(f"jarvis_skill_{manifest.name}", str(tool_py))
         mod = importlib.util.module_from_spec(spec)
         # Inject the registration helper before exec.
         mod.register_skill_tool = lambda spec, _m=manifest: _register(manifest, spec)  # noqa: E731
@@ -145,16 +151,21 @@ def load_skill(skill_dir: Path, trust: TrustLevel = TrustLevel.THIRD_PARTY,
 
 def _register(manifest: SkillManifest, spec: ToolSpec) -> ToolSpec:
     if spec.name in REGISTRY:
-        logger.debug("skill %s: tool %s already registered, skipping",
-                     manifest.name, spec.name)
+        logger.debug("skill %s: tool %s already registered, skipping", manifest.name, spec.name)
         return REGISTRY[spec.name]
     # Enforce the trust risk floor.
     floor = Risk.DESTRUCTIVE if manifest.trust == TrustLevel.THIRD_PARTY else Risk.READ
     if spec.risk.value < floor.value:
-        spec = ToolSpec(name=spec.name, description=spec.description,
-                        params=spec.params, risk=floor, handler=spec.handler,
-                        timeout_s=spec.timeout_s, scopes=spec.scopes,
-                        carries_external_data=spec.carries_external_data)
+        spec = ToolSpec(
+            name=spec.name,
+            description=spec.description,
+            params=spec.params,
+            risk=floor,
+            handler=spec.handler,
+            timeout_s=spec.timeout_s,
+            scopes=spec.scopes,
+            carries_external_data=spec.carries_external_data,
+        )
     return tool(spec)
 
 
@@ -169,14 +180,14 @@ def load_all(skills_dir: Path, local_names: frozenset = frozenset()) -> List[Ski
         if (child / ".disabled").exists():
             logger.info("skill %s disabled, skipping", child.name)
             continue
-        trust = (TrustLevel.LOCAL if child.name in local_names
-                 else TrustLevel.THIRD_PARTY)
+        trust = TrustLevel.LOCAL if child.name in local_names else TrustLevel.THIRD_PARTY
         if trust is not TrustLevel.LOCAL:
             # Phase 9 moonshot: a marketplace-installed skill carries a
             # signed install record; re-verify its pins and honour the
             # recorded trust tier (fail-closed → THIRD_PARTY).
             try:
                 from jarvis.marketplace.installer import trust_for_installed
+
                 trust = trust_for_installed(child)
             except Exception:
                 logger.exception("skill %s: trust check failed", child.name)
@@ -185,6 +196,5 @@ def load_all(skills_dir: Path, local_names: frozenset = frozenset()) -> List[Ski
         except Exception as e:
             logger.error("skill %s failed to load: %s", child.name, e)
     digest = sha256_of(skills_dir) if manifests else ""
-    logger.info("loaded %d skills from %s (sha256 %.12s)",
-                len(manifests), skills_dir, digest)
+    logger.info("loaded %d skills from %s (sha256 %.12s)", len(manifests), skills_dir, digest)
     return manifests

@@ -25,10 +25,20 @@ ai_code (clipboard+LLM flows), repeat_last (needs conversational state).
 import ast
 import os
 
-SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   "src", "jarvis", "voice", "interface.py")
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   "src", "jarvis", "legacy", "rule_commands.py")
+SRC = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "src",
+    "jarvis",
+    "voice",
+    "interface.py",
+)
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "src",
+    "jarvis",
+    "legacy",
+    "rule_commands.py",
+)
 
 # A-04/A-10 normalization from VoiceCommandProcessor._launch_app.
 LAUNCH_NORMALIZE = {
@@ -62,15 +72,19 @@ HANDWRITTEN = {
         # Legacy picked the last non-keyword group and fell back to the
         # clipboard, then "trending song". Reflex: single clean group with
         # the same last-resort default (clipboard fallback dropped).
-        "patterns": [r"^download (?:this|current|the)? ?(?:video|song|youtube video)(?: (.+))?$",
-                     r"^download (.+) (?:from|on) youtube$"],
+        "patterns": [
+            r"^download (?:this|current|the)? ?(?:video|song|youtube video)(?: (.+))?$",
+            r"^download (.+) (?:from|on) youtube$",
+        ],
         "tool": "download_media",
         "args": {"url_or_query": "{group1|default:trending song}", "media_type": "video"},
         "reply": "Starting video download to your Downloads folder in the background.",
     },
     "download_youtube_audio": {
-        "patterns": [r"^download (?:this|current|the)? ?(?:mp3|audio)(?: (.+))?$",
-                     r"^download audio of (.+)$"],
+        "patterns": [
+            r"^download (?:this|current|the)? ?(?:mp3|audio)(?: (.+))?$",
+            r"^download audio of (.+)$",
+        ],
         "tool": "download_media",
         "args": {"url_or_query": "{group1|default:trending song}", "media_type": "audio"},
         "reply": "Starting audio download to your Downloads folder in the background.",
@@ -108,7 +122,9 @@ HANDWRITTEN = {
     },
     "search_wikipedia": {
         "tool": "open_website",
-        "args": {"url_or_name": "https://en.wikipedia.org/wiki/Special:Search?search={group1|urlencode}"},
+        "args": {
+            "url_or_name": "https://en.wikipedia.org/wiki/Special:Search?search={group1|urlencode}"
+        },
         "reply": "Searching Wikipedia for {group1}",
     },
     "weather": {
@@ -137,26 +153,36 @@ HANDWRITTEN = {
 
 EXCLUDED = {"find_file", "ai_summarize", "ai_fix_code", "repeat_last"}
 
-COMPUTE_IDS = {"_action_get_time": "time", "_action_get_date": "date",
-               "_action_get_day": "day", "_action_tell_joke": "joke",
-               "_action_flip_coin": "coin", "_action_roll_dice": "dice",
-               "_action_calculate": "calc"}
+COMPUTE_IDS = {
+    "_action_get_time": "time",
+    "_action_get_date": "date",
+    "_action_get_day": "day",
+    "_action_tell_joke": "joke",
+    "_action_flip_coin": "coin",
+    "_action_roll_dice": "dice",
+    "_action_calculate": "calc",
+}
 
 SIMPLE_GATED = {
-    "_action_lock_pc": ("system_control", {"action": "lock_pc"},
-                        "Locking the workstation"),
-    "_action_take_screenshot": ("system_control", {"action": "take_screenshot"},
-                                "Screenshot captured."),
-    "_action_empty_recycle_bin": ("system_control",
-                                  {"action": "empty_recycle_bin"},
-                                  "Recycle Bin emptied"),
-    "_action_check_battery": ("system_control", {"action": "check_battery"},
-                              None),
+    "_action_lock_pc": ("system_control", {"action": "lock_pc"}, "Locking the workstation"),
+    "_action_take_screenshot": (
+        "system_control",
+        {"action": "take_screenshot"},
+        "Screenshot captured.",
+    ),
+    "_action_empty_recycle_bin": (
+        "system_control",
+        {"action": "empty_recycle_bin"},
+        "Recycle Bin emptied",
+    ),
+    "_action_check_battery": ("system_control", {"action": "check_battery"}, None),
     "_action_read_notes": ("manage_notes", {"action": "read"}, None),
-    "_action_clear_notes": ("manage_notes", {"action": "clear"},
-                            "Your notes have been cleared."),
-    "_action_weather_general": ("web_search", {"query": "weather"},
-                                "Showing the current weather forecast"),
+    "_action_clear_notes": ("manage_notes", {"action": "clear"}, "Your notes have been cleared."),
+    "_action_weather_general": (
+        "web_search",
+        {"query": "weather"},
+        "Showing the current weather forecast",
+    ),
 }
 
 
@@ -181,21 +207,27 @@ def main():
             if not (isinstance(t, ast.Attribute) and t.attr == "commands"):
                 continue
             for elt in node.value.elts:
-                d = {k.value: v
-                     for k, v in zip(elt.keys, elt.values, strict=True)}
+                d = {k.value: v for k, v in zip(elt.keys, elt.values, strict=True)}
                 rid = d["id"].value
                 patterns = str_list(d["patterns"])
                 act = d["action"]
-                rule = {"id": rid, "patterns": patterns, "tool": None,
-                        "args": {}, "reply": None, "compute": None}
+                rule = {
+                    "id": rid,
+                    "patterns": patterns,
+                    "tool": None,
+                    "args": {},
+                    "reply": None,
+                    "compute": None,
+                }
 
                 if rid in EXCLUDED:
                     skipped.append(rid)
                     continue
                 if rid in HANDWRITTEN:
                     h = HANDWRITTEN[rid]
-                    rule.update({k: h.get(k, rule[k]) for k in
-                                 ("tool", "args", "reply", "compute")})
+                    rule.update(
+                        {k: h.get(k, rule[k]) for k in ("tool", "args", "reply", "compute")}
+                    )
                     if "patterns" in h:
                         rule["patterns"] = h["patterns"]
                     rules.append(rule)
@@ -205,60 +237,76 @@ def main():
                     call = act.body
                     if isinstance(call, ast.Constant):  # identity/help/exit
                         rule["reply"] = call.value
-                    elif (isinstance(call, ast.Call)
-                          and isinstance(call.func, ast.Attribute)
-                          and call.func.value.id == "random"
-                          and call.func.attr == "choice"):
+                    elif (
+                        isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Attribute)
+                        and call.func.value.id == "random"
+                        and call.func.attr == "choice"
+                    ):
                         rule["reply"] = str_list(call.args[0])
-                    elif isinstance(call, ast.Call) and isinstance(
-                            call.func, ast.Attribute):
+                    elif isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute):
                         meth = call.func.attr
                         a = call.args
-                        kw = {k.arg: const(k.value) for k in call.keywords
-                              if isinstance(k.value, ast.Constant)}
+                        kw = {
+                            k.arg: const(k.value)
+                            for k in call.keywords
+                            if isinstance(k.value, ast.Constant)
+                        }
                         if meth == "_open_url":
-                            rule.update(tool="open_website",
-                                        args={"url_or_name": const(a[0])},
-                                        reply=const(a[1]))
+                            rule.update(
+                                tool="open_website",
+                                args={"url_or_name": const(a[0])},
+                                reply=const(a[1]),
+                            )
                         elif meth == "_press_key":
-                            rule.update(tool="keyboard_mouse_action",
-                                        args={"action": "press_key",
-                                              "value": const(a[0])},
-                                        reply=const(a[1]))
+                            rule.update(
+                                tool="keyboard_mouse_action",
+                                args={"action": "press_key", "value": const(a[0])},
+                                reply=const(a[1]),
+                            )
                         elif meth == "_hotkey":
                             keys = str_list(a[0])
-                            rule.update(tool="keyboard_mouse_action",
-                                        args={"action": "press_hotkey",
-                                              "value": "+".join(keys)},
-                                        reply=const(a[1]))
+                            rule.update(
+                                tool="keyboard_mouse_action",
+                                args={"action": "press_hotkey", "value": "+".join(keys)},
+                                reply=const(a[1]),
+                            )
                         elif meth == "_launch_app":
                             cmd = const(a[0])
-                            rule.update(tool="open_application",
-                                        args={"app_name": LAUNCH_NORMALIZE.get(
-                                            cmd.strip().lower(), cmd)},
-                                        reply=const(a[1]))
+                            rule.update(
+                                tool="open_application",
+                                args={"app_name": LAUNCH_NORMALIZE.get(cmd.strip().lower(), cmd)},
+                                reply=const(a[1]),
+                            )
                         elif meth == "_change_volume":
                             up = kw.get("up", True)
                             # Legacy pressed N times; the ToolSpec does one
                             # step per call (behavior change, now gated).
-                            rule.update(tool="system_control",
-                                        args={"action": "volume_up" if up else "volume_down"},
-                                        reply=kw.get("msg") or (
-                                            "Volume increased" if up else "Volume decreased"))
+                            rule.update(
+                                tool="system_control",
+                                args={"action": "volume_up" if up else "volume_down"},
+                                reply=kw.get("msg")
+                                or ("Volume increased" if up else "Volume decreased"),
+                            )
                         elif meth == "_gated":
                             tool_name = const(a[0])
-                            args = {const(k): const(v)
-                                    for k, v in zip(a[1].keys, a[1].values,
-                                                    strict=True)}
+                            args = {
+                                const(k): const(v)
+                                for k, v in zip(a[1].keys, a[1].values, strict=True)
+                            }
                             ok = const(a[2]) if len(a) > 2 else None
                             rule.update(tool=tool_name, args=args, reply=ok)
                         elif meth == "_action_scroll":
                             down = kw.get("down", True)
                             # No scroll ToolSpec: closest gated equivalent.
-                            rule.update(tool="keyboard_mouse_action",
-                                        args={"action": "press_key",
-                                              "value": "pagedown" if down else "pageup"},
-                                        reply="Scrolled down" if down else "Scrolled up")
+                            rule.update(
+                                tool="keyboard_mouse_action",
+                                args={
+                                    "action": "press_key",
+                                    "value": "pagedown" if down else "pageup",
+                                },
+                                reply="Scrolled down" if down else "Scrolled up",
+                            )
                         elif meth in COMPUTE_IDS:
                             rule["compute"] = COMPUTE_IDS[meth]
                         elif meth in SIMPLE_GATED:
@@ -276,36 +324,38 @@ def main():
                 rules.append(rule)
 
     # ---- emit ----
-    lines = ['# ruff: noqa: E501  (generated file — long string constants are data)',
-             '"""Reflex rule data — AST-extracted from the legacy voice command table.',
-             '',
-             'DO NOT EDIT BY HAND. Regenerate with scripts/extract_reflex_rules.py',
-             'after changing src/jarvis/voice/interface.py.',
-             '',
-             'Each rule: patterns -> ToolSpec call (policy-gated by the router)',
-             'or a computed/reply-only response. Template syntax in args/reply:',
-             '  {groupN}            regex group N (1-based)',
-             '  {groupN|urlencode}  URL-encoded group',
-             '  {groupN|default:X}  X when the group is empty/missing',
-             '"""',
-             '',
-             'RULES = [']
+    lines = [
+        "# ruff: noqa: E501  (generated file — long string constants are data)",
+        '"""Reflex rule data — AST-extracted from the legacy voice command table.',
+        "",
+        "DO NOT EDIT BY HAND. Regenerate with scripts/extract_reflex_rules.py",
+        "after changing src/jarvis/voice/interface.py.",
+        "",
+        "Each rule: patterns -> ToolSpec call (policy-gated by the router)",
+        "or a computed/reply-only response. Template syntax in args/reply:",
+        "  {groupN}            regex group N (1-based)",
+        "  {groupN|urlencode}  URL-encoded group",
+        "  {groupN|default:X}  X when the group is empty/missing",
+        '"""',
+        "",
+        "RULES = [",
+    ]
     for r in rules:
-        lines.append('    {')
+        lines.append("    {")
         lines.append(f'        "id": {r["id"]!r},')
         lines.append('        "patterns": [')
         for p in r["patterns"]:
-            lines.append(f'            {p!r},')
-        lines.append('        ],')
+            lines.append(f"            {p!r},")
+        lines.append("        ],")
         lines.append(f'        "tool": {r["tool"]!r},')
         lines.append(f'        "args": {r["args"]!r},')
         lines.append(f'        "reply": {r["reply"]!r},')
         lines.append(f'        "compute": {r["compute"]!r},')
-        lines.append('    },')
-    lines.append(']')
-    lines.append('')
-    lines.append(f'JOKES = {JOKES!r}')
-    lines.append('')
+        lines.append("    },")
+    lines.append("]")
+    lines.append("")
+    lines.append(f"JOKES = {JOKES!r}")
+    lines.append("")
     open(OUT, "w").write("\n".join(lines) + "\n")
     print(f"wrote {len(rules)} rules, skipped {len(skipped)}: {skipped}")
 

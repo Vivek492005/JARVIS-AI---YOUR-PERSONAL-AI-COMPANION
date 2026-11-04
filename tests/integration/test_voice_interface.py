@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 for _mod in ("pyautogui",):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 
-from access_os.voice_interface import VoiceInterface, VoiceCommand
+from access_os.voice_interface import VoiceInterface, VoiceCommand  # noqa: E402
 
 
 class TestVoiceInterface(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestVoiceInterface(unittest.TestCase):
         self.voice_interface.engine.say.assert_called_once_with(test_text)
         self.voice_interface.engine.runAndWait.assert_called_once()
 
-    @patch('access_os.voice_interface.threading.Thread')
+    @patch("access_os.voice_interface.threading.Thread")
     def test_speak_async(self, mock_thread):
         """Test the speak method with async=True."""
         test_text = "Hello, async world!"

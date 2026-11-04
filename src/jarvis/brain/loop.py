@@ -70,6 +70,7 @@ class Observation:
 # Planner protocol
 # ---------------------------------------------------------------------------
 
+
 class Planner:
     """Produces plans and next actions. LLM-backed or fake (tests)."""
 
@@ -91,8 +92,9 @@ ACTION_SCHEMA_HINT = """Reply with ONE JSON object, one of:
 class LLMPlanner(Planner):
     """Planner backed by any LLMProvider. Repair loop for bad JSON (max 2)."""
 
-    def __init__(self, provider, system_prompt: str = "", temperature: float = 0.3,
-                 max_repair: int = 2) -> None:
+    def __init__(
+        self, provider, system_prompt: str = "", temperature: float = 0.3, max_repair: int = 2
+    ) -> None:
         self.provider = provider
         self.system_prompt = system_prompt
         self.temperature = temperature
@@ -103,40 +105,53 @@ class LLMPlanner(Planner):
         for _ in range(self.max_repair + 1):
             msgs = list(messages)
             if last_error:
-                msgs.append({"role": "user",
-                             "content": f"Your last reply was not valid: {last_error}. "
-                                        f"{ACTION_SCHEMA_HINT}"})
-            comp = self.provider.complete(msgs, tools=tools,
-                                          temperature=self.temperature)
+                msgs.append(
+                    {
+                        "role": "user",
+                        "content": f"Your last reply was not valid: {last_error}. "
+                        f"{ACTION_SCHEMA_HINT}",
+                    }
+                )
+            comp = self.provider.complete(msgs, tools=tools, temperature=self.temperature)
             action = _parse_action(comp.text)
             if action is not None:
                 return action
             last_error = "not a valid action JSON object"
         # Repair exhausted: finish honestly rather than hallucinate.
-        return Action(type="finish",
-                      reply="Samajh nahi paya — kripya dobara batayein.")
+        return Action(type="finish", reply="Samajh nahi paya — kripya dobara batayein.")
 
     def plan(self, goal: str, ctx: "LoopContext") -> Plan:
-        msgs = [{"role": "system", "content": self.system_prompt},
-                {"role": "user",
-                 "content": f"Goal: {goal}\nReply with a short numbered plan "
-                            f"(JSON list of step strings) inside "
-                            f'{{"type":"finish","reply":"PLAN: ..." }}'}]
+        msgs = [
+            {"role": "system", "content": self.system_prompt},
+            {
+                "role": "user",
+                "content": f"Goal: {goal}\nReply with a short numbered plan "
+                f"(JSON list of step strings) inside "
+                f'{{"type":"finish","reply":"PLAN: ..." }}',
+            },
+        ]
         action = self._ask(msgs)
         steps = _extract_plan_steps(action.reply)
         return Plan(goal=goal, steps=steps)
 
     def next_action(self, goal: str, plan: Plan, ctx: "LoopContext") -> Action:
         hist = "\n".join(
-            f"- {o.tool}({o.args}) -> ok={o.ok}: {o.evidence[:120]}"
-            for o in ctx.history[-6:])
-        msgs = ([{"role": "system", "content": self.system_prompt}] +
-                ctx.messages_for_llm() +
-                [{"role": "user",
-                  "content": f"Goal: {goal}\nPlan: {plan.steps}\n"
-                             f"History:\n{hist or '(none)'}\n"
-                             f"{ACTION_SCHEMA_HINT}"}])
+            f"- {o.tool}({o.args}) -> ok={o.ok}: {o.evidence[:120]}" for o in ctx.history[-6:]
+        )
+        msgs = (
+            [{"role": "system", "content": self.system_prompt}]
+            + ctx.messages_for_llm()
+            + [
+                {
+                    "role": "user",
+                    "content": f"Goal: {goal}\nPlan: {plan.steps}\n"
+                    f"History:\n{hist or '(none)'}\n"
+                    f"{ACTION_SCHEMA_HINT}",
+                }
+            ]
+        )
         from jarvis.tools.registry import function_schemas
+
         return self._ask(msgs, tools=function_schemas())
 
 
@@ -180,6 +195,7 @@ def _extract_plan_steps(reply: str) -> List[str]:
 # Verifier (4.1b) — postconditions make "Reflect" real
 # ---------------------------------------------------------------------------
 
+
 class Verifier:
     """Checks a tool result against a postcondition.
 
@@ -192,6 +208,7 @@ class Verifier:
         # tools + the verifiable/unverifiable distinction).
         try:
             from jarvis.perception import postconditions as _pc
+
             if _pc.has_check(tool_name):
                 return _pc.verify(tool_name, args, result)
         except Exception:
@@ -214,11 +231,19 @@ class Verifier:
         # Best-effort process check on Windows; trust + evidence elsewhere.
         try:
             import subprocess
-            out = subprocess.run(["tasklist"], capture_output=True, text=True,
-                                 timeout=5).stdout.lower()
+
+            out = subprocess.run(
+                ["tasklist"],  # noqa: S607 — fixed Windows system binary
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout.lower()
             hit = any(tok in out for tok in name.split() if len(tok) > 2)
-            return (True, f"process list contains '{name}'") if hit else \
-                (True, f"launched (process check inconclusive): {result[:120]}")
+            return (
+                (True, f"process list contains '{name}'")
+                if hit
+                else (True, f"launched (process check inconclusive): {result[:120]}")
+            )
         except Exception:
             return True, f"launched (unverified on this platform): {result[:120]}"
 
@@ -247,6 +272,7 @@ class Verifier:
 # Undo journal (4.1.5 + 4.9)
 # ---------------------------------------------------------------------------
 
+
 # Inverse operations for reversible tools: (tool, args) -> (inverse_tool, inverse_args)
 def _inverse_of(tool: str, args: Dict[str, Any]) -> Optional[Tuple[str, Dict[str, Any]]]:
     if tool == "manage_notes" and args.get("action") == "save":
@@ -259,6 +285,7 @@ def _inverse_of(tool: str, args: Dict[str, Any]) -> Optional[Tuple[str, Dict[str
     if tool in ("move_file", "copy_file"):
         # Phase 5.6: file inverses live in perception.files.
         from jarvis.perception import files as _files
+
         return _files.inverse_of(tool, args)
     return None
 
@@ -277,10 +304,11 @@ class UndoJournal:
         # during execution; drain them here so "wapas kar do" replays each.
         try:
             from jarvis.perception import files as _files
+
             for inv_tool, inv_args in _files.drain_pending_undo():
                 self._stack.append((inv_tool, inv_args, f"{tool} (bulk)"))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("drain_pending_undo best-effort failed: %s", e)
 
     def undo_last(self, executor) -> str:
         """executor: (tool, args) -> str. Returns user-facing message."""
@@ -293,6 +321,7 @@ class UndoJournal:
             # Guarded and best-effort — the undo path must never break.
             try:
                 from jarvis.learning.recorder import record_undo_event
+
                 record_undo_event(tool, args, desc)
             except Exception:  # noqa: S110 - undo must never break
                 pass
@@ -319,14 +348,17 @@ def needs_handoff(text: str) -> Optional[str]:
     """Return a handoff message if the text describes a user-action gate."""
     for pat in _HANDOFF_PATTERNS:
         if pat.search(text or ""):
-            return ("Yahan aapki zaroorat hai (login/CAPTCHA/payment/permission). "
-                    "Aap kar do, phir bol dena 'ho gaya'.")
+            return (
+                "Yahan aapki zaroorat hai (login/CAPTCHA/payment/permission). "
+                "Aap kar do, phir bol dena 'ho gaya'."
+            )
     return None
 
 
 # ---------------------------------------------------------------------------
 # Loop context + the loop itself
 # ---------------------------------------------------------------------------
+
 
 class LoopContext:
     """Per-task state: history, retries, entities, undo journal."""
@@ -342,8 +374,7 @@ class LoopContext:
     def add_observation(self, obs: Observation) -> None:
         self.history.append(obs)
         if self.ctx_manager is not None:
-            self.ctx_manager.add_tool_observation(obs.tool,
-                                                  f"ok={obs.ok} {obs.evidence}")
+            self.ctx_manager.add_tool_observation(obs.tool, f"ok={obs.ok} {obs.evidence}")
 
     def messages_for_llm(self) -> List[Dict[str, str]]:
         if self.ctx_manager is not None:
@@ -383,7 +414,7 @@ class AgentLoop:
                 logger.exception("bus emit failed")
 
     def run_task(self, goal: str, ctx: Optional[LoopContext] = None) -> str:
-        from jarvis.core.events import AgentThinking, ToolFinished, ToolRequested
+        from jarvis.core.events import AgentThinking
 
         ctx = ctx or LoopContext()
         deadline = time.time() + self.wall_time_s
@@ -425,22 +456,30 @@ class AgentLoop:
         fails = [o for o in ctx.history if not o.ok]
         if fails and ("ho gaya" in reply.lower() or "done" in reply.lower()):
             # Don't let the model claim success when steps failed.
-            return (f"{reply} (note: {len(fails)} step(s) verify nahi hue: "
-                    f"{', '.join(o.tool for o in fails)})")
+            return (
+                f"{reply} (note: {len(fails)} step(s) verify nahi hue: "
+                f"{', '.join(o.tool for o in fails)})"
+            )
         return reply
 
     def _clarify(self, action: Action, ctx: LoopContext) -> str:
         from jarvis.brain.disambiguate import format_options, parse_selection
+
         question = action.question or "Kaunsa?"
         options = action.options or []
         if self.clarify_callback is not None and options:
             answer = self.clarify_callback(question, options)
             idx = parse_selection(answer, len(options))
             if idx is not None:
-                ctx.add_observation(Observation(
-                    tool="clarify", args={"options": options},
-                    result=f"user picked: {options[idx]}", ok=True,
-                    evidence=f"user picked: {options[idx]}"))
+                ctx.add_observation(
+                    Observation(
+                        tool="clarify",
+                        args={"options": options},
+                        result=f"user picked: {options[idx]}",
+                        ok=True,
+                        evidence=f"user picked: {options[idx]}",
+                    )
+                )
                 # Continue the loop with the answer as a fresh observation.
                 return self._resume_after_clarify(ctx, options[idx])
         return format_options(question, options) if options else question
@@ -463,9 +502,15 @@ class AgentLoop:
 
         spec = REGISTRY.get(action.tool)
         if spec is None:
-            ctx.add_observation(Observation(
-                tool=action.tool, args=action.args, result="unknown tool",
-                ok=False, evidence=f"unknown tool: {action.tool}"))
+            ctx.add_observation(
+                Observation(
+                    tool=action.tool,
+                    args=action.args,
+                    result="unknown tool",
+                    ok=False,
+                    evidence=f"unknown tool: {action.tool}",
+                )
+            )
             return None  # error goes back to the planner next step
 
         # Validate args (repair loop is the planner's job; we validate once).
@@ -473,10 +518,15 @@ class AgentLoop:
             validated = spec.params.model_validate(action.args)
             args = validated.model_dump(exclude_none=True)
         except Exception as e:
-            ctx.add_observation(Observation(
-                tool=action.tool, args=action.args,
-                result=f"invalid args: {e}", ok=False,
-                evidence=f"invalid args: {e}"))
+            ctx.add_observation(
+                Observation(
+                    tool=action.tool,
+                    args=action.args,
+                    result=f"invalid args: {e}",
+                    ok=False,
+                    evidence=f"invalid args: {e}",
+                )
+            )
             return None
 
         self._emit(ToolRequested(tool=action.tool, args=args))
@@ -487,11 +537,17 @@ class AgentLoop:
             return handoff
 
         from jarvis.tools.actions import run_action
+
         verdict, result = run_action(action.tool, args)
 
         if verdict == DENY:
-            obs = Observation(tool=action.tool, args=args, result=result,
-                              ok=False, evidence=f"policy DENY: {result[:120]}")
+            obs = Observation(
+                tool=action.tool,
+                args=args,
+                result=result,
+                ok=False,
+                evidence=f"policy DENY: {result[:120]}",
+            )
             ctx.add_observation(obs)
             self._emit(ToolFinished(tool=action.tool, ok=False, result=result))
             return None
@@ -499,34 +555,48 @@ class AgentLoop:
         if verdict == CONFIRM:
             # run_action did NOT execute; the prompt is in `result`.
             if self.confirm_callback is None:
-                return ("Is action ke liye confirmation chahiye, par poochne "
-                        "ka rasta nahi hai.")
+                return "Is action ke liye confirmation chahiye, par poochne ka rasta nahi hai."
             if not self.confirm_callback(action.tool, args):
-                ctx.add_observation(Observation(
-                    tool=action.tool, args=args, result="user ne mana kiya",
-                    ok=False, evidence="user declined confirmation"))
-                self._emit(ToolFinished(tool=action.tool, ok=False,
-                                        result="user declined"))
+                ctx.add_observation(
+                    Observation(
+                        tool=action.tool,
+                        args=args,
+                        result="user ne mana kiya",
+                        ok=False,
+                        evidence="user declined confirmation",
+                    )
+                )
+                self._emit(ToolFinished(tool=action.tool, ok=False, result="user declined"))
                 return None
             # Confirmed: execute directly (run_action would just re-prompt).
             from jarvis.tools.actions import _audit_log, execute_tool_raw
             import time as _time
+
             _t0 = _time.time()
             result = execute_tool_raw(action.tool, args)
-            _audit_log(action.tool, args, "allow",
-                       f"confirmed-by-user; {result}"[:500],
-                       latency_ms=(_time.time() - _t0) * 1000.0)
+            _audit_log(
+                action.tool,
+                args,
+                "allow",
+                f"confirmed-by-user; {result}"[:500],
+                latency_ms=(_time.time() - _t0) * 1000.0,
+            )
 
         handoff = needs_handoff(result)
         if handoff:
-            ctx.add_observation(Observation(
-                tool=action.tool, args=args, result=result, ok=False,
-                evidence="handoff: user action needed"))
+            ctx.add_observation(
+                Observation(
+                    tool=action.tool,
+                    args=args,
+                    result=result,
+                    ok=False,
+                    evidence="handoff: user action needed",
+                )
+            )
             return handoff
 
         ok, evidence = self.verifier.verify(action.tool, args, result)
-        obs = Observation(tool=action.tool, args=args, result=result,
-                          ok=ok, evidence=evidence)
+        obs = Observation(tool=action.tool, args=args, result=result, ok=ok, evidence=evidence)
         ctx.add_observation(obs)
         self._emit(ToolFinished(tool=action.tool, ok=ok, result=evidence))
         ctx.undo.record(action.tool, args, result)
@@ -535,6 +605,8 @@ class AgentLoop:
         if not ok:
             ctx.retries[action.tool] = retries + 1
             if retries + 1 >= 2:
-                return (f"{action.tool} fail ho raha hai: {evidence}. "
-                        f"Yahan tak kiya: {self._progress(ctx)}")
+                return (
+                    f"{action.tool} fail ho raha hai: {evidence}. "
+                    f"Yahan tak kiya: {self._progress(ctx)}"
+                )
         return None

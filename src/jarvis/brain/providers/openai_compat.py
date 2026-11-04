@@ -34,6 +34,7 @@ def _is_quota_error(exc: Exception) -> bool:
         return True
     try:
         from openai import RateLimitError
+
         if isinstance(exc, RateLimitError):
             return True
     except ImportError:
@@ -45,15 +46,21 @@ def _is_quota_error(exc: Exception) -> bool:
 class OpenAICompatibleProvider:
     """Any OpenAI-compatible chat endpoint (plan's ``OpenAICompatible``)."""
 
-    def __init__(self, name: str, api_key: str, base_url: str, model: str,
-                 timeout: httpx.Timeout = DEFAULT_TIMEOUT,
-                 client: Any = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        api_key: str,
+        base_url: str,
+        model: str,
+        timeout: httpx.Timeout = DEFAULT_TIMEOUT,
+        client: Any = None,
+    ) -> None:
         from openai import OpenAI  # lazy: keeps import cost off module load
+
         self._name = name
         self._model = model
         self._base_url = base_url.rstrip("/")
-        self._client = client or OpenAI(api_key=api_key, base_url=base_url,
-                                        timeout=timeout)
+        self._client = client or OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
 
     @property
     def name(self) -> str:
@@ -68,9 +75,12 @@ class OpenAICompatibleProvider:
         """The underlying ``openai.OpenAI`` client (back-compat for tests)."""
         return self._client
 
-    def complete(self, messages: List[Dict[str, Any]],
-                 tools: Optional[List[Dict[str, Any]]] = None,
-                 temperature: float = 0.3) -> Completion:
+    def complete(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.3,
+    ) -> Completion:
         kwargs: Dict[str, Any] = {
             "model": self._model,
             "messages": messages,
@@ -116,40 +126,41 @@ class OpenAICompatibleProvider:
 class HuggingFaceRouter(OpenAICompatibleProvider):
     """Primary cloud brain: Qwen 2.5 72B via the HF router."""
 
-    def __init__(self, api_key: str,
-                 model: Optional[str] = None,
-                 base_url: Optional[str] = None, **kw) -> None:
+    def __init__(
+        self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kw
+    ) -> None:
         super().__init__(
-            "huggingface", api_key,
-            base_url or os.getenv("HUGGINGFACE_BASE_URL",
-                                  "https://router.huggingface.co/v1"),
-            model or os.getenv("HUGGINGFACE_MODEL",
-                               "Qwen/Qwen2.5-72B-Instruct"),
-            **kw)
+            "huggingface",
+            api_key,
+            base_url or os.getenv("HUGGINGFACE_BASE_URL", "https://router.huggingface.co/v1"),
+            model or os.getenv("HUGGINGFACE_MODEL", "Qwen/Qwen2.5-72B-Instruct"),
+            **kw,
+        )
 
 
 class DeepSeek(OpenAICompatibleProvider):
     """Backup cloud brain: DeepSeek chat."""
 
-    def __init__(self, api_key: str,
-                 model: Optional[str] = None,
-                 base_url: Optional[str] = None, **kw) -> None:
+    def __init__(
+        self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kw
+    ) -> None:
         super().__init__(
-            "deepseek", api_key,
-            base_url or os.getenv("DEEPSEEK_BASE_URL",
-                                  "https://api.deepseek.com"),
+            "deepseek",
+            api_key,
+            base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
             model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-            **kw)
+            **kw,
+        )
 
 
 class Ollama(OpenAICompatibleProvider):
     """Local brain: Ollama (OpenAI-compatible /v1 endpoint)."""
 
-    def __init__(self, model: Optional[str] = None,
-                 base_url: Optional[str] = None, **kw) -> None:
+    def __init__(self, model: Optional[str] = None, base_url: Optional[str] = None, **kw) -> None:
         super().__init__(
-            "ollama", "ollama",  # key unused locally
-            base_url or os.getenv("OLLAMA_BASE_URL",
-                                  "http://localhost:11434/v1"),
+            "ollama",
+            "ollama",  # key unused locally
+            base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
             model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
-            **kw)
+            **kw,
+        )

@@ -50,8 +50,7 @@ def test_clipboard_content_on_explicit_ask(desktop):
 
 def test_sensitive_window_redacted(desktop):
     made = desktop
-    made["context"] = _ctx(title="KeePassXC", process="keepassxc.exe",
-                           selection="hunter2")
+    made["context"] = _ctx(title="KeePassXC", process="keepassxc.exe", selection="hunter2")
     _reinstall(made)
     snap = get_context(detail="selection")
     assert snap.window_title == "[sensitive window]"
@@ -93,6 +92,7 @@ def test_tool_registered():
 
 def test_run_action_get_context(desktop):
     from jarvis.tools.actions import run_action
+
     verdict, result = run_action("get_context", {})
     assert verdict == "allow", result
     assert "active window" in result
@@ -102,11 +102,14 @@ def test_run_action_get_context(desktop):
 
 # -- helpers ---------------------------------------------------------------
 
+
 def _ctx(**kw):
     from fakes.fake_desktop import FakeContext
+
     return FakeContext(**kw)
 
 
 def _reinstall(made):
     from jarvis.perception import backends as B
+
     B.set_backend("context", made["context"])

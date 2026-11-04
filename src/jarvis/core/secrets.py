@@ -32,6 +32,7 @@ SECRET_NAMES: Dict[str, str] = {
 def keyring_available() -> bool:
     try:
         import keyring  # type: ignore
+
         # A backend that can actually store (not the fail backend).
         return not str(type(keyring.get_keyring())).endswith("FailKeyring'>")
     except ImportError:
@@ -53,8 +54,8 @@ def get_secret(env_name: str) -> str:
         return ""
     try:
         import keyring  # type: ignore
-        return keyring.get_password(KEYRING_SERVICE,
-                                    SECRET_NAMES.get(env_name, env_name)) or ""
+
+        return keyring.get_password(KEYRING_SERVICE, SECRET_NAMES.get(env_name, env_name)) or ""
     except Exception as e:
         logger.warning(f"keyring read failed for {env_name}: {e}")
         return ""
@@ -67,8 +68,8 @@ def store_secret(env_name: str, value: str) -> bool:
         return False
     try:
         import keyring  # type: ignore
-        keyring.set_password(KEYRING_SERVICE,
-                             SECRET_NAMES.get(env_name, env_name), value)
+
+        keyring.set_password(KEYRING_SERVICE, SECRET_NAMES.get(env_name, env_name), value)
         return True
     except Exception as e:
         logger.error(f"keyring store failed for {env_name}: {e}")
@@ -80,8 +81,8 @@ def delete_secret(env_name: str) -> bool:
         return False
     try:
         import keyring  # type: ignore
-        keyring.delete_password(KEYRING_SERVICE,
-                                SECRET_NAMES.get(env_name, env_name))
+
+        keyring.delete_password(KEYRING_SERVICE, SECRET_NAMES.get(env_name, env_name))
         return True
     except Exception:
         logger.debug(f"keyring delete failed for {env_name} (non-fatal)")
@@ -94,8 +95,9 @@ def secret_status() -> Dict[str, Dict[str, bool]]:
     for env_name in SECRET_NAMES:
         out[env_name] = {
             "env": bool(os.getenv(env_name)),
-            "keyring": bool(keyring_available() and get_secret(env_name)
-                            and not os.getenv(env_name)),
+            "keyring": bool(
+                keyring_available() and get_secret(env_name) and not os.getenv(env_name)
+            ),
         }
     return out
 
@@ -103,6 +105,7 @@ def secret_status() -> Dict[str, Dict[str, bool]]:
 # ---------------------------------------------------------------------------
 # Logging redaction filter
 # ---------------------------------------------------------------------------
+
 
 class SecretRedactingFilter(logging.Filter):
     """Scrub registered secret values out of log records."""
@@ -154,15 +157,15 @@ def install_secret_redaction() -> SecretRedactingFilter:
 # CLI: python -m access_os.secrets <store|delete|status>
 # ---------------------------------------------------------------------------
 
+
 def main(argv=None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(prog="jarvis secrets",
-                                 description="Manage secrets (OS keyring)")
+
+    ap = argparse.ArgumentParser(prog="jarvis secrets", description="Manage secrets (OS keyring)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("store", help="store a key in the OS keyring")
-    p.add_argument("name", choices=list(SECRET_NAMES),
-                   help="which secret to store")
+    p.add_argument("name", choices=list(SECRET_NAMES), help="which secret to store")
 
     p = sub.add_parser("delete", help="delete a key from the OS keyring")
     p.add_argument("name", choices=list(SECRET_NAMES))
@@ -173,8 +176,7 @@ def main(argv=None) -> int:
 
     if a.cmd == "status":
         for name, src in secret_status().items():
-            where = ("env" if src["env"]
-                     else "keyring" if src["keyring"] else "NOT SET")
+            where = "env" if src["env"] else "keyring" if src["keyring"] else "NOT SET"
             print(f"{name}: {where}")
         if not keyring_available():
             print("(OS keyring unavailable — use .env)")

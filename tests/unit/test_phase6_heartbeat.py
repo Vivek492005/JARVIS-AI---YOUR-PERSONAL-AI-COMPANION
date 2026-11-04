@@ -3,7 +3,9 @@
 from datetime import datetime
 
 from jarvis.integrations.heartbeat import (
-    Heartbeat, HeartbeatConfig, in_quiet_hours,
+    Heartbeat,
+    HeartbeatConfig,
+    in_quiet_hours,
 )
 
 
@@ -13,8 +15,7 @@ def dt(h=12, mi=0):
 
 def _hb(notes, **kw):
     cfg = HeartbeatConfig(**kw)
-    return Heartbeat(config=cfg, notify=notes.append,
-                     now_fn=lambda: dt())
+    return Heartbeat(config=cfg, notify=notes.append, now_fn=lambda: dt())
 
 
 def test_quiet_hours_overnight():
@@ -28,6 +29,7 @@ def test_quiet_hours_overnight():
 
 def test_heartbeat_ok_when_nothing(monkeypatch):
     from jarvis.integrations import heartbeat as hbmod
+
     monkeypatch.setattr(hbmod.Heartbeat, "_run_read", lambda s, t, a: "")
     notes = []
     hb = _hb(notes)
@@ -57,64 +59,73 @@ def test_quiet_hours_holds_normal_but_not_urgent(monkeypatch):
         if tool == "calendar_list":
             return "[ev1] Standup | x"
         if tool == "system_control":
-            return "Battery: 5% (discharging)"   # urgent
+            return "Battery: 5% (discharging)"  # urgent
         return ""
 
     monkeypatch.setattr(hbmod.Heartbeat, "_run_read", fake_read)
     notes = []
-    hb = Heartbeat(config=HeartbeatConfig(),
-                   notify=notes.append,
-                   now_fn=lambda: dt(h=2))       # 02:00, quiet
+    hb = Heartbeat(
+        config=HeartbeatConfig(), notify=notes.append, now_fn=lambda: dt(h=2)
+    )  # 02:00, quiet
     hb.tick()
     kinds = [n.title for n in notes]
-    assert "Battery low" in kinds                  # urgent passes
-    assert "Meeting in 30 minutes" not in kinds    # normal held
+    assert "Battery low" in kinds  # urgent passes
+    assert "Meeting in 30 minutes" not in kinds  # normal held
 
 
 def test_rate_limit_caps_proactive(monkeypatch):
     from jarvis.integrations import heartbeat as hbmod
-    monkeypatch.setattr(hbmod.Heartbeat, "_run_read",
-                        lambda s, t, a: "[ev1] x" if t == "calendar_list" else "")
+
+    monkeypatch.setattr(
+        hbmod.Heartbeat, "_run_read", lambda s, t, a: "[ev1] x" if t == "calendar_list" else ""
+    )
     notes = []
     hb = _hb(notes, max_per_day=2)
     assert hb.tick() == "NOTIFIED"
     assert hb.tick() == "NOTIFIED"
-    assert hb.tick() == "HEARTBEAT_OK"             # budget exhausted
+    assert hb.tick() == "HEARTBEAT_OK"  # budget exhausted
     assert len(notes) == 2
 
 
 def test_non_read_check_tools_skipped(monkeypatch):
     # A heartbeat check whose tool is above READ must be skipped, never run.
     from jarvis.tools import actions as actmod
+
     calls = []
-    monkeypatch.setattr(actmod, "run_action",
-                        lambda t, a: calls.append(t) or ("allow", "x"))
+    monkeypatch.setattr(actmod, "run_action", lambda t, a: calls.append(t) or ("allow", "x"))
     hb = _hb([])
-    assert hb._run_read("mail_send", {"to": "a", "subject": "s",
-                                      "body": "b"}) is None
+    assert hb._run_read("mail_send", {"to": "a", "subject": "s", "body": "b"}) is None
     assert calls == []
 
 
 def test_daily_brief_opt_in_once(monkeypatch):
     from jarvis.integrations import heartbeat as hbmod
-    monkeypatch.setattr(hbmod.Heartbeat, "_run_read",
-                        lambda s, t, a: "some data")
+
+    monkeypatch.setattr(hbmod.Heartbeat, "_run_read", lambda s, t, a: "some data")
     notes = []
-    hb = Heartbeat(config=HeartbeatConfig(
-        rules={"calendar_meeting": False, "mail_vip": False,
-               "battery_low": False, "daily_brief": True}),
-        notify=notes.append, now_fn=lambda: dt(h=8))
+    hb = Heartbeat(
+        config=HeartbeatConfig(
+            rules={
+                "calendar_meeting": False,
+                "mail_vip": False,
+                "battery_low": False,
+                "daily_brief": True,
+            }
+        ),
+        notify=notes.append,
+        now_fn=lambda: dt(h=8),
+    )
     assert hb.tick() == "NOTIFIED"
     assert any(n.title == "Daily Brief" for n in notes)
     notes.clear()
-    assert hb.tick() == "HEARTBEAT_OK"             # once per day
+    assert hb.tick() == "HEARTBEAT_OK"  # once per day
 
 
 def test_daily_brief_opt_out_by_default(monkeypatch):
     from jarvis.integrations import heartbeat as hbmod
-    monkeypatch.setattr(hbmod.Heartbeat, "_run_read",
-                        lambda s, t, a: "some data")
+
+    monkeypatch.setattr(hbmod.Heartbeat, "_run_read", lambda s, t, a: "some data")
     notes = []
-    hb = _hb(notes)                               # daily_brief False
+    hb = _hb(notes)  # daily_brief False
     hb.tick()
     assert all(n.title != "Daily Brief" for n in notes)

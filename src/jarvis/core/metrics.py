@@ -18,8 +18,17 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_CSV_FIELDS = ["ts", "trace", "path", "reflex_match_ms", "run_ms",
-               "total_ms", "provider", "degraded", "error"]
+_CSV_FIELDS = [
+    "ts",
+    "trace",
+    "path",
+    "reflex_match_ms",
+    "run_ms",
+    "total_ms",
+    "provider",
+    "degraded",
+    "error",
+]
 
 
 def _metrics_dir() -> str:
@@ -44,10 +53,15 @@ class MetricsRecorder:
         day = time.strftime("%Y-%m-%d")
         return os.path.join(self._dir, f"{day}.csv")
 
-    def record(self, trace: str, path: str,
-               timings: Optional[Dict[str, float]] = None,
-               provider: str = "", degraded: bool = False,
-               error: str = "") -> None:
+    def record(
+        self,
+        trace: str,
+        path: str,
+        timings: Optional[Dict[str, float]] = None,
+        provider: str = "",
+        degraded: bool = False,
+        error: str = "",
+    ) -> None:
         """Append one utterance row. Never raises (metrics must not break
         the turn)."""
         timings = timings or {}
@@ -66,8 +80,7 @@ class MetricsRecorder:
             with self._lock:
                 path_csv = self._path_for_today()
                 new = not os.path.exists(path_csv)
-                with open(path_csv, "a", newline="",
-                          encoding="utf-8") as f:
+                with open(path_csv, "a", newline="", encoding="utf-8") as f:
                     w = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
                     if new:
                         w.writeheader()

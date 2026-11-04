@@ -9,24 +9,25 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 sys.modules.setdefault("pyautogui", MagicMock(name="pyautogui"))
 
-from jarvis.brain.reflection import Reflector, parse_lesson
-from jarvis.brain.skills.loader import (
+from jarvis.brain.reflection import Reflector, parse_lesson  # noqa: E402
+from jarvis.brain.skills.loader import (  # noqa: E402
     _parse_frontmatter,
     _parse_tools,
     load_all,
     load_manifest,
 )
-from jarvis.brain.skills.scaffold import new_skill
-from jarvis.brain.skills.trust import SkillTrust, TrustLevel, TrustStore
-from jarvis.tools.registry import REGISTRY, Risk, ToolSpec
+from jarvis.brain.skills.scaffold import new_skill  # noqa: E402
+from jarvis.brain.skills.trust import TrustLevel, TrustStore  # noqa: E402
+from jarvis.tools.registry import REGISTRY, Risk, ToolSpec  # noqa: E402
 
 
 def _demo_spec(name="demo_tool_tp", risk=Risk.REVERSIBLE):
     from pydantic import BaseModel
+
     class P(BaseModel):
         pass
-    return ToolSpec(name=name, description="d", params=P, risk=risk,
-                    handler=lambda a: ("ok", None))
+
+    return ToolSpec(name=name, description="d", params=P, risk=risk, handler=lambda a: ("ok", None))
 
 
 @pytest.fixture
@@ -58,6 +59,7 @@ def _skill_dir(tmp_path, name="demo", tools_block="- name: demo_tool\n  risk: re
 # Manifest parsing
 # ---------------------------------------------------------------------------
 
+
 def test_parse_frontmatter_multiline_tools(tmp_path):
     d = _skill_dir(tmp_path)
     fm = _parse_frontmatter((d / "SKILL.md").read_text(encoding="utf-8"))
@@ -78,27 +80,35 @@ def test_load_manifest_requires_frontmatter(tmp_path):
 # Trust: third-party defaults to DESTRUCTIVE
 # ---------------------------------------------------------------------------
 
+
 def test_third_party_tool_forced_destructive(clean_registry):
     from jarvis.brain.skills.loader import _register, SkillManifest, SkillToolDecl
-    from jarvis.tools.registry import ToolSpec
-    manifest = SkillManifest(name="x", description="x",
-                             tools=[SkillToolDecl("demo_tool", "reversible")],
-                             trust=TrustLevel.THIRD_PARTY)
+
+    manifest = SkillManifest(
+        name="x",
+        description="x",
+        tools=[SkillToolDecl("demo_tool", "reversible")],
+        trust=TrustLevel.THIRD_PARTY,
+    )
     out = _register(manifest, _demo_spec())
     assert out.risk == Risk.DESTRUCTIVE
 
 
 def test_local_skill_keeps_declared_tier(clean_registry):
     from jarvis.brain.skills.loader import _register, SkillManifest, SkillToolDecl
-    from jarvis.tools.registry import ToolSpec
-    manifest = SkillManifest(name="x", description="x",
-                             tools=[SkillToolDecl("demo_tool_local", "reversible")],
-                             trust=TrustLevel.LOCAL)
+
+    manifest = SkillManifest(
+        name="x",
+        description="x",
+        tools=[SkillToolDecl("demo_tool_local", "reversible")],
+        trust=TrustLevel.LOCAL,
+    )
     assert _register(manifest, _demo_spec("demo_tool_local")).risk == Risk.REVERSIBLE
 
 
 def test_trust_store_pins_and_verifies(tmp_path):
     from jarvis.brain.skills.trust import sha256_of
+
     store = TrustStore()
     f = tmp_path / "tool.py"
     f.write_text("x = 1\n", encoding="utf-8")
@@ -113,6 +123,7 @@ def test_trust_store_pins_and_verifies(tmp_path):
 # load_all: dogfood skills + .disabled
 # ---------------------------------------------------------------------------
 
+
 def test_load_all_dogfood_skills():
     skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
     if not skills_dir.is_dir():
@@ -123,7 +134,7 @@ def test_load_all_dogfood_skills():
 
 
 def test_disabled_skill_skipped(tmp_path):
-    d = _skill_dir(tmp_path, name="off")
+    _skill_dir(tmp_path, name="off")
     (tmp_path / "off.disabled").touch()
     assert load_all(tmp_path) == []
 
@@ -131,6 +142,7 @@ def test_disabled_skill_skipped(tmp_path):
 # ---------------------------------------------------------------------------
 # Scaffold
 # ---------------------------------------------------------------------------
+
 
 def test_new_skill_scaffold(tmp_path):
     p = new_skill(tmp_path, "my-skill", tool_name="my_tool")
@@ -143,6 +155,7 @@ def test_new_skill_scaffold(tmp_path):
 # Reflection (4.8)
 # ---------------------------------------------------------------------------
 
+
 def test_parse_lesson_hinglish():
     lesson = parse_lesson("seekha: powershell fail hua -> quotes escape karke dobara chalao")
     assert lesson is not None and "quotes" in lesson.what_to_do
@@ -154,11 +167,15 @@ def test_parse_lesson_ignores_plain_text():
 
 def test_reflector_records_failure_episode(tmp_path):
     from jarvis.brain.memory.store import MemoryStore
+
     store = MemoryStore(tmp_path / "m.db")
     try:
         r = Reflector(store)
-        r.record_failure("open_application", "app nahi mila",
-                         lesson_text="seekha: app nahi mila -> pehle installed apps check karo")
+        r.record_failure(
+            "open_application",
+            "app nahi mila",
+            lesson_text="seekha: app nahi mila -> pehle installed apps check karo",
+        )
         eps = store.recent_episodes(limit=5)
         outcomes = {e["outcome"] for e in eps}
         assert "failed" in outcomes and "lesson" in outcomes
@@ -168,11 +185,13 @@ def test_reflector_records_failure_episode(tmp_path):
 
 def test_weekly_proposals_needs_approval(tmp_path):
     from jarvis.brain.memory.store import MemoryStore
+
     store = MemoryStore(tmp_path / "m.db")
     try:
         r = Reflector(store)
-        r.record_failure("x", "kuch fail hua",
-                         lesson_text="lesson: test fail -> test wali baat yaad rakho")
+        r.record_failure(
+            "x", "kuch fail hua", lesson_text="lesson: test fail -> test wali baat yaad rakho"
+        )
         props = r.weekly_proposals()
         # Proposals are strings for the user to approve; the Reflector never
         # writes to MEMORY.md itself (approval gate lives in ProfileStore).

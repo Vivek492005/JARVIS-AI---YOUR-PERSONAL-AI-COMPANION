@@ -12,6 +12,7 @@ Usage:
 
 Exit code: 0 = gate passed, 1 = gate failed.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -32,12 +33,10 @@ CORE_MIN_COVERAGE = 80.0
 # excluded from the gate run, NOT hidden: pytest still reports them as failed
 # in the normal suite run.
 KNOWN_BROKEN = [
-    "tests/unit/test_providers.py",          # 5x ModuleNotFoundError
-    "tests/integration/test_observability.py::"
-    "test_doctor_packages_source_checkout_warns_not_fails",
-    "tests/integration/test_privacy.py::"
-    "test_egress_toggle_blocks_client_creation",
-    "tests/integration/test_main.py",        # legacy GUI collection error
+    "tests/unit/test_providers.py",  # 5x ModuleNotFoundError
+    "tests/integration/test_observability.py::test_doctor_packages_source_checkout_warns_not_fails",
+    "tests/integration/test_privacy.py::test_egress_toggle_blocks_client_creation",
+    "tests/integration/test_main.py",  # legacy GUI collection error
 ]
 
 
@@ -53,23 +52,45 @@ def main() -> int:
     deselect_args: list[str] = ["--ignore", "tests/integration/test_main.py"]
     for item in KNOWN_BROKEN[1:]:  # [0] is test_providers.py, handled below
         deselect_args += ["--deselect", item]
-    rc = _run([sys.executable, "-m", "coverage", "run", "-m", "pytest",
-               "tests/", "-m", "not hardware and not live", "-q",
-               "--ignore", KNOWN_BROKEN[0], *deselect_args])
+    rc = _run(
+        [
+            sys.executable,
+            "-m",
+            "coverage",
+            "run",
+            "-m",
+            "pytest",
+            "tests/",
+            "-m",
+            "not hardware and not live",
+            "-q",
+            "--ignore",
+            KNOWN_BROKEN[0],
+            *deselect_args,
+        ]
+    )
     if rc != 0:
         print("coverage run: test suite itself failed -> gate FAILED")
         return 1
-    rc = _run([sys.executable, "-m", "coverage", "report",
-               "--include=" + ",".join(CORE_MODULES)])
+    rc = _run([sys.executable, "-m", "coverage", "report", "--include=" + ",".join(CORE_MODULES)])
     if rc != 0:
         return 1
     if report_only:
         return 0
     # Parse per-file numbers from a second machine-readable pass.
     out = subprocess.run(  # noqa: S603  (fixed argv, dev-only script)
-        [sys.executable, "-m", "coverage", "report",
-         "--include=" + ",".join(CORE_MODULES), "--format=text"],
-        capture_output=True, text=True, check=True).stdout
+        [
+            sys.executable,
+            "-m",
+            "coverage",
+            "report",
+            "--include=" + ",".join(CORE_MODULES),
+            "--format=text",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
     failures: list[str] = []
     for line in out.splitlines():
         parts = line.split()

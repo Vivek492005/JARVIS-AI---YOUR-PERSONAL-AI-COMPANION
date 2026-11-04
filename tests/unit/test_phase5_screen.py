@@ -42,8 +42,7 @@ def test_capture_active_window_to_memory(desktop):
 
 def test_capture_refuses_sensitive_window(desktop):
     made = desktop
-    sens = [h for h, w in made["uia"].windows.items()
-            if "keepass" in w.title.lower()][0]
+    sens = [h for h, w in made["uia"].windows.items() if "keepass" in w.title.lower()][0]
     cap = ScreenCapture()
     with pytest.raises(SensitiveWindowError):
         cap.capture(handle=sens)
@@ -60,8 +59,7 @@ def test_read_screen_text_redacts(desktop):
 
 def test_read_screen_text_refuses_sensitive(desktop):
     made = desktop
-    sens = [h for h, w in made["uia"].windows.items()
-            if "keepass" in w.title.lower()][0]
+    sens = [h for h, w in made["uia"].windows.items() if "keepass" in w.title.lower()][0]
     cap = ScreenCapture()
     with pytest.raises(SensitiveWindowError):
         cap.read_text(handle=sens)
@@ -79,6 +77,7 @@ def test_prune_old_screenshots(tmp_path):
     old.write_bytes(b"x")
     ancient = time.time() - 30 * 3600
     import os
+
     os.utime(old, (ancient, ancient))
     new = tmp_path / "shot-0002.png"
     new.write_bytes(b"y")
@@ -95,6 +94,7 @@ def test_tools_registered():
 
 def test_run_action_capture_and_read(desktop):
     from jarvis.tools.actions import run_action
+
     verdict, result = run_action("capture_screen", {})
     assert verdict == "allow", result
     assert "shot-" in result

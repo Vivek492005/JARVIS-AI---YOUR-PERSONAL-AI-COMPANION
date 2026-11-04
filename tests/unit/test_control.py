@@ -21,10 +21,10 @@ def client(tmp_path, monkeypatch):
     # cached settings or settings.toml (leaking autonomy_level=2 broke
     # unrelated gate tests in the full suite).
     import jarvis.core.config as cfgmod
+
     iso = cfgmod.Settings()
     monkeypatch.setattr(cfgmod, "get_settings", lambda: iso)
-    monkeypatch.setattr(cfgmod, "_write_settings_toml",
-                        lambda settings, path="x": None)
+    monkeypatch.setattr(cfgmod, "_write_settings_toml", lambda settings, path="x": None)
     monkeypatch.setattr(iso.brain, "memory_workspace", str(tmp_path))
     # service WITHOUT a pre-created MemoryStore: control._memory_store
     # creates one per request from memory_workspace, which keeps each
@@ -48,8 +48,12 @@ def test_settings_redacts_secrets():
         brain={"huggingface_api_key": "sk-secret", "daily_token_budget": 0},
         safety={"autonomy_level": 1},
         privacy={"privacy_mode": False},
-        model_dump=lambda: {"voice": s.voice, "brain": s.brain,
-                            "safety": s.safety, "privacy": s.privacy},
+        model_dump=lambda: {
+            "voice": s.voice,
+            "brain": s.brain,
+            "safety": s.safety,
+            "privacy": s.privacy,
+        },
     )
     out = _redact_settings(s)
     assert out["brain"]["huggingface_api_key"] == "***REDACTED***"
@@ -64,27 +68,23 @@ def test_get_settings_ok(client):
 
 
 def test_put_settings_allowlisted(client):
-    r = client.put("/api/settings",
-                   json={"updates": {"safety.autonomy_level": 2}})
+    r = client.put("/api/settings", json={"updates": {"safety.autonomy_level": 2}})
     assert r.status_code == 200
     assert r.json()["applied"] == ["safety.autonomy_level"]
 
 
 def test_put_settings_rejects_unknown(client):
-    r = client.put("/api/settings",
-                   json={"updates": {"brain.huggingface_api_key": "evil"}})
+    r = client.put("/api/settings", json={"updates": {"brain.huggingface_api_key": "evil"}})
     assert r.json()["rejected"] == ["brain.huggingface_api_key"]
 
 
 def test_put_settings_rejects_bad_range(client):
-    r = client.put("/api/settings",
-                   json={"updates": {"safety.autonomy_level": 99}})
+    r = client.put("/api/settings", json={"updates": {"safety.autonomy_level": 99}})
     assert r.json()["rejected"] == ["safety.autonomy_level"]
 
 
 def test_memory_crud(client):
-    r = client.post("/api/memory/facts",
-                    json={"key": "dog", "value": "Tommy"})
+    r = client.post("/api/memory/facts", json={"key": "dog", "value": "Tommy"})
     assert r.status_code == 200
     facts = client.get("/api/memory/facts").json()
     assert any(f["key"] == "dog" and f["value"] == "Tommy" for f in facts)
@@ -107,16 +107,14 @@ def test_providers_and_costs_degrade_gracefully(client):
 
 def test_push_subscribe_unsubscribe_cycle(client, tmp_path, monkeypatch):
     import jarvis.core.config as cfgmod
-    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace",
-                        str(tmp_path))
-    sub = {"endpoint": "https://push.example/abc",
-           "keys": {"p256dh": "x", "auth": "y"}}
+
+    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace", str(tmp_path))
+    sub = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "x", "auth": "y"}}
     r = client.post("/api/push/subscribe", json=sub)
     assert r.status_code == 200 and r.json()["subscriptions"] == 1
     # re-subscribe same endpoint: no duplicate
     assert client.post("/api/push/subscribe", json=sub).json()["subscriptions"] == 1
-    r = client.delete("/api/push/subscribe",
-                      params={"endpoint": "https://push.example/abc"})
+    r = client.delete("/api/push/subscribe", params={"endpoint": "https://push.example/abc"})
     assert r.json()["subscriptions"] == 0
 
 
@@ -128,8 +126,8 @@ def test_push_vapid_key_missing(client, monkeypatch):
 def test_notify_push_no_config_returns_zero(tmp_path, monkeypatch):
     import jarvis.core.config as cfgmod
     from jarvis.server.control import notify_push
-    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace",
-                        str(tmp_path))
+
+    monkeypatch.setattr(cfgmod.get_settings().brain, "memory_workspace", str(tmp_path))
     monkeypatch.delenv("JARVIS_VAPID_PUBLIC_KEY", raising=False)
     monkeypatch.delenv("JARVIS_VAPID_PRIVATE_KEY", raising=False)
     assert notify_push("t", "b") == 0  # no subs, no keys: clean no-op
@@ -139,7 +137,8 @@ def test_skills_enable_disable(tmp_path, monkeypatch):
     skills_dir = tmp_path / "skills"
     (skills_dir / "demo").mkdir(parents=True)
     (skills_dir / "demo" / "SKILL.md").write_text(
-        "---\nname: demo\nversion: 1.0.0\ndescription: test\n---\n", encoding="utf-8")
+        "---\nname: demo\nversion: 1.0.0\ndescription: test\n---\n", encoding="utf-8"
+    )
 
     # Point the settings at our fake skills dir.
     from jarvis.server import control as ctrl
@@ -152,18 +151,25 @@ def test_skills_enable_disable(tmp_path, monkeypatch):
             flag.touch()
 
     monkeypatch.setattr(ctrl, "_skill_flag", fake_flag)
-    monkeypatch.setattr("jarvis.brain.skills.load_manifest",
-                        lambda p: SimpleNamespace(
-                            name="demo", version="1.0.0",
-                            description="test",
-                            trust=SimpleNamespace(value="local"),
-                            tools=[], permissions=["shell"]))
+    monkeypatch.setattr(
+        "jarvis.brain.skills.load_manifest",
+        lambda p: SimpleNamespace(
+            name="demo",
+            version="1.0.0",
+            description="test",
+            trust=SimpleNamespace(value="local"),
+            tools=[],
+            permissions=["shell"],
+        ),
+    )
 
     import jarvis.core.config as cfgmod
+
     monkeypatch.setattr(cfgmod.get_settings().brain, "skills_dir", str(skills_dir))
 
     def verify():
         return None
+
     app = FastAPI()
     app.include_router(build_control_router(SimpleNamespace(), verify))
     c = TestClient(app)

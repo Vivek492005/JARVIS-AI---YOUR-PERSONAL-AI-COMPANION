@@ -28,14 +28,21 @@ A pure-Python gate that every tool call passes through **before** execution:
 # Allowlist: read-only / informational PowerShell patterns
 SAFE_PATTERNS = [
     r"^Get-(ChildItem|Content|Process|Service|ComputerInfo|Date|Location|Command)\b",
-    r"^Test-Path\b", r"^Get-ChildItem\b", ...
+    r"^Test-Path\b",
+    r"^Get-ChildItem\b",
+    ...,
 ]
 # Blocklist: always denied, even if allowlisted pattern partially matches
 BLOCKED_PATTERNS = [
-    r"\bRemove-Item\b", r"\bStop-Process\b", r"\bInvoke-Expression\b",
-    r"\bFormat-[A-Z]", r"\bSet-ExecutionPolicy\b", r"\bNew-Item\b.*-ItemType",
-    r"[;&|]\s*\S",        # command chaining
-    r"\$\(", r"`",        # subexpression / backtick escapes
+    r"\bRemove-Item\b",
+    r"\bStop-Process\b",
+    r"\bInvoke-Expression\b",
+    r"\bFormat-[A-Z]",
+    r"\bSet-ExecutionPolicy\b",
+    r"\bNew-Item\b.*-ItemType",
+    r"[;&|]\s*\S",  # command chaining
+    r"\$\(",
+    r"`",  # subexpression / backtick escapes
 ]
 ```
 

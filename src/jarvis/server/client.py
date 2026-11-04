@@ -22,8 +22,7 @@ class JarvisClient:
         self._service = service
 
     # -- commands ------------------------------------------------------
-    def send_command(self, text: str,
-                     priority: Priority = Priority.TASK) -> CancelToken:
+    def send_command(self, text: str, priority: Priority = Priority.TASK) -> CancelToken:
         return self._service.submit_command(text, priority=priority)
 
     def send_text_command(self, text: str) -> Optional[CancelToken]:

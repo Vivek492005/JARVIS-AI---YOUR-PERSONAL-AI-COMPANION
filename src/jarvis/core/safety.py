@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Kill switch: Ctrl+Alt+Shift+J
 # ---------------------------------------------------------------------------
 
+
 class KillSwitch:
     """Global emergency stop.
 
@@ -60,12 +61,10 @@ class KillSwitch:
         try:
             import keyboard  # type: ignore
         except ImportError:
-            logger.info("kill-switch hotkey unavailable: "
-                        "'keyboard' package not installed")
+            logger.info("kill-switch hotkey unavailable: 'keyboard' package not installed")
             return False
         try:
-            self._hotkey_handle = keyboard.add_hotkey(
-                self.HOTKEY, lambda: self.trigger("hotkey"))
+            self._hotkey_handle = keyboard.add_hotkey(self.HOTKEY, lambda: self.trigger("hotkey"))
             logger.info(f"kill-switch hotkey installed: {self.HOTKEY}")
             return True
         except Exception as e:
@@ -77,6 +76,7 @@ class KillSwitch:
             return
         try:
             import keyboard  # type: ignore
+
             keyboard.remove_hotkey(self._hotkey_handle)
         except Exception:
             logger.debug("kill-switch hotkey uninstall failed (non-fatal)")
@@ -86,6 +86,7 @@ class KillSwitch:
 # ---------------------------------------------------------------------------
 # Rate limiter: sliding window over tool calls
 # ---------------------------------------------------------------------------
+
 
 class RateLimiter:
     """Sliding-window rate limiter for tool calls.
@@ -131,6 +132,7 @@ class RateLimiter:
 # Circuit breaker: consecutive tool failures
 # ---------------------------------------------------------------------------
 
+
 class CircuitBreaker:
     """Trips OPEN after max_failures consecutive failures; half-opens after
     cooldown_s so one probe can close it again."""
@@ -168,8 +170,8 @@ class CircuitBreaker:
             if self._failures >= self.max_failures:
                 if self._state != self.OPEN:
                     logger.warning(
-                        f"circuit breaker OPEN after {self._failures} "
-                        f"consecutive failures")
+                        f"circuit breaker OPEN after {self._failures} consecutive failures"
+                    )
                 self._state = self.OPEN
                 self._opened_at = time.time()
 
@@ -180,10 +182,22 @@ class CircuitBreaker:
 
 # Said mid-action, these stop the current TTS + skip tool dispatch.
 # Kept as whole-phrase matches on the lowercased transcript.
-STOP_WORDS = frozenset({
-    "stop", "ruko", "ruk jao", "rukjo", "bas", "bas karo", "enough",
-    "cancel", "cancel karo", "chup", "quiet", "shut up",
-})
+STOP_WORDS = frozenset(
+    {
+        "stop",
+        "ruko",
+        "ruk jao",
+        "rukjo",
+        "bas",
+        "bas karo",
+        "enough",
+        "cancel",
+        "cancel karo",
+        "chup",
+        "quiet",
+        "shut up",
+    }
+)
 
 
 def is_stop_command(text: str) -> bool:

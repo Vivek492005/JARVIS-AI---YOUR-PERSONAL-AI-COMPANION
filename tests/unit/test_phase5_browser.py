@@ -25,22 +25,34 @@ from fakes.fake_desktop import (  # noqa: E402
 @pytest.fixture()
 def desktop():
     made = install_fake_desktop()
-    made["browser"].add_page(FakePage(
-        url="https://example.com/form", title="Form",
-        ax_tree="form [ref=f1]\n  textbox 'Name' [ref=t1]\n  button 'Submit' [ref=b1]",
-        refs={"f1": "form", "t1": "name field", "b1": "submit"}))
-    made["browser"].add_page(FakePage(
-        url="https://bank.example.com/login", title="Login",
-        ax_tree="textbox 'Password' [ref=p1]",
-        refs={"p1": "password"}))
+    made["browser"].add_page(
+        FakePage(
+            url="https://example.com/form",
+            title="Form",
+            ax_tree="form [ref=f1]\n  textbox 'Name' [ref=t1]\n  button 'Submit' [ref=b1]",
+            refs={"f1": "form", "t1": "name field", "b1": "submit"},
+        )
+    )
+    made["browser"].add_page(
+        FakePage(
+            url="https://bank.example.com/login",
+            title="Login",
+            ax_tree="textbox 'Password' [ref=p1]",
+            refs={"p1": "password"},
+        )
+    )
     yield made
     uninstall_fake_desktop()
 
 
 def test_scheme_blocklist():
-    for bad in ("file:///etc/passwd", "chrome://settings",
-                "about:blank", "data:text/html,hi",
-                "javascript:alert(1)"):
+    for bad in (
+        "file:///etc/passwd",
+        "chrome://settings",
+        "about:blank",
+        "data:text/html,hi",
+        "javascript:alert(1)",
+    ):
         with pytest.raises(BrowserBlocked):
             _check_url(bad)
 
@@ -57,10 +69,13 @@ def test_localhost_denied():
 def test_allowlist_mode():
     with pytest.raises(BrowserBlocked):
         _check_url("https://evil.com", allowed_domains=["example.com"])
-    assert _check_url("https://example.com/x",
-                      allowed_domains=["example.com"]) == "https://example.com/x"
-    assert _check_url("https://sub.example.com",
-                      allowed_domains=["example.com"]).endswith("sub.example.com")
+    assert (
+        _check_url("https://example.com/x", allowed_domains=["example.com"])
+        == "https://example.com/x"
+    )
+    assert _check_url("https://sub.example.com", allowed_domains=["example.com"]).endswith(
+        "sub.example.com"
+    )
 
 
 def test_auth_payment_hints():
@@ -117,6 +132,7 @@ def test_tools_registered():
 
 def test_run_action_browser_blocked_scheme(desktop):
     from jarvis.tools.actions import execute_tool_raw, run_action
+
     verdict, result = run_action("browser_open", {"url": "file:///etc/passwd"})
     # Gate asks for confirmation (REVERSIBLE at L1)...
     assert verdict == "confirm", (verdict, result)

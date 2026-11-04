@@ -68,25 +68,52 @@ _PS_ALLOWLIST = [
 # file writes (redirection), command chaining, and PowerShell escape hatches.
 _PS_BLOCKLIST = [
     # destructive / state-changing
-    r"\bRemove-Item\b", r"\bClear-RecycleBin\b", r"\bStop-Process\b",
-    r"\bStart-Process\b", r"\bNew-Item\b", r"\bCopy-Item\b", r"\bMove-Item\b",
-    r"\bRename-Item\b", r"\bClear-Content\b", r"\bSet-Content\b",
-    r"\bAdd-Content\b", r"\bSet-ItemProperty\b", r"\bNew-ItemProperty\b",
-    r"\bFormat-[A-Za-z]+\b", r"\bOut-File\b", r"\bRestart-Computer\b",
+    r"\bRemove-Item\b",
+    r"\bClear-RecycleBin\b",
+    r"\bStop-Process\b",
+    r"\bStart-Process\b",
+    r"\bNew-Item\b",
+    r"\bCopy-Item\b",
+    r"\bMove-Item\b",
+    r"\bRename-Item\b",
+    r"\bClear-Content\b",
+    r"\bSet-Content\b",
+    r"\bAdd-Content\b",
+    r"\bSet-ItemProperty\b",
+    r"\bNew-ItemProperty\b",
+    r"\bFormat-[A-Za-z]+\b",
+    r"\bOut-File\b",
+    r"\bRestart-Computer\b",
     r"\bStop-Computer\b",
     # code execution / policy bypass
-    r"\bInvoke-Expression\b", r"\bInvoke-Command\b",
-    r"\bSet-ExecutionPolicy\b", r"\bStart-Job\b",
+    r"\bInvoke-Expression\b",
+    r"\bInvoke-Command\b",
+    r"\bSet-ExecutionPolicy\b",
+    r"\bStart-Job\b",
     # exfiltration / download (notes, screenshots and file contents stay local)
-    r"\bInvoke-WebRequest\b", r"\bInvoke-RestMethod\b",
-    r"\bcurl(\.exe)?\b", r"\bwget(\.exe)?\b", r"\bNet\.WebClient\b",
+    r"\bInvoke-WebRequest\b",
+    r"\bInvoke-RestMethod\b",
+    r"\bcurl(\.exe)?\b",
+    r"\bwget(\.exe)?\b",
+    r"\bNet\.WebClient\b",
     # chaining / redirection / escapes — checked as literals
-    r";", r"\|", r"&", r">", r"<",
-    r"\$\(", r"`",
+    r";",
+    r"\|",
+    r"&",
+    r">",
+    r"<",
+    r"\$\(",
+    r"`",
     # A-03: CR/LF are statement separators in PowerShell too — a second
     # statement after a newline must never slip past the blocklist.
     # (Dangerous cmdlet names are covered above; this is defense in depth.)
-    r"\r", r"\n", "\u0085", "\u2028", "\u2029", "\x0b", "\x0c",
+    r"\r",
+    r"\n",
+    "\u0085",
+    "\u2028",
+    "\u2029",
+    "\x0b",
+    "\x0c",
 ]
 
 
@@ -114,13 +141,15 @@ def validate_powershell(command: str) -> Verdict:
 # Normalized as "alt+f4" (lowercase, no spaces). These combos can close apps,
 # open run dialogs, or are part of known prompt-injection kill chains
 # (e.g. win+r -> type -> enter).
-_BLOCKED_HOTKEYS = frozenset({
-    "alt+f4",
-    "ctrl+alt+del",
-    "ctrl+alt+delete",
-    "win+r",
-    "super+r",
-})
+_BLOCKED_HOTKEYS = frozenset(
+    {
+        "alt+f4",
+        "ctrl+alt+del",
+        "ctrl+alt+delete",
+        "win+r",
+        "super+r",
+    }
+)
 
 
 def _normalize_hotkey(value: str) -> str:
@@ -165,9 +194,9 @@ def validate_url(url: str) -> Verdict:
 # Zero-width / invisible characters attackers use to hide instructions inside
 # otherwise-innocent text. Stripped from tool results before they reach the LLM.
 _HIDDEN_CHARS = "".join(
-    [chr(c) for c in range(0x200B, 0x2010)]     # ZWSP, ZWNJ, ZWJ, LRM, RLM
-    + [chr(c) for c in range(0x2060, 0x2070)]   # WJ, function/application marks
-    + [chr(0xFEFF)]                              # zero-width no-break space
+    [chr(c) for c in range(0x200B, 0x2010)]  # ZWSP, ZWNJ, ZWJ, LRM, RLM
+    + [chr(c) for c in range(0x2060, 0x2070)]  # WJ, function/application marks
+    + [chr(0xFEFF)]  # zero-width no-break space
 )
 
 
@@ -211,7 +240,8 @@ _TAINT_PATTERNS = [
 # attack — strip negated overrides before matching.
 _NEGATED_OVERRIDE = re.compile(
     r"\b(do\s+not|don't|never)\s+override\s+(your\s+|the\s+)?"
-    r"(safety|policy|system)")
+    r"(safety|policy|system)"
+)
 
 
 def detect_tainted(text: str) -> bool:
@@ -256,21 +286,27 @@ def confirmation_prompt(tool_name: str, args: Dict[str, Any]) -> str:
         what = _CONFIRM_DESCRIPTIONS.get(action, f"perform '{action}'")
         return f"This will {what}. Say 'yes' to confirm, anything else to cancel."
     if tool_name == "manage_notes" and args.get("action") == "clear":
-        return f"This will {_CONFIRM_DESCRIPTIONS['clear_notes']}. Say 'yes' to confirm, anything else to cancel."
+        return (
+            f"This will {_CONFIRM_DESCRIPTIONS['clear_notes']}. "
+            "Say 'yes' to confirm, anything else to cancel."
+        )
     if tool_name == "mail_send":
         # Task 6.3: sending mail needs a full recipient+body preview.
         body = str(args.get("body", ""))
         preview = body[:300] + ("…" if len(body) > 300 else "")
-        return (f"Send email to {args.get('to', '?')} "
-                f"(subject: {args.get('subject', '(none)')})?\n"
-                f"Body preview:\n{preview}\n"
-                f"Say 'yes' to confirm, anything else to cancel.")
+        return (
+            f"Send email to {args.get('to', '?')} "
+            f"(subject: {args.get('subject', '(none)')})?\n"
+            f"Body preview:\n{preview}\n"
+            f"Say 'yes' to confirm, anything else to cancel."
+        )
     return "This action needs your confirmation. Say 'yes' to confirm, anything else to cancel."
 
 
 # ---------------------------------------------------------------------------
 # Main gate — call this before executing ANY tool
 # ---------------------------------------------------------------------------
+
 
 def check_tool_call(tool_name: str, args: Dict[str, Any]) -> Verdict:
     """

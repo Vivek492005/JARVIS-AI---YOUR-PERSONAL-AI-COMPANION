@@ -34,8 +34,7 @@ _UNLEARNABLE_SOURCES = frozenset({"mcp", "untrusted", "web", "clipboard"})
 
 
 def _args_hash(args: Dict[str, Any]) -> str:
-    canon = json.dumps(args or {}, sort_keys=True, ensure_ascii=False,
-                       default=str)
+    canon = json.dumps(args or {}, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:16]
 
 
@@ -50,23 +49,35 @@ class LearningRecorder:
         self.store = store
 
     # -- explicit recording ------------------------------------------------
-    def record_run(self, tool: str, args: Optional[Dict[str, Any]],
-                   decision: str = "", ok: Optional[bool] = None,
-                   latency_ms: Optional[float] = None, path: str = "",
-                   source_trust: str = "local") -> Optional[int]:
+    def record_run(
+        self,
+        tool: str,
+        args: Optional[Dict[str, Any]],
+        decision: str = "",
+        ok: Optional[bool] = None,
+        latency_ms: Optional[float] = None,
+        path: str = "",
+        source_trust: str = "local",
+    ) -> Optional[int]:
         """Record one skill/tool execution. Never raises."""
         try:
             if not self.store.is_enabled():
                 return None
-            return self._store_run(tool, args or {}, decision, ok,
-                                   latency_ms, path, source_trust)
+            return self._store_run(tool, args or {}, decision, ok, latency_ms, path, source_trust)
         except Exception:
             logger.exception("learning record_run failed")
             return None
 
-    def _store_run(self, tool: str, args: Dict[str, Any], decision: str,
-                   ok: Optional[bool], latency_ms: Optional[float],
-                   path: str, source_trust: str) -> int:
+    def _store_run(
+        self,
+        tool: str,
+        args: Dict[str, Any],
+        decision: str,
+        ok: Optional[bool],
+        latency_ms: Optional[float],
+        path: str,
+        source_trust: str,
+    ) -> int:
         from jarvis.policy.audit import redact_args
         from jarvis.brain.memory.write_policy import contains_sensitive
 
@@ -83,14 +94,21 @@ class LearningRecorder:
         else:
             withheld = False
         return self.store.add_run(
-            tool=tool, args_redacted=redacted,
-            args_hash=_args_hash(redacted), decision=decision, ok=ok,
-            latency_ms=latency_ms, path=path, source_trust=trust,
-            learnable=learnable, withheld=withheld)
+            tool=tool,
+            args_redacted=redacted,
+            args_hash=_args_hash(redacted),
+            decision=decision,
+            ok=ok,
+            latency_ms=latency_ms,
+            path=path,
+            source_trust=trust,
+            learnable=learnable,
+            withheld=withheld,
+        )
 
-    def record_correction(self, kind: str, tool: str,
-                          args: Optional[Dict[str, Any]] = None,
-                          note: str = "") -> Optional[int]:
+    def record_correction(
+        self, kind: str, tool: str, args: Optional[Dict[str, Any]] = None, note: str = ""
+    ) -> Optional[int]:
         """Record a user correction (undo / explicit correction / decline).
 
         ``kind`` in {"undo", "user_correction", "confirm_decline"}.
@@ -102,8 +120,8 @@ class LearningRecorder:
                 logger.warning("learning: bad correction kind %r", kind)
                 return None
             return self.store.add_correction(
-                kind=kind, tool=tool or "",
-                args_hash=_args_hash(args or {}), note=note)
+                kind=kind, tool=tool or "", args_hash=_args_hash(args or {}), note=note
+            )
         except Exception:
             logger.exception("learning record_correction failed")
             return None
@@ -128,15 +146,13 @@ class LearningRecorder:
                 if not isinstance(args, dict):
                     args = {}
                 decision = str(e.get("decision", ""))
-                ok = True if decision == "allow" else (
-                    False if decision == "deny" else None)
+                ok = True if decision == "allow" else (False if decision == "deny" else None)
                 lat = e.get("latency_ms")
                 try:
                     lat = float(lat) if lat is not None else None
                 except (TypeError, ValueError):
                     lat = None
-                self._store_run(tool, args, decision, ok, lat,
-                                path="", source_trust="local")
+                self._store_run(tool, args, decision, ok, lat, path="", source_trust="local")
                 n += 1
         except Exception:
             logger.exception("learning ingest_audit failed")
@@ -151,8 +167,7 @@ class LearningRecorder:
 _recorder: Optional[LearningRecorder] = None
 
 
-def record_undo_event(tool: str, args: Optional[Dict[str, Any]],
-                      desc: str = "") -> None:
+def record_undo_event(tool: str, args: Optional[Dict[str, Any]], desc: str = "") -> None:
     """Record that the user undid something. Never raises."""
     global _recorder
     try:

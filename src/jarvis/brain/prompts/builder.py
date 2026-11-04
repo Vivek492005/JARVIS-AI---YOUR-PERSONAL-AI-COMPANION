@@ -56,12 +56,16 @@ def _read_learned_layer() -> str:
 
 def tool_catalog() -> str:
     """Auto-generated tool catalog from the registry (layer 4)."""
-    from jarvis.tools.registry import REGISTRY, Risk
+    from jarvis.tools.registry import REGISTRY
 
-    lines = ["# TOOL CATALOG", "",
-             "Call tools with JSON arguments matching their schema.",
-             "Risk tiers: READ (safe), REVERSIBLE (undoable),",
-             "DESTRUCTIVE (confirm first), SYSTEM (confirm first).", ""]
+    lines = [
+        "# TOOL CATALOG",
+        "",
+        "Call tools with JSON arguments matching their schema.",
+        "Risk tiers: READ (safe), REVERSIBLE (undoable),",
+        "DESTRUCTIVE (confirm first), SYSTEM (confirm first).",
+        "",
+    ]
     for name in sorted(REGISTRY):
         if "." in name:  # sub-action tiers enforced server-side
             continue
@@ -108,14 +112,15 @@ class PromptBuilder:
             lines += [f"- {f}" for f in memory_facts]
         return "\n".join(lines)
 
-    def build(self,
-              memory_facts: Optional[List[str]] = None,
-              live_extra: Optional[Dict[str, str]] = None) -> str:
+    def build(
+        self, memory_facts: Optional[List[str]] = None, live_extra: Optional[Dict[str, str]] = None
+    ) -> str:
         """Assemble all six layers into the system prompt."""
         # Task 7.3: persona (workspace/PERSONA.md) is injected at layer 1,
         # right after the built-in identity. The persona block always ends
         # with a guard: safety (layer 3) overrides persona, never the reverse.
         from jarvis.brain.persona import load_persona
+
         persona_block = load_persona(self.workspace).render_prompt()
         sections = [
             _read_layer("identity"),

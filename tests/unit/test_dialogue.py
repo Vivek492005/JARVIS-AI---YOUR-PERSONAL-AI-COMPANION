@@ -29,8 +29,9 @@ def _machine(**kw):
     earcons = NullEarconPlayer()
     events = []
     fillers = []
-    m = DialogueMachine(earcons=earcons, bus_emit=events.append,
-                        speak_filler=fillers.append, clock=clock)
+    m = DialogueMachine(
+        earcons=earcons, bus_emit=events.append, speak_filler=fillers.append, clock=clock
+    )
     return m, clock, earcons, events, fillers
 
 

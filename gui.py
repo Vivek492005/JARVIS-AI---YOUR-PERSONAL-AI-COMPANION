@@ -11,12 +11,10 @@ Features:
 """
 
 import os
-import sys
 import queue
 import logging
 import threading
 import tkinter as tk
-from tkinter import font as tkfont
 from PIL import Image, ImageTk, ImageDraw
 
 logger = logging.getLogger(__name__)
@@ -41,12 +39,11 @@ class JARVISGUI:
         try:
             voice = getattr(getattr(self, "assistant", None), "voice", None)
             if voice is not None and getattr(voice, "privacy_mode", False):
-                self.privacy_btn.config(text="🔓  Privacy Off",
-                                        fg=self.accent_pink)
+                self.privacy_btn.config(text="🔓  Privacy Off", fg=self.accent_pink)
                 self.is_listening = False
                 self.mic_btn.config(text="🔇  Mic Off", fg=self.accent_pink)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("mic toggle best-effort failed: %s", e)
         self._start_queue_poller()
 
     # ── Window Setup ─────────────────────────────────────────────────────────
@@ -67,14 +64,14 @@ class JARVISGUI:
         self.root.geometry(f"{self.width}x{self.height}+{pos_x}+{pos_y}")
 
         # Dark theme palette
-        self.bg_color = "#1E1E2E"       # Deep dark slate
-        self.card_border = "#89B4FA"    # Soft blue accent border
-        self.text_primary = "#CDD6F4"   # Soft white/lavender
-        self.text_secondary = "#BAC2DE" # Subtle grey-blue
-        self.accent_green = "#A6E3A1"   # Mint green (active)
-        self.accent_pink = "#F38BA8"    # Soft coral/red (danger/mute)
+        self.bg_color = "#1E1E2E"  # Deep dark slate
+        self.card_border = "#89B4FA"  # Soft blue accent border
+        self.text_primary = "#CDD6F4"  # Soft white/lavender
+        self.text_secondary = "#BAC2DE"  # Subtle grey-blue
+        self.accent_green = "#A6E3A1"  # Mint green (active)
+        self.accent_pink = "#F38BA8"  # Soft coral/red (danger/mute)
         self.accent_yellow = "#F9E2AF"  # Warm amber (processing)
-        self.btn_bg = "#313244"         # Elevated surface
+        self.btn_bg = "#313244"  # Elevated surface
 
         self.root.configure(bg=self.card_border)
 
@@ -108,18 +105,14 @@ class JARVISGUI:
     def _build_widgets(self):
         # 1. Avatar display
         if self.avatar_image:
-            self.avatar_label = tk.Label(
-                self.container,
-                image=self.avatar_image,
-                bg=self.bg_color
-            )
+            self.avatar_label = tk.Label(self.container, image=self.avatar_image, bg=self.bg_color)
         else:
             self.avatar_label = tk.Label(
                 self.container,
                 text="🐶",
                 font=("Segoe UI Emoji", 44),
                 bg=self.bg_color,
-                fg=self.text_primary
+                fg=self.text_primary,
             )
         self.avatar_label.pack(pady=(4, 6))
 
@@ -129,7 +122,7 @@ class JARVISGUI:
             text="● Listening...",
             font=("Segoe UI", 9, "bold"),
             bg=self.bg_color,
-            fg=self.accent_green
+            fg=self.accent_green,
         )
         self.status_label.pack(pady=(0, 4))
 
@@ -141,7 +134,7 @@ class JARVISGUI:
             bg=self.bg_color,
             fg=self.text_secondary,
             wraplength=260,
-            justify=tk.CENTER
+            justify=tk.CENTER,
         )
         self.user_label.pack(pady=(2, 4))
 
@@ -153,7 +146,7 @@ class JARVISGUI:
             bg=self.bg_color,
             fg=self.card_border,
             wraplength=260,
-            justify=tk.CENTER
+            justify=tk.CENTER,
         )
         self.assistant_label.pack(pady=(4, 6))
 
@@ -168,7 +161,7 @@ class JARVISGUI:
             fg=self.text_primary,
             insertbackground=self.text_primary,
             relief=tk.FLAT,
-            bd=0
+            bd=0,
         )
         self.cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 2))
         self.cmd_entry.bind("<Return>", lambda event: self._on_submit_text())
@@ -185,7 +178,7 @@ class JARVISGUI:
             padx=6,
             pady=1,
             cursor="hand2",
-            command=self._on_submit_text
+            command=self._on_submit_text,
         )
         self.send_btn.pack(side=tk.RIGHT)
 
@@ -207,7 +200,7 @@ class JARVISGUI:
             padx=12,
             pady=6,
             cursor="hand2",
-            command=self.toggle_mic
+            command=self.toggle_mic,
         )
         self.mic_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
 
@@ -225,10 +218,9 @@ class JARVISGUI:
             padx=12,
             pady=6,
             cursor="hand2",
-            command=self.toggle_privacy
+            command=self.toggle_privacy,
         )
-        self.privacy_btn.pack(side=tk.LEFT, expand=True, fill=tk.X,
-                              padx=(0, 6))
+        self.privacy_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
 
         # Close button
         self.close_btn = tk.Button(
@@ -244,7 +236,7 @@ class JARVISGUI:
             width=3,
             pady=6,
             cursor="hand2",
-            command=self.close_app
+            command=self.close_app,
         )
         self.close_btn.pack(side=tk.RIGHT)
 
@@ -272,7 +264,14 @@ class JARVISGUI:
             self.root.geometry(f"+{new_x}+{new_y}")
 
         # Bind to background and labels so user can grab anywhere
-        for widget in (self.root, self.container, self.avatar_label, self.status_label, self.user_label, self.assistant_label):
+        for widget in (
+            self.root,
+            self.container,
+            self.avatar_label,
+            self.status_label,
+            self.user_label,
+            self.assistant_label,
+        ):
             widget.bind("<Button-1>", on_drag_start)
             widget.bind("<B1-Motion>", on_drag_motion)
 
@@ -301,8 +300,8 @@ class JARVISGUI:
             voice = getattr(getattr(self, "assistant", None), "voice", None)
             if voice is not None:
                 self.set_mic_state(voice.mic_state_snapshot())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("mic-state poll best-effort failed: %s", e)
 
         # Poll again in 40ms
         self.root.after(40, self._start_queue_poller)
@@ -327,13 +326,11 @@ class JARVISGUI:
         msg = voice.set_privacy_mode(new_state)
         self.set_assistant_text(msg)
         if new_state:
-            self.privacy_btn.config(text="🔓  Privacy Off",
-                                    fg=self.accent_pink)
+            self.privacy_btn.config(text="🔓  Privacy Off", fg=self.accent_pink)
             self.is_listening = False
             self.mic_btn.config(text="🔇  Mic Off", fg=self.accent_pink)
         else:
-            self.privacy_btn.config(text="🔒  Privacy",
-                                    fg=self.text_primary)
+            self.privacy_btn.config(text="🔒  Privacy", fg=self.text_primary)
 
     # Mic-state badge (Task 1.6.3): LISTENING / PROCESSING / MUTED / PRIVACY.
     _MIC_BADGE = {
@@ -345,16 +342,14 @@ class JARVISGUI:
     }
 
     def set_mic_state(self, state_name: str):
-        text, color_attr = self._MIC_BADGE.get(
-            state_name, ("● Listening...", "accent_green"))
+        text, color_attr = self._MIC_BADGE.get(state_name, ("● Listening...", "accent_green"))
         self.status_label.config(text=text, fg=getattr(self, color_attr))
 
     def toggle_mic(self):
         """Toggle speech listening state."""
         voice = getattr(getattr(self, "assistant", None), "voice", None)
         if voice is not None and getattr(voice, "privacy_mode", False):
-            self.set_assistant_text(
-                "Privacy Mode is on — turn it off before enabling the mic.")
+            self.set_assistant_text("Privacy Mode is on — turn it off before enabling the mic.")
             return
         if self.is_listening:
             self.is_listening = False

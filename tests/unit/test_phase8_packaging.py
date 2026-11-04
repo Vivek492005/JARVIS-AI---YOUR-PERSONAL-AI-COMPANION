@@ -1,4 +1,5 @@
 """Tests for Task 8.4: auto-update client + portable builder + packaging lint."""
+
 import hashlib
 import json
 import os
@@ -7,8 +8,7 @@ import pytest
 
 from jarvis.core import updater
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class _FakeResp:
@@ -28,20 +28,25 @@ class _FakeResp:
 
 
 def _release_payload(tag="v1.0.0"):
-    return json.dumps({
-        "tag_name": tag,
-        "assets": [
-            {"name": f"JARVIS-Setup-{tag}.exe",
-             "browser_download_url": "https://example.com/setup.exe"},
-            {"name": "SHA256SUMS.txt",
-             "browser_download_url": "https://example.com/SHA256SUMS.txt"},
-        ],
-    }).encode()
+    return json.dumps(
+        {
+            "tag_name": tag,
+            "assets": [
+                {
+                    "name": f"JARVIS-Setup-{tag}.exe",
+                    "browser_download_url": "https://example.com/setup.exe",
+                },
+                {
+                    "name": "SHA256SUMS.txt",
+                    "browser_download_url": "https://example.com/SHA256SUMS.txt",
+                },
+            ],
+        }
+    ).encode()
 
 
 def test_check_for_update_newer(monkeypatch):
-    monkeypatch.setattr(updater, "_get_json",
-                        lambda url: json.loads(_release_payload()))
+    monkeypatch.setattr(updater, "_get_json", lambda url: json.loads(_release_payload()))
     info = updater.check_for_update("0.9.0")
     assert info is not None
     assert info.tag == "1.0.0"
@@ -49,22 +54,21 @@ def test_check_for_update_newer(monkeypatch):
 
 
 def test_check_for_update_current_is_none(monkeypatch):
-    monkeypatch.setattr(updater, "_get_json",
-                        lambda url: json.loads(_release_payload()))
+    monkeypatch.setattr(updater, "_get_json", lambda url: json.loads(_release_payload()))
     assert updater.check_for_update("1.0.0") is None
 
 
 def test_check_for_update_network_failure_is_none(monkeypatch):
     def boom(url):
         raise OSError("no network")
+
     monkeypatch.setattr(updater, "_get_json", boom)
     assert updater.check_for_update("0.9.0") is None
 
 
 def test_check_for_update_missing_assets(monkeypatch):
     payload = json.dumps({"tag_name": "v1.1.0", "assets": []}).encode()
-    monkeypatch.setattr(updater, "_get_json",
-                        lambda url: json.loads(payload))
+    monkeypatch.setattr(updater, "_get_json", lambda url: json.loads(payload))
     assert updater.check_for_update("0.9.0") is None
 
 
@@ -89,8 +93,9 @@ def test_verify_sha256_ok_and_mismatch(tmp_path):
 
 def test_download_writes_file(monkeypatch, tmp_path):
     data = b"x" * 100
-    monkeypatch.setattr(updater.urllib.request, "urlopen",
-                        lambda req, timeout=None: _FakeResp(data))
+    monkeypatch.setattr(
+        updater.urllib.request, "urlopen", lambda req, timeout=None: _FakeResp(data)
+    )
     dest = str(tmp_path / "setup.exe")
     assert updater.download("https://example.com/setup.exe", dest) == dest
     assert open(dest, "rb").read() == data
@@ -98,8 +103,8 @@ def test_download_writes_file(monkeypatch, tmp_path):
 
 def _load_script(name):
     import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        name, os.path.join(REPO, "scripts", f"{name}.py"))
+
+    spec = importlib.util.spec_from_file_location(name, os.path.join(REPO, "scripts", f"{name}.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

@@ -7,6 +7,7 @@ backoff, gives up after N consecutive failures, and records every crash via
 This is intentionally small: the OS (Task Scheduler / autostart) owns
 boot-time launch; the watchdog owns *runtime* resilience.
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,11 +23,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class WatchdogConfig:
-    command: List[str]                       # e.g. [sys.executable, "-m", "jarvis", "serve"]
-    max_restarts: int = 5                    # give up after this many crashes...
-    window_s: float = 300.0                  # ...inside this window
-    backoff_base_s: float = 2.0              # first restart waits this long
-    backoff_max_s: float = 60.0              # cap the wait
+    command: List[str]  # e.g. [sys.executable, "-m", "jarvis", "serve"]
+    max_restarts: int = 5  # give up after this many crashes...
+    window_s: float = 300.0  # ...inside this window
+    backoff_base_s: float = 2.0  # first restart waits this long
+    backoff_max_s: float = 60.0  # cap the wait
     restart_timestamps: List[float] = field(default_factory=list)
 
 
@@ -42,12 +43,10 @@ class Watchdog:
 
     def _prune_window(self, now: float) -> None:
         cutoff = now - self.cfg.window_s
-        self.cfg.restart_timestamps = [
-            t for t in self.cfg.restart_timestamps if t >= cutoff]
+        self.cfg.restart_timestamps = [t for t in self.cfg.restart_timestamps if t >= cutoff]
 
     def _backoff(self, attempt: int) -> float:
-        return min(self.cfg.backoff_base_s * (2 ** attempt),
-                   self.cfg.backoff_max_s)
+        return min(self.cfg.backoff_base_s * (2**attempt), self.cfg.backoff_max_s)
 
     def run_once(self) -> int:
         """Spawn the child once, wait for it, return its exit code.
@@ -80,15 +79,17 @@ class Watchdog:
             self.cfg.restart_timestamps.append(now)
             write_crash_report(
                 summary=f"jarvisd exited with code {code}",
-                context={"command": self.cfg.command, "attempt": attempt})
+                context={"command": self.cfg.command, "attempt": attempt},
+            )
             if len(self.cfg.restart_timestamps) > self.cfg.max_restarts:
                 logger.error(
                     "watchdog: %d crashes in %.0fs — giving up",
-                    len(self.cfg.restart_timestamps), self.cfg.window_s)
+                    len(self.cfg.restart_timestamps),
+                    self.cfg.window_s,
+                )
                 return 1
             wait = self._backoff(attempt)
-            logger.warning("watchdog: restarting in %.1fs (attempt %d)",
-                           wait, attempt + 1)
+            logger.warning("watchdog: restarting in %.1fs (attempt %d)", wait, attempt + 1)
             time.sleep(wait)
             attempt += 1
         logger.info("watchdog: stopped by request")
@@ -98,5 +99,6 @@ class Watchdog:
 def supervise_jarvisd(argv: Optional[List[str]] = None) -> int:
     """Entry point used by the Windows Task Scheduler / autostart shortcut."""
     import sys
+
     cmd = [sys.executable, "-m", "jarvis", "serve", *(argv or [])]
     return Watchdog(WatchdogConfig(command=cmd)).supervise()

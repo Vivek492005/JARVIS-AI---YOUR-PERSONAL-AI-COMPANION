@@ -26,7 +26,6 @@ from typing import Dict, Optional, Tuple
 from jarvis.perception import backends as _backends
 from jarvis.perception.backends import WindowInfo
 from jarvis.perception.privacy import (
-    SensitiveWindowError,
     check_window,
     redact_text,
 )
@@ -89,27 +88,25 @@ class ScreenCapture:
     def _ocr_be(self):
         return self._ocr or _backends.get_backend("ocr")
 
-    def capture(self, handle: Optional[int] = None,
-                keep_on_disk: bool = False) -> Dict[str, object]:
+    def capture(
+        self, handle: Optional[int] = None, keep_on_disk: bool = False
+    ) -> Dict[str, object]:
         """Capture the active window (or ``handle``) to memory.
 
         Returns ``{"shot_id": ..., "window": ..., "bytes": N,
         "on_disk": path|None}``. Raises :class:`SensitiveWindowError`
         for blocklisted windows.
         """
-        win = _window_by_handle(handle) if handle is not None \
-            else _active_window()
+        win = _window_by_handle(handle) if handle is not None else _active_window()
         check_window(win.title, win.process)
         png = self._screen_be().capture_window(win.handle)
         shot_id = _store_shot(png, win.title)
         on_disk = None
         if keep_on_disk:
             on_disk = _save_shot(png, shot_id)
-        return {"shot_id": shot_id, "window": win.title,
-                "bytes": len(png), "on_disk": on_disk}
+        return {"shot_id": shot_id, "window": win.title, "bytes": len(png), "on_disk": on_disk}
 
-    def read_text(self, handle: Optional[int] = None,
-                  lang: str = "en") -> str:
+    def read_text(self, handle: Optional[int] = None, lang: str = "en") -> str:
         """OCR the active window (or ``handle``); redacted.
 
         Raises :class:`SensitiveWindowError` for blocklisted windows.
@@ -122,8 +119,11 @@ class ScreenCapture:
 
 
 def _screenshots_dir() -> Path:
-    d = Path(os.path.expandvars("%LOCALAPPDATA%/jarvis/screenshots")
-             if os.name == "nt" else "~/.local/share/jarvis/screenshots")
+    d = Path(
+        os.path.expandvars("%LOCALAPPDATA%/jarvis/screenshots")
+        if os.name == "nt"
+        else "~/.local/share/jarvis/screenshots"
+    )
     return d.expanduser()
 
 

@@ -23,9 +23,13 @@ class _NoParams(BaseModel):
 
 
 def _register(name, risk):
-    spec = ToolSpec(name=name, description="test tool", params=_NoParams,
-                    risk=risk,
-                    handler=lambda args, cb, nf: "ok")
+    spec = ToolSpec(
+        name=name,
+        description="test tool",
+        params=_NoParams,
+        risk=risk,
+        handler=lambda args, cb, nf: "ok",
+    )
     REGISTRY[name] = spec
     return spec
 
@@ -33,9 +37,11 @@ def _register(name, risk):
 @pytest.fixture()
 def tools():
     names = []
-    for n, r in (("learn_test_read", Risk.READ),
-                 ("learn_test_rev", Risk.REVERSIBLE),
-                 ("learn_test_des", Risk.DESTRUCTIVE)):
+    for n, r in (
+        ("learn_test_read", Risk.READ),
+        ("learn_test_rev", Risk.REVERSIBLE),
+        ("learn_test_des", Risk.DESTRUCTIVE),
+    ):
         _register(n, r)
         names.append(n)
     yield names
@@ -52,37 +58,55 @@ def store(tmp_path):
 
 @pytest.fixture()
 def reviewer(store, tmp_path):
-    return Reviewer(store,
-                    learned_rules_path=tmp_path / "reflex_learned.json",
-                    learned_prompt_path=tmp_path / "learned.md",
-                    skills_dir=tmp_path / "skills")
+    return Reviewer(
+        store,
+        learned_rules_path=tmp_path / "reflex_learned.json",
+        learned_prompt_path=tmp_path / "learned.md",
+        skills_dir=tmp_path / "skills",
+    )
 
 
 def _ok_runner(subset):
-    return {"passed": 10, "total": 10,
-            "by_category": {subset: {"passed": 10, "total": 10},
-                            "safety": {"passed": 5, "total": 5},
-                            "injection": {"passed": 5, "total": 5}}}
+    return {
+        "passed": 10,
+        "total": 10,
+        "by_category": {
+            subset: {"passed": 10, "total": 10},
+            "safety": {"passed": 5, "total": 5},
+            "injection": {"passed": 5, "total": 5},
+        },
+    }
 
 
 def _fail_runner(subset):
-    return {"passed": 1, "total": 10,
-            "by_category": {subset: {"passed": 1, "total": 10},
-                            "safety": {"passed": 5, "total": 5},
-                            "injection": {"passed": 5, "total": 5}}}
+    return {
+        "passed": 1,
+        "total": 10,
+        "by_category": {
+            subset: {"passed": 1, "total": 10},
+            "safety": {"passed": 5, "total": 5},
+            "injection": {"passed": 5, "total": 5},
+        },
+    }
 
 
 def _mk(store, ptype, body, target="t"):
-    return store.add_proposal(ptype, target, f"{ptype} proposal", body,
-                              {"n": 3}, 0.7)
+    return store.add_proposal(ptype, target, f"{ptype} proposal", body, {"n": 3}, 0.7)
 
 
 # -- reflex_rule ------------------------------------------------------------
 
+
 def test_approve_reflex_rule_happy_path(reviewer, store, tools, tmp_path):
-    body = {"rule": {"id": "learned_learn_test_read_ab12cd34",
-                     "patterns": ["^what time is it$"],
-                     "tool": "learn_test_read", "args": {}, "reply": "time"}}
+    body = {
+        "rule": {
+            "id": "learned_learn_test_read_ab12cd34",
+            "patterns": ["^what time is it$"],
+            "tool": "learn_test_read",
+            "args": {},
+            "reply": "time",
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert out.ok, out.message
@@ -97,8 +121,7 @@ def test_approve_reflex_rule_happy_path(reviewer, store, tools, tmp_path):
 
 
 def test_reflex_rule_refuses_empty_patterns(reviewer, store, tools):
-    body = {"rule": {"id": "learned_x", "patterns": [],
-                     "tool": "learn_test_read", "args": {}}}
+    body = {"rule": {"id": "learned_x", "patterns": [], "tool": "learn_test_read", "args": {}}}
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert not out.ok
@@ -108,9 +131,14 @@ def test_reflex_rule_refuses_empty_patterns(reviewer, store, tools):
 
 def test_reflex_rule_refuses_destructive_tool(reviewer, store, tools):
     # The capability cap: a learned regex must never bypass confirmation.
-    body = {"rule": {"id": "learned_learn_test_des_ab12cd34",
-                     "patterns": ["^delete everything$"],
-                     "tool": "learn_test_des", "args": {}}}
+    body = {
+        "rule": {
+            "id": "learned_learn_test_des_ab12cd34",
+            "patterns": ["^delete everything$"],
+            "tool": "learn_test_des",
+            "args": {},
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert not out.ok
@@ -118,9 +146,14 @@ def test_reflex_rule_refuses_destructive_tool(reviewer, store, tools):
 
 
 def test_reflex_rule_refuses_unknown_tool(reviewer, store):
-    body = {"rule": {"id": "learned_nope_ab12cd34",
-                     "patterns": ["^x$"], "tool": "no_such_tool",
-                     "args": {}}}
+    body = {
+        "rule": {
+            "id": "learned_nope_ab12cd34",
+            "patterns": ["^x$"],
+            "tool": "no_such_tool",
+            "args": {},
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert not out.ok
@@ -128,9 +161,14 @@ def test_reflex_rule_refuses_unknown_tool(reviewer, store):
 
 
 def test_reflex_rule_refuses_bad_regex(reviewer, store, tools):
-    body = {"rule": {"id": "learned_learn_test_read_ab12cd34",
-                     "patterns": ["^([unclosed$"],
-                     "tool": "learn_test_read", "args": {}}}
+    body = {
+        "rule": {
+            "id": "learned_learn_test_read_ab12cd34",
+            "patterns": ["^([unclosed$"],
+            "tool": "learn_test_read",
+            "args": {},
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert not out.ok
@@ -138,9 +176,14 @@ def test_reflex_rule_refuses_bad_regex(reviewer, store, tools):
 
 
 def test_approve_blocked_by_eval_gate(reviewer, store, tools):
-    body = {"rule": {"id": "learned_learn_test_read_ab12cd34",
-                     "patterns": ["^hi$"],
-                     "tool": "learn_test_read", "args": {}}}
+    body = {
+        "rule": {
+            "id": "learned_learn_test_read_ab12cd34",
+            "patterns": ["^hi$"],
+            "tool": "learn_test_read",
+            "args": {},
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_fail_runner)
     assert not out.ok
@@ -153,9 +196,9 @@ def test_approve_blocked_by_eval_gate(reviewer, store, tools):
 
 # -- prompt_snippet ----------------------------------------------------------
 
+
 def test_approve_prompt_snippet(reviewer, store, tmp_path):
-    body = {"section_title": "Learned: get_time",
-            "markdown": "**get_time**: be careful."}
+    body = {"section_title": "Learned: get_time", "markdown": "**get_time**: be careful."}
     pid = _mk(store, "prompt_snippet", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert out.ok, out.message
@@ -173,10 +216,13 @@ def test_prompt_snippet_rejects_script(reviewer, store):
 
 # -- skill_variant ------------------------------------------------------------
 
+
 def test_approve_skill_variant(reviewer, store, tmp_path):
-    body = {"skill_name": "learned-open-then-mute",
-            "description": "composite",
-            "suggested_tools": ["open_app", "set_volume"]}
+    body = {
+        "skill_name": "learned-open-then-mute",
+        "description": "composite",
+        "suggested_tools": ["open_app", "set_volume"],
+    }
     pid = _mk(store, "skill_variant", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert out.ok, out.message
@@ -185,15 +231,17 @@ def test_approve_skill_variant(reviewer, store, tmp_path):
     assert "composite" in (d / "SKILL.md").read_text(encoding="utf-8")
     # Scaffold is inert: tool.py has no UNCOMMENTED registration
     # (register_skill_tool appears only in comments).
-    code_lines = [line for line in (d / "tool.py").read_text().splitlines()
-                  if line.strip() and not line.strip().startswith("#")]
+    code_lines = [
+        line
+        for line in (d / "tool.py").read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
     assert not any("register_skill_tool(" in line for line in code_lines)
 
 
 def test_skill_variant_refuses_existing_dir(reviewer, store, tmp_path):
     (tmp_path / "skills" / "learned-dup").mkdir(parents=True)
-    body = {"skill_name": "learned-dup", "description": "x",
-            "suggested_tools": []}
+    body = {"skill_name": "learned-dup", "description": "x", "suggested_tools": []}
     pid = _mk(store, "skill_variant", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert not out.ok
@@ -202,9 +250,9 @@ def test_skill_variant_refuses_existing_dir(reviewer, store, tmp_path):
 
 # -- reject / edit / revert -----------------------------------------------------
 
+
 def test_reject_and_edit(reviewer, store):
-    pid = _mk(store, "prompt_snippet",
-              {"section_title": "t", "markdown": "m"})
+    pid = _mk(store, "prompt_snippet", {"section_title": "t", "markdown": "m"})
     out = reviewer.edit(pid, title="new title")
     assert out.ok
     assert store.get_proposal(pid)["title"] == "new title"
@@ -217,16 +265,20 @@ def test_reject_and_edit(reviewer, store):
 
 
 def test_edit_revalidates_payload(reviewer, store):
-    pid = _mk(store, "prompt_snippet",
-              {"section_title": "t", "markdown": "m"})
+    pid = _mk(store, "prompt_snippet", {"section_title": "t", "markdown": "m"})
     out = reviewer.edit(pid, body={"section_title": "", "markdown": ""})
     assert not out.ok  # empty title rejected by validator
 
 
 def test_revert_reflex_rule(reviewer, store, tools, tmp_path):
-    body = {"rule": {"id": "learned_learn_test_rev_ab12cd34",
-                     "patterns": ["^mute$"],
-                     "tool": "learn_test_rev", "args": {}}}
+    body = {
+        "rule": {
+            "id": "learned_learn_test_rev_ab12cd34",
+            "patterns": ["^mute$"],
+            "tool": "learn_test_rev",
+            "args": {},
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert out.ok
@@ -238,8 +290,7 @@ def test_revert_reflex_rule(reviewer, store, tools, tmp_path):
 
 
 def test_revert_skill_variant_removes_dir(reviewer, store, tmp_path):
-    body = {"skill_name": "learned-tmp-skill", "description": "x",
-            "suggested_tools": []}
+    body = {"skill_name": "learned-tmp-skill", "description": "x", "suggested_tools": []}
     pid = _mk(store, "skill_variant", body)
     out = reviewer.approve(pid, eval_runner=_ok_runner)
     assert out.ok
@@ -249,9 +300,14 @@ def test_revert_skill_variant_removes_dir(reviewer, store, tmp_path):
 
 
 def test_double_approve_refused(reviewer, store, tools):
-    body = {"rule": {"id": "learned_learn_test_read_zz99yy88",
-                     "patterns": ["^yo$"],
-                     "tool": "learn_test_read", "args": {}}}
+    body = {
+        "rule": {
+            "id": "learned_learn_test_read_zz99yy88",
+            "patterns": ["^yo$"],
+            "tool": "learn_test_read",
+            "args": {},
+        }
+    }
     pid = _mk(store, "reflex_rule", body)
     assert reviewer.approve(pid, eval_runner=_ok_runner).ok
     out = reviewer.approve(pid, eval_runner=_ok_runner)

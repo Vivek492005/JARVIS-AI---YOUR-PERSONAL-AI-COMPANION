@@ -123,10 +123,14 @@ def latency_summary(metrics_dir: str, days: int = 7) -> List[LatencyReport]:
     reports = []
     for stage, budget in BUDGET_MS.items():
         vals = samples.get(stage, [])
-        reports.append(LatencyReport(
-            stage=stage,
-            p50_ms=round(statistics.median(vals), 1) if vals else None,
-            budget_ms=budget, n=len(vals)))
+        reports.append(
+            LatencyReport(
+                stage=stage,
+                p50_ms=round(statistics.median(vals), 1) if vals else None,
+                budget_ms=budget,
+                n=len(vals),
+            )
+        )
     return reports
 
 
@@ -137,6 +141,8 @@ def format_latency_report(reports: List[LatencyReport]) -> str:
             lines.append(f"  {r.stage:<16} no data (budget {r.budget_ms:.0f} ms)")
         else:
             mark = "OK  " if r.status == "ok" else "OVER"
-            lines.append(f"  {mark} {r.stage:<16} p50 {r.p50_ms:.0f} ms "
-                         f"(budget {r.budget_ms:.0f} ms, n={r.n})")
+            lines.append(
+                f"  {mark} {r.stage:<16} p50 {r.p50_ms:.0f} ms "
+                f"(budget {r.budget_ms:.0f} ms, n={r.n})"
+            )
     return "\n".join(lines)

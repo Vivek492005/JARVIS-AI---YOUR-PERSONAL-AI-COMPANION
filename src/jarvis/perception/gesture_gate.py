@@ -41,6 +41,7 @@ def gesture_available() -> Tuple[bool, str]:
 def _default_controller():
     """Build the legacy GestureController (camera NOT started yet)."""
     from jarvis.legacy.gestures.controller import GestureController
+
     return GestureController(
         enable_hand_tracking=True,
         enable_face_mesh=False,
@@ -50,9 +51,10 @@ def _default_controller():
     )
 
 
-def await_gesture(timeout_s: float = CONFIRM_TIMEOUT_S,
-                  controller_factory: Optional[Callable[[], object]] = None,
-                  ) -> str:
+def await_gesture(
+    timeout_s: float = CONFIRM_TIMEOUT_S,
+    controller_factory: Optional[Callable[[], object]] = None,
+) -> str:
     """Open the camera, wait for a thumbs-up/down, close the camera.
 
     Returns "haan" | "nahi" | "timeout" | "unavailable: <reason>".
@@ -74,7 +76,8 @@ def await_gesture(timeout_s: float = CONFIRM_TIMEOUT_S,
         seen: List[str] = []
         for gesture in ("thumbs_up", "thumbs_down"):
             controller.register_gesture(  # type: ignore[attr-defined]
-                gesture, lambda ev, g=gesture: seen.append(g), cooldown=0.2)
+                gesture, lambda ev, g=gesture: seen.append(g), cooldown=0.2
+            )
         controller.start()  # type: ignore[attr-defined]
         while time.time() < deadline and not seen:
             time.sleep(0.1)

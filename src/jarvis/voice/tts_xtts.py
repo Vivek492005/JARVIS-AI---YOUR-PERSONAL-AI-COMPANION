@@ -30,10 +30,13 @@ DEFAULT_MODEL = "tts_models/multilingual/multi-dataset/xtts_v2"
 class XTTSEngine:
     """Coqui XTTS v2 provider. Offline, voice-cloning, no key."""
 
-    def __init__(self, model_name: str = DEFAULT_MODEL,
-                 speaker_wav: str = "",
-                 language: str = "en",
-                 device: str = "auto") -> None:
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        speaker_wav: str = "",
+        language: str = "en",
+        device: str = "auto",
+    ) -> None:
         self.model_name = model_name
         self.speaker_wav = speaker_wav
         self.language = language
@@ -70,6 +73,7 @@ class XTTSEngine:
     def _cuda() -> bool:
         try:
             import torch
+
             return torch.cuda.is_available()
         except ImportError:
             return False
@@ -88,8 +92,7 @@ class XTTSEngine:
         fd, path = tempfile.mkstemp(suffix=".wav", prefix="jarvis-xtts-")
         os.close(fd)
         try:
-            tts.tts_to_file(text=text, speaker_wav=speaker,
-                            language=self.language, file_path=path)
+            tts.tts_to_file(text=text, speaker_wav=speaker, language=self.language, file_path=path)
             with open(path, "rb") as f:
                 data = f.read()
         finally:
@@ -97,11 +100,12 @@ class XTTSEngine:
                 os.remove(path)
             except OSError:
                 pass
-        logger.debug(f"xtts synth {len(text)} chars in {time.monotonic()-t0:.1f}s")
+        logger.debug(f"xtts synth {len(text)} chars in {time.monotonic() - t0:.1f}s")
         return data
 
     def synth_stream(self, sentences, voice: Optional[str] = None):
         from jarvis.voice.tts import AudioChunk
+
         for i, s in enumerate(sentences):
             data = self.synth(s, voice)
             if data:
@@ -112,6 +116,7 @@ def check_xtts() -> tuple:
     """(ok, detail) for ``jarvis doctor``."""
     try:
         import TTS  # noqa: F401
+
         return True, "coqui-tts installed"
     except ImportError:
         return False, "coqui-tts not installed (pip install jarvis-assistant[xtts])"

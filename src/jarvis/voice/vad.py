@@ -31,11 +31,31 @@ logger = logging.getLogger(__name__)
 
 # Connector words (Hindi + English): ending on one of these extends the
 # hangover — the sentence is probably incomplete.
-CONNECTOR_WORDS = frozenset({
-    "aur", "phir", "matlab", "lekin", "kyunki", "toh", "to", "phirbhi",
-    "aur phir", "isliye", "magar", "par",
-    "and", "so", "then", "but", "because", "uh", "um", "like", "you know",
-})
+CONNECTOR_WORDS = frozenset(
+    {
+        "aur",
+        "phir",
+        "matlab",
+        "lekin",
+        "kyunki",
+        "toh",
+        "to",
+        "phirbhi",
+        "aur phir",
+        "isliye",
+        "magar",
+        "par",
+        "and",
+        "so",
+        "then",
+        "but",
+        "because",
+        "uh",
+        "um",
+        "like",
+        "you know",
+    }
+)
 
 
 class VADBackend(Protocol):
@@ -123,11 +143,13 @@ class SileroVADBackend:
             ) from e
         self._torch = torch
         self._model, self._utils = torch.hub.load(
-            "snakers4/silero-vad", "silero_vad", trust_repo=True)
+            "snakers4/silero-vad", "silero_vad", trust_repo=True
+        )
         self.name = "silero"
 
     def is_speech(self, frame: bytes, sample_rate: int = 16000) -> bool:
         import numpy as np
+
         audio = np.frombuffer(frame, dtype=np.int16).astype("float32") / 32768.0
         tensor = self._torch.from_numpy(audio)
         with self._torch.no_grad():
@@ -137,10 +159,10 @@ class SileroVADBackend:
 
 @dataclass
 class EndpointConfig:
-    hangover_ms: int = 500          # silence after speech before end-of-turn
+    hangover_ms: int = 500  # silence after speech before end-of-turn
     hangover_extension_ms: int = 400  # extra when transcript ends on connector
-    max_utterance_s: float = 30.0   # hard cap (plan: configurable)
-    min_utterance_ms: int = 200     # ignore blips shorter than this
+    max_utterance_s: float = 30.0  # hard cap (plan: configurable)
+    min_utterance_ms: int = 200  # ignore blips shorter than this
 
 
 class Endpointer:
@@ -152,9 +174,12 @@ class Endpointer:
     semantic hangover extension.
     """
 
-    def __init__(self, vad: VADBackend,
-                 config: Optional[EndpointConfig] = None,
-                 clock: Optional[callable] = None) -> None:
+    def __init__(
+        self,
+        vad: VADBackend,
+        config: Optional[EndpointConfig] = None,
+        clock: Optional[callable] = None,
+    ) -> None:
         self.vad = vad
         self.config = config or EndpointConfig()
         self._clock = clock or time.monotonic

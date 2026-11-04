@@ -73,33 +73,34 @@ class MemoryStore:
 
     # -- episodes ------------------------------------------------------
 
-    def add_episode(self, role: str, text: str, session: str = "",
-                    tool: str = "", outcome: str = "") -> int:
+    def add_episode(
+        self, role: str, text: str, session: str = "", tool: str = "", outcome: str = ""
+    ) -> int:
         cur = self._conn.execute(
-            "INSERT INTO episodes(ts, session, role, text, tool, outcome)"
-            " VALUES (?,?,?,?,?,?)",
-            (self._now(), session, role, text, tool, outcome))
+            "INSERT INTO episodes(ts, session, role, text, tool, outcome) VALUES (?,?,?,?,?,?)",
+            (self._now(), session, role, text, tool, outcome),
+        )
         self._conn.commit()
         return int(cur.lastrowid)
 
     def recent_episodes(self, limit: int = 20) -> List[sqlite3.Row]:
-        return list(self._conn.execute(
-            "SELECT * FROM episodes ORDER BY id DESC LIMIT ?", (limit,)))
+        return list(self._conn.execute("SELECT * FROM episodes ORDER BY id DESC LIMIT ?", (limit,)))
 
     def episodes_since(self, ts: str) -> List[sqlite3.Row]:
-        return list(self._conn.execute(
-            "SELECT * FROM episodes WHERE ts >= ? ORDER BY id", (ts,)))
+        return list(self._conn.execute("SELECT * FROM episodes WHERE ts >= ? ORDER BY id", (ts,)))
 
     # -- facts ---------------------------------------------------------
 
-    def add_fact(self, key: str, value: str, source: str,
-                 importance: float = 0.5, expires: str = "") -> int:
+    def add_fact(
+        self, key: str, value: str, source: str, importance: float = 0.5, expires: str = ""
+    ) -> int:
         if source not in ("user", "confirmed"):
             raise ValueError(f"bad fact source: {source!r}")
         cur = self._conn.execute(
             "INSERT INTO facts(ts, key, value, source, importance, last_used, expires)"
             " VALUES (?,?,?,?,?,?,?)",
-            (self._now(), key, value, source, importance, self._now(), expires))
+            (self._now(), key, value, source, importance, self._now(), expires),
+        )
         self._conn.commit()
         return int(cur.lastrowid)
 
@@ -111,30 +112,40 @@ class MemoryStore:
     def delete_facts_like(self, text: str) -> int:
         """Delete facts whose key or value matches; returns count removed."""
         cur = self._conn.execute(
-            "DELETE FROM facts WHERE key LIKE ? OR value LIKE ?",
-            (f"%{text}%", f"%{text}%"))
+            "DELETE FROM facts WHERE key LIKE ? OR value LIKE ?", (f"%{text}%", f"%{text}%")
+        )
         self._conn.commit()
         return cur.rowcount
 
     def all_facts(self) -> List[Fact]:
         rows = self._conn.execute("SELECT * FROM facts ORDER BY importance DESC")
-        return [Fact(id=r["id"], key=r["key"], value=r["value"],
-                     source=r["source"], importance=r["importance"],
-                     last_used=r["last_used"], expires=r["expires"]) for r in rows]
+        return [
+            Fact(
+                id=r["id"],
+                key=r["key"],
+                value=r["value"],
+                source=r["source"],
+                importance=r["importance"],
+                last_used=r["last_used"],
+                expires=r["expires"],
+            )
+            for r in rows
+        ]
 
     def touch_fact(self, fact_id: int, importance: Optional[float] = None) -> None:
         if importance is None:
-            self._conn.execute(
-                "UPDATE facts SET last_used=? WHERE id=?", (self._now(), fact_id))
+            self._conn.execute("UPDATE facts SET last_used=? WHERE id=?", (self._now(), fact_id))
         else:
             self._conn.execute(
                 "UPDATE facts SET last_used=?, importance=? WHERE id=?",
-                (self._now(), importance, fact_id))
+                (self._now(), importance, fact_id),
+            )
         self._conn.commit()
 
     def purge_expired(self) -> int:
         cur = self._conn.execute(
-            "DELETE FROM facts WHERE expires != '' AND expires < ?", (self._now(),))
+            "DELETE FROM facts WHERE expires != '' AND expires < ?", (self._now(),)
+        )
         self._conn.commit()
         return cur.rowcount
 

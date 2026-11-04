@@ -36,6 +36,7 @@ def new_trace() -> str:
 # Events
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Event:
     trace: str = ""

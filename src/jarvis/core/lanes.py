@@ -84,8 +84,7 @@ class LaneQueue:
         if self._running:
             return
         self._running = True
-        self._worker = threading.Thread(target=self._worker_loop, daemon=True,
-                                        name="jarvis-lane")
+        self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="jarvis-lane")
         self._worker.start()
 
     def stop(self, timeout: float = 5.0) -> None:
@@ -102,14 +101,17 @@ class LaneQueue:
         return self._pq.qsize()
 
     # -- submission ----------------------------------------------------
-    def submit(self, fn: Callable[[CancelToken], Any],
-               priority: Priority = Priority.TASK,
-               name: str = "",
-               on_done: Optional[Callable[[Any, Optional[BaseException]], None]] = None,
-               ) -> CancelToken:
+    def submit(
+        self,
+        fn: Callable[[CancelToken], Any],
+        priority: Priority = Priority.TASK,
+        name: str = "",
+        on_done: Optional[Callable[[Any, Optional[BaseException]], None]] = None,
+    ) -> CancelToken:
         """Enqueue ``fn``; returns its :class:`CancelToken`."""
-        item = LaneItem(fn=fn, priority=priority, name=name or getattr(fn, "__name__", "task"),
-                        on_done=on_done)
+        item = LaneItem(
+            fn=fn, priority=priority, name=name or getattr(fn, "__name__", "task"), on_done=on_done
+        )
         self._pq.put((int(priority), next(self._seq), item))
         return item.token
 

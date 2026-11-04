@@ -1,7 +1,7 @@
 """Deprecated compatibility shim (Phase 2, v0.4.0).
 
-``access_os.secrets`` moved to ``jarvis.core.secrets``. Import from ``jarvis.core.secrets`` instead —
-this shim will be removed in v1.0.0.
+``access_os.secrets`` moved to ``jarvis.core.secrets``.
+Import from ``jarvis.core.secrets`` instead — this shim will be removed in v1.0.0.
 
 The shim is a transparent proxy: the real module's public attributes are
 mirrored into this module's ``__dict__`` at import time, and every later
@@ -9,6 +9,7 @@ read/write/delete is forwarded to the real module. That keeps
 ``mock.patch("access_os.secrets....")`` and ``monkeypatch.setattr`` working
 exactly as before the move (including pytest's ``__dict__``-based undo).
 """
+
 import sys as _sys
 import warnings as _warnings
 import importlib as _importlib

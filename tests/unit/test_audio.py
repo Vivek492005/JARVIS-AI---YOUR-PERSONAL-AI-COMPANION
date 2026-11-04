@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import sys
-import threading
 import time
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -114,6 +112,7 @@ def test_echo_guard_passthrough_by_default():
 
 def test_list_devices_without_sounddevice(monkeypatch):
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -127,6 +126,7 @@ def test_list_devices_without_sounddevice(monkeypatch):
 
 def test_check_audio_reports_missing_sounddevice(monkeypatch):
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):

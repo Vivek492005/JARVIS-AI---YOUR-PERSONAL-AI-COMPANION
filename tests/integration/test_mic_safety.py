@@ -37,6 +37,7 @@ def voice(tmp_path, monkeypatch):
     v.push_to_talk = False
     v.push_to_talk_hotkey = "ctrl+alt+j"
     import threading
+
     v._ptt_held = threading.Event()
     v.is_listening = False
     v.microphone = None
@@ -49,6 +50,7 @@ def voice(tmp_path, monkeypatch):
 # 1.6.1 wake word required by default
 # ---------------------------------------------------------------------------
 
+
 def test_wake_word_required_by_default():
     assert VoiceCfg().require_wake_word is True
 
@@ -57,6 +59,7 @@ def test_settings_default_require_wake_word(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("VOICE__REQUIRE_WAKE_WORD", raising=False)
     from access_os.config import reset_settings_cache
+
     reset_settings_cache()
     try:
         assert get_settings().voice.require_wake_word is True
@@ -67,6 +70,7 @@ def test_settings_default_require_wake_word(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # 1.6.2 push-to-talk (default OFF)
 # ---------------------------------------------------------------------------
+
 
 def test_push_to_talk_defaults_off():
     cfg = VoiceCfg()
@@ -98,9 +102,9 @@ def test_ptt_ignored_when_disabled(voice):
 # 1.6.3 mic state + Privacy Mode
 # ---------------------------------------------------------------------------
 
+
 def test_mic_states_exist():
-    assert {s.name for s in MicState} == {
-        "IDLE", "LISTENING", "PROCESSING", "MUTED", "PRIVACY"}
+    assert {s.name for s in MicState} == {"IDLE", "LISTENING", "PROCESSING", "MUTED", "PRIVACY"}
 
 
 def test_mute_blocks_capture(voice):
@@ -139,6 +143,7 @@ def test_privacy_mode_default_off():
 # 1.6.4 no mic audio data is written to disk
 # ---------------------------------------------------------------------------
 
+
 def test_no_mic_audio_written_to_disk():
     """Static guarantee: the voice module never persists captured audio.
 
@@ -147,10 +152,10 @@ def test_no_mic_audio_written_to_disk():
     in-memory only.
     """
     import pathlib
+
     # Phase 2: the voice module moved to src/jarvis/voice/interface.py
     # (access_os/voice_interface.py is now a deprecation shim).
-    src = pathlib.Path("src/jarvis/voice/interface.py").read_text(
-        encoding="utf-8")
+    src = pathlib.Path("src/jarvis/voice/interface.py").read_text(encoding="utf-8")
     # No persistence of recognizer audio: get_wav_data/get_raw_data must
     # never flow into open()/write().
     assert "get_wav_data" not in src

@@ -13,8 +13,8 @@ from __future__ import annotations
 import logging
 import re
 from collections import deque
-from dataclasses import dataclass, field
-from typing import Any, Callable, Deque, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Callable, Deque, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +32,7 @@ def truncate_tool_output(text: str, max_chars: int = 2000) -> str:
         return text
     head = max_chars * 3 // 5
     tail = max_chars - head - 40
-    return (text[:head]
-            + f"\n... [truncated {len(text) - head - tail} chars] ...\n"
-            + text[-tail:])
+    return text[:head] + f"\n... [truncated {len(text) - head - tail} chars] ...\n" + text[-tail:]
 
 
 @dataclass
@@ -51,6 +49,7 @@ class Turn:
 @dataclass
 class Summary:
     """A compressed replacement for evicted turns."""
+
     text: str
     turns_covered: int = 0
 
@@ -73,7 +72,9 @@ class LastEntities:
     def resolve_reference(self, text: str) -> Optional[str]:
         """If the text is a bare demonstrative reference, return the entity."""
         t = text.strip().lower()
-        if re.fullmatch(r"(wo|woh|that|it|us|usko|ise|is)\s*(wala|wali|wale)?\s*(file|url|link|app|note)?", t):
+        if re.fullmatch(
+            r"(wo|woh|that|it|us|usko|ise|is)\s*(wala|wali|wale)?\s*(file|url|link|app|note)?", t
+        ):
             # Prefer an explicit kind word, else fall back in priority order.
             for kind in self._KINDS:
                 if kind in t and self._ents.get(kind):
@@ -122,8 +123,9 @@ class ContextManager:
     # -- limits --------------------------------------------------------
 
     def _enforce_limits(self) -> None:
-        while (len(self.turns) > self.max_turns or self._tokens > self.token_budget) \
-                and len(self.turns) > 4:
+        while (len(self.turns) > self.max_turns or self._tokens > self.token_budget) and len(
+            self.turns
+        ) > 4:
             # Summarize the oldest third, keep the newest two-thirds.
             n = max(1, len(self.turns) // 3)
             old = [self.turns.popleft() for _ in range(n)]
@@ -149,11 +151,14 @@ class ContextManager:
         """Assemble the LLM message list: system + summaries + turns."""
         msgs: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
         for s in self.summaries:
-            msgs.append({"role": "system",
-                         "content": f"[summary of {s.turns_covered} older turns] {s.text}"})
+            msgs.append(
+                {
+                    "role": "system",
+                    "content": f"[summary of {s.turns_covered} older turns] {s.text}",
+                }
+            )
         for t in self.turns:
-            msgs.append({"role": t.role if t.role != "tool" else "user",
-                         "content": t.text})
+            msgs.append({"role": t.role if t.role != "tool" else "user", "content": t.text})
         return msgs
 
     @property

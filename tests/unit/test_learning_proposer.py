@@ -20,8 +20,9 @@ def store(tmp_path):
 
 def _run(store, tool, h, n=3, **kw):
     for _ in range(n):
-        store.add_run(tool=tool, args_redacted={"a": 1}, args_hash=h,
-                      decision="allow", ok=True, **kw)
+        store.add_run(
+            tool=tool, args_redacted={"a": 1}, args_hash=h, decision="allow", ok=True, **kw
+        )
 
 
 def test_reflex_rule_proposal(store):
@@ -50,8 +51,7 @@ def test_reflex_proposal_dedup(store):
 
 
 def test_unlearnable_runs_never_propose(store):
-    _run(store, "mcp.fs.read", "h9", n=5, source_trust="mcp",
-         learnable=False)
+    _run(store, "mcp.fs.read", "h9", n=5, source_trust="mcp", learnable=False)
     assert proposer.propose_reflex_rules(store, min_evidence=3) == []
 
 
@@ -69,6 +69,7 @@ def test_prompt_snippet_proposal(store):
 def test_skill_variant_proposal(store):
     # A->B bigrams close in time.
     import datetime
+
     base = datetime.datetime.now(datetime.timezone.utc)
     with store._lock:
         for i in range(6):
@@ -77,19 +78,18 @@ def test_skill_variant_proposal(store):
                 store._conn.execute(
                     "INSERT INTO skill_runs (ts, tool, args_redacted, "
                     "args_hash, decision, learnable) VALUES (?,?,?,?,?,?)",
-                    (ts, t, "{}", "h", "allow", 1))
+                    (ts, t, "{}", "h", "allow", 1),
+                )
         store._conn.commit()
     ids = proposer.propose_skill_variants(store, min_evidence=3)
     # Both directions occur (open->set within an iteration, set->open
     # across the iteration boundary) — both are genuine bigrams.
     assert len(ids) == 2
     bodies = [json.loads(store.get_proposal(pid)["body"]) for pid in ids]
-    seqs = sorted(json.loads(store.get_proposal(pid)["evidence"])["sequence"]
-                  for pid in ids)
+    seqs = sorted(json.loads(store.get_proposal(pid)["evidence"])["sequence"] for pid in ids)
     assert seqs == ["open_app -> set_volume", "set_volume -> open_app"]
     by_name = {b["skill_name"]: b for b in bodies}
-    assert by_name["learned-open-app-set-volume"]["suggested_tools"] == [
-        "open_app", "set_volume"]
+    assert by_name["learned-open-app-set-volume"]["suggested_tools"] == ["open_app", "set_volume"]
 
 
 def test_generate_proposals_aggregates(store):

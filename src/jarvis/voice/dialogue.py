@@ -39,8 +39,7 @@ class DialogueState(Enum):
 _TRANSITIONS: Dict[DialogueState, List[DialogueState]] = {
     DialogueState.IDLE: [DialogueState.LISTENING],
     DialogueState.LISTENING: [DialogueState.THINKING, DialogueState.IDLE],
-    DialogueState.THINKING: [DialogueState.SPEAKING, DialogueState.CONFIRMING,
-                             DialogueState.IDLE],
+    DialogueState.THINKING: [DialogueState.SPEAKING, DialogueState.CONFIRMING, DialogueState.IDLE],
     DialogueState.SPEAKING: [DialogueState.IDLE, DialogueState.LISTENING],
     DialogueState.CONFIRMING: [DialogueState.THINKING, DialogueState.IDLE],
 }
@@ -76,6 +75,7 @@ class WinsoundEarconPlayer(EarconPlayer):
     def play(self, name: str) -> None:
         try:
             import winsound
+
             freq, dur = self._Tones.get(name, (440, 80))
             winsound.Beep(freq, dur)
         except Exception as e:
@@ -96,11 +96,13 @@ class DialogueMachine:
     with the filler text when THINKING runs long.
     """
 
-    def __init__(self,
-                 earcons: Optional[EarconPlayer] = None,
-                 bus_emit: Optional[Callable] = None,
-                 speak_filler: Optional[Callable[[str], None]] = None,
-                 clock: Optional[Callable[[], float]] = None) -> None:
+    def __init__(
+        self,
+        earcons: Optional[EarconPlayer] = None,
+        bus_emit: Optional[Callable] = None,
+        speak_filler: Optional[Callable[[str], None]] = None,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> None:
         self.state = DialogueState.IDLE
         self.earcons = earcons or NullEarconPlayer()
         self._emit = bus_emit or (lambda e: None)
@@ -126,6 +128,7 @@ class DialogueMachine:
         self.earcons.play(state.name.lower())
         try:
             from jarvis.core.events import StatusChanged
+
             self._emit(StatusChanged(status=f"dialogue:{state.name}"))
         except Exception:
             logger.exception("dialogue bus emit failed")
@@ -134,8 +137,11 @@ class DialogueMachine:
     def maybe_filler(self) -> bool:
         """Speak the thinking filler if THINKING is running long."""
         with self._lock:
-            if (self.state != DialogueState.THINKING or self._filler_spoken
-                    or self._think_started is None):
+            if (
+                self.state != DialogueState.THINKING
+                or self._filler_spoken
+                or self._think_started is None
+            ):
                 return False
             elapsed = self._clock() - self._think_started
             if elapsed < THINK_FILLER_LATENCY_S:

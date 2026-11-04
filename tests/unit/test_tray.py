@@ -42,8 +42,7 @@ def test_tray_unavailable_backend_does_not_raise():
 def test_hotkey_fires_summon():
     fired = []
     backend = FakeHotkeyBackend()
-    summon = HotkeySummon(on_summon=lambda: fired.append(1),
-                          hotkey="ctrl+alt+j", backend=backend)
+    summon = HotkeySummon(on_summon=lambda: fired.append(1), hotkey="ctrl+alt+j", backend=backend)
     summon.start()
     assert backend.registered and backend.registered[0][0] == "ctrl+alt+j"
     backend.fire("ctrl+alt+j")
@@ -53,14 +52,12 @@ def test_hotkey_fires_summon():
 
 
 def test_hotkey_unavailable_does_not_raise():
-    summon = HotkeySummon(on_summon=lambda: None,
-                          backend=KeyboardBackend())  # not installed here
+    summon = HotkeySummon(on_summon=lambda: None, backend=KeyboardBackend())  # not installed here
     assert summon.available is False
     summon.start()
     summon.stop()
 
 
 def test_hotkey_default_from_config():
-    summon = HotkeySummon(on_summon=lambda: None,
-                          backend=FakeHotkeyBackend())
+    summon = HotkeySummon(on_summon=lambda: None, backend=FakeHotkeyBackend())
     assert summon.hotkey == "ctrl+alt+j"

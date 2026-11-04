@@ -77,19 +77,13 @@ def _scalarmult(P: list, e: int) -> list:
 
 def _encodeint(y: int) -> bytes:
     bits = [(y >> i) & 1 for i in range(_b)]
-    return b"".join(
-        bytes([sum(bits[i * 8 + j] << j for j in range(8))])
-        for i in range(_b // 8)
-    )
+    return b"".join(bytes([sum(bits[i * 8 + j] << j for j in range(8))]) for i in range(_b // 8))
 
 
 def _encodepoint(P: list) -> bytes:
     x, y = P
     bits = [(y >> i) & 1 for i in range(_b - 1)] + [x & 1]
-    return b"".join(
-        bytes([sum(bits[i * 8 + j] << j for j in range(8))])
-        for i in range(_b // 8)
-    )
+    return b"".join(bytes([sum(bits[i * 8 + j] << j for j in range(8))]) for i in range(_b // 8))
 
 
 def _bit(h: bytes, i: int) -> int:
@@ -98,19 +92,19 @@ def _bit(h: bytes, i: int) -> int:
 
 def _publickey(sk: bytes) -> bytes:
     h = _H(sk)
-    a = 2 ** (_b - 2) + sum(2 ** i * _bit(h, i) for i in range(3, _b - 2))
+    a = 2 ** (_b - 2) + sum(2**i * _bit(h, i) for i in range(3, _b - 2))
     return _encodepoint(_scalarmult(_B, a))
 
 
 def _Hint(m: bytes) -> int:
     h = _H(m)
-    return sum(2 ** i * _bit(h, i) for i in range(2 * _b))
+    return sum(2**i * _bit(h, i) for i in range(2 * _b))
 
 
 def _signature(m: bytes, sk: bytes, pk: bytes) -> bytes:
     h = _H(sk)
-    a = 2 ** (_b - 2) + sum(2 ** i * _bit(h, i) for i in range(3, _b - 2))
-    r = _Hint(h[_b // 8:_b // 4] + m)
+    a = 2 ** (_b - 2) + sum(2**i * _bit(h, i) for i in range(3, _b - 2))
+    r = _Hint(h[_b // 8 : _b // 4] + m)
     R = _scalarmult(_B, r)
     S = (r + _Hint(_encodepoint(R) + pk + m) * a) % _l
     return _encodepoint(R) + _encodeint(S)
@@ -122,11 +116,11 @@ def _isoncurve(P: list) -> bool:
 
 
 def _decodeint(s: bytes) -> int:
-    return sum(2 ** i * _bit(s, i) for i in range(_b))
+    return sum(2**i * _bit(s, i) for i in range(_b))
 
 
 def _decodepoint(s: bytes) -> list:
-    y = sum(2 ** i * _bit(s, i) for i in range(_b - 1))
+    y = sum(2**i * _bit(s, i) for i in range(_b - 1))
     x = _xrecover(y)
     if x & 1 != _bit(s, _b - 1):
         x = _q - x
@@ -141,9 +135,9 @@ def _checkvalid(s: bytes, m: bytes, pk: bytes) -> None:
         raise ValueError("bad signature length")
     if len(pk) != _b // 8:
         raise ValueError("bad public-key length")
-    R = _decodepoint(s[:_b // 8])
+    R = _decodepoint(s[: _b // 8])
     A = _decodepoint(pk)
-    S = _decodeint(s[_b // 8:_b // 4])
+    S = _decodeint(s[_b // 8 : _b // 4])
     h = _Hint(_encodepoint(R) + pk + m)
     v1 = _scalarmult(_B, S)
     v2 = _edwards(R, _scalarmult(A, h))
@@ -154,6 +148,7 @@ def _checkvalid(s: bytes, m: bytes, pk: bytes) -> None:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def keypair(seed: bytes | None = None) -> tuple[bytes, bytes]:
     """Generate an Ed25519 keypair. Returns (secret_seed, public_key).

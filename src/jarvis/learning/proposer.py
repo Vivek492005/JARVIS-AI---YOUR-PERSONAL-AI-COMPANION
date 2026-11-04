@@ -42,9 +42,9 @@ def _rule_id(tool: str, args_hash: str) -> str:
     return f"learned_{safe}_{args_hash[:8]}"
 
 
-def propose_reflex_rules(store: LearningStore,
-                         min_evidence: int = DEFAULT_MIN_EVIDENCE
-                         ) -> List[str]:
+def propose_reflex_rules(
+    store: LearningStore, min_evidence: int = DEFAULT_MIN_EVIDENCE
+) -> List[str]:
     """Clusters of repeated identical tool calls -> reflex_rule proposals."""
     made = []
     for cl in store.run_clusters(min_count=min_evidence):
@@ -67,34 +67,44 @@ def propose_reflex_rules(store: LearningStore,
             "compute": None,
         }
         pid = store.add_proposal(
-            ptype="reflex_rule", target=target,
+            ptype="reflex_rule",
+            target=target,
             title=f"Reflex rule candidate: '{tool}' x{cl['n']}",
             body={"rule": rule},
-            evidence={"runs": cl["n"], "allowed": cl["n_allow"],
-                      "args_hash": h,
-                      "note": "Same tool+args executed repeatedly. "
-                              "Add regex patterns (from real utterances you "
-                              "observed) before approving."},
-            confidence=_confidence(cl["n"], min_evidence))
+            evidence={
+                "runs": cl["n"],
+                "allowed": cl["n_allow"],
+                "args_hash": h,
+                "note": "Same tool+args executed repeatedly. "
+                "Add regex patterns (from real utterances you "
+                "observed) before approving.",
+            },
+            confidence=_confidence(cl["n"], min_evidence),
+        )
         made.append(pid)
     return made
 
 
 _CORRECTION_SNIPPETS = {
-    "undo": ("The user undid this tool's action more than once. Double-check "
-             "arguments with the user before acting, and prefer the least "
-             "surprising interpretation."),
-    "confirm_decline": ("The user declined the confirmation prompt repeatedly. "
-                        "Summarize exactly what will happen (including "
-                        "side effects) BEFORE asking, in one short line."),
-    "user_correction": ("The user corrected this tool's usage. If the request "
-                        "is ambiguous, ask a clarifying question instead of "
-                        "guessing."),
+    "undo": (
+        "The user undid this tool's action more than once. Double-check "
+        "arguments with the user before acting, and prefer the least "
+        "surprising interpretation."
+    ),
+    "confirm_decline": (
+        "The user declined the confirmation prompt repeatedly. "
+        "Summarize exactly what will happen (including "
+        "side effects) BEFORE asking, in one short line."
+    ),
+    "user_correction": (
+        "The user corrected this tool's usage. If the request "
+        "is ambiguous, ask a clarifying question instead of "
+        "guessing."
+    ),
 }
 
 
-def propose_prompt_snippets(store: LearningStore,
-                            min_evidence: int = 2) -> List[str]:
+def propose_prompt_snippets(store: LearningStore, min_evidence: int = 2) -> List[str]:
     """Repeated corrections on a tool -> prompt_snippet proposals."""
     made = []
     for cl in store.correction_clusters(min_count=min_evidence):
@@ -105,21 +115,24 @@ def propose_prompt_snippets(store: LearningStore,
         if store.proposal_exists_for("prompt_snippet", target):
             continue
         draft = _CORRECTION_SNIPPETS.get(
-            kind, "The user corrected this tool's usage; be extra careful.")
+            kind, "The user corrected this tool's usage; be extra careful."
+        )
         title = f"Usage note for '{tool}' ({kind} x{cl['n']})"
         pid = store.add_proposal(
-            ptype="prompt_snippet", target=target, title=title,
-            body={"section_title": f"Learned: {tool}",
-                  "markdown": f"**{tool}**: {draft}"},
+            ptype="prompt_snippet",
+            target=target,
+            title=title,
+            body={"section_title": f"Learned: {tool}", "markdown": f"**{tool}**: {draft}"},
             evidence={"corrections": cl["n"], "kind": kind},
-            confidence=_confidence(cl["n"], min_evidence))
+            confidence=_confidence(cl["n"], min_evidence),
+        )
         made.append(pid)
     return made
 
 
-def propose_skill_variants(store: LearningStore,
-                           min_evidence: int = DEFAULT_MIN_EVIDENCE
-                           ) -> List[str]:
+def propose_skill_variants(
+    store: LearningStore, min_evidence: int = DEFAULT_MIN_EVIDENCE
+) -> List[str]:
     """Frequent A->B tool sequences -> skill_variant proposals."""
     made = []
     for seq in store.tool_sequences(min_count=min_evidence):
@@ -128,23 +141,26 @@ def propose_skill_variants(store: LearningStore,
         if store.proposal_exists_for("skill_variant", name):
             continue
         pid = store.add_proposal(
-            ptype="skill_variant", target=name,
+            ptype="skill_variant",
+            target=name,
             title=f"Composite skill candidate: {a} -> {b} (x{seq['n']})",
-            body={"skill_name": name,
-                  "description":
-                      f"Learned composite: runs '{a}' then '{b}'. "
-                      f"Observed {seq['n']} times. Scaffold only — a "
-                      f"developer must implement tool.py.",
-                  "suggested_tools": [a, b]},
+            body={
+                "skill_name": name,
+                "description": f"Learned composite: runs '{a}' then '{b}'. "
+                f"Observed {seq['n']} times. Scaffold only — a "
+                f"developer must implement tool.py.",
+                "suggested_tools": [a, b],
+            },
             evidence={"sequence": seq["sequence"], "occurrences": seq["n"]},
-            confidence=_confidence(seq["n"], min_evidence))
+            confidence=_confidence(seq["n"], min_evidence),
+        )
         made.append(pid)
     return made
 
 
-def generate_proposals(store: LearningStore,
-                       min_evidence: int = DEFAULT_MIN_EVIDENCE
-                       ) -> Dict[str, List[str]]:
+def generate_proposals(
+    store: LearningStore, min_evidence: int = DEFAULT_MIN_EVIDENCE
+) -> Dict[str, List[str]]:
     """Run all proposers. Returns {type: [proposal_ids]}."""
     out = {
         "reflex_rule": propose_reflex_rules(store, min_evidence),

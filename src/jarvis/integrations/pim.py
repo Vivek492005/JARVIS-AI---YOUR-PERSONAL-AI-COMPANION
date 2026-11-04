@@ -33,11 +33,12 @@ logger = logging.getLogger(__name__)
 # Data shapes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CalEvent:
     id: str
     title: str
-    start: str          # ISO-8601
+    start: str  # ISO-8601
     end: str
     location: str = ""
     description: str = ""
@@ -65,10 +66,12 @@ class TaskItem:
 # Provider protocols
 # ---------------------------------------------------------------------------
 
+
 class CalendarProvider(Protocol):
     def list_events(self, start: str, end: str) -> List[CalEvent]: ...
-    def create_event(self, title: str, start: str, end: str,
-                     location: str = "", description: str = "") -> CalEvent: ...
+    def create_event(
+        self, title: str, start: str, end: str, location: str = "", description: str = ""
+    ) -> CalEvent: ...
     def delete_event(self, event_id: str) -> bool: ...
 
 
@@ -89,20 +92,27 @@ class TaskProvider(Protocol):
 # Fake providers (default; also used by tests)
 # ---------------------------------------------------------------------------
 
+
 class FakeCalendar(CalendarProvider):
     def __init__(self) -> None:
         self._events: Dict[str, CalEvent] = {}
         self._n = 0
 
     def list_events(self, start: str, end: str) -> List[CalEvent]:
-        return [e for e in self._events.values()
-                if start <= e.start <= end]
+        return [e for e in self._events.values() if start <= e.start <= end]
 
-    def create_event(self, title: str, start: str, end: str,
-                     location: str = "", description: str = "") -> CalEvent:
+    def create_event(
+        self, title: str, start: str, end: str, location: str = "", description: str = ""
+    ) -> CalEvent:
         self._n += 1
-        ev = CalEvent(id=f"ev{self._n}", title=title, start=start,
-                      end=end, location=location, description=description)
+        ev = CalEvent(
+            id=f"ev{self._n}",
+            title=title,
+            start=start,
+            end=end,
+            location=location,
+            description=description,
+        )
         self._events[ev.id] = ev
         return ev
 
@@ -117,18 +127,26 @@ class FakeMail(MailProvider):
         self._sent: List[Dict[str, str]] = []
         self._n = 0
 
-    def seed(self, sender: str, subject: str, body: str,
-             unread: bool = True) -> MailMsg:
+    def seed(self, sender: str, subject: str, body: str, unread: bool = True) -> MailMsg:
         self._n += 1
-        m = MailMsg(id=f"m{self._n}", sender=sender, subject=subject,
-                    snippet=body[:80], body=body, unread=unread)
+        m = MailMsg(
+            id=f"m{self._n}",
+            sender=sender,
+            subject=subject,
+            snippet=body[:80],
+            body=body,
+            unread=unread,
+        )
         self._msgs[m.id] = m
         return m
 
     def list_messages(self, query: str = "", max_n: int = 10) -> List[MailMsg]:
         q = query.lower()
-        out = [m for m in self._msgs.values()
-               if not q or q in m.subject.lower() or q in m.sender.lower()]
+        out = [
+            m
+            for m in self._msgs.values()
+            if not q or q in m.subject.lower() or q in m.sender.lower()
+        ]
         return out[:max_n]
 
     def read_message(self, msg_id: str) -> Optional[MailMsg]:
@@ -149,8 +167,7 @@ class FakeTasks(TaskProvider):
         self._n = 0
 
     def list_tasks(self, include_done: bool = False) -> List[TaskItem]:
-        return [t for t in self._tasks.values()
-                if include_done or not t.done]
+        return [t for t in self._tasks.values() if include_done or not t.done]
 
     def add_task(self, title: str, due: str = "") -> TaskItem:
         self._n += 1
@@ -178,10 +195,12 @@ _tasks: Optional[TaskProvider] = None
 def _provider_kind() -> str:
     """'google' only with explicit opt-in AND not offline; else 'fake'."""
     from jarvis.core.secrets import get_secret
+
     # Task 8.3: offline mode forces the fake providers even if the user
     # opted into Google — no network calls, fail-closed.
     try:
         from jarvis.core.config import get_settings
+
         if get_settings().privacy.offline:
             return "fake"
     except Exception:  # noqa: S110 — settings unreadable: stay on fakes
@@ -221,22 +240,26 @@ def reset_providers() -> None:
 
 def _google_calendar() -> CalendarProvider:
     from jarvis.integrations.google_pim import GoogleCalendar  # lazy
+
     return GoogleCalendar()
 
 
 def _google_mail() -> MailProvider:
     from jarvis.integrations.google_pim import GoogleMail  # lazy
+
     return GoogleMail()
 
 
 def _google_tasks() -> TaskProvider:
     from jarvis.integrations.google_pim import GoogleTasks  # lazy
+
     return GoogleTasks()
 
 
 # ---------------------------------------------------------------------------
 # Formatting helpers (keep tool outputs small and readable)
 # ---------------------------------------------------------------------------
+
 
 def _fmt_event(e: CalEvent) -> str:
     loc = f" @ {e.location}" if e.location else ""

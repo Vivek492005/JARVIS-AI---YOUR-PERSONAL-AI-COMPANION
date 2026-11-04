@@ -1,8 +1,6 @@
 """Tests for Task 0.8: main.py command queue, status recovery, signal wiring."""
 
-import queue
 import sys
-import threading
 import time
 from unittest.mock import MagicMock, patch
 
@@ -10,14 +8,13 @@ from unittest.mock import MagicMock, patch
 for _mod in ("pyautogui",):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 
-import main as main_mod
-from main import JARVISAssistant
+import main as main_mod  # noqa: E402
+from main import JARVISAssistant  # noqa: E402
 
 
 def _assistant():
     """JARVISAssistant with VoiceInterface/GUI mocked out."""
-    with patch.object(main_mod, "VoiceInterface") as vi, \
-         patch.object(main_mod, "JARVISGUI"):
+    with patch.object(main_mod, "VoiceInterface"), patch.object(main_mod, "JARVISGUI"):
         a = JARVISAssistant()
     a.voice = MagicMock()
     a.gui = MagicMock()
@@ -93,13 +90,13 @@ def test_stop_stops_lane():
 def test_logging_uses_rotating_handler():
     import logging
     import logging.handlers
+
     root = logging.getLogger()
     old = root.handlers[:]
     root.handlers.clear()
     try:
         main_mod._setup_logging()
-        assert any(isinstance(h, logging.handlers.RotatingFileHandler)
-                   for h in root.handlers)
+        assert any(isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers)
     finally:
         root.handlers.clear()
         root.handlers.extend(old)

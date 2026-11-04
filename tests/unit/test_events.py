@@ -3,16 +3,12 @@
 import asyncio
 import sys
 import threading
-import time
 from unittest.mock import MagicMock
 
-import pytest
 
 from jarvis.core.events import (
-    AgentThinking,
     Bus,
     Error,
-    Event,
     Interrupt,
     SpeechStarted,
     SpeechStopped,
@@ -158,8 +154,9 @@ def test_emit_thread_safe():
             count[0] += 1
 
     bus.on(StatusChanged, handler)
-    threads = [threading.Thread(target=bus.emit, args=(StatusChanged(status="s"),))
-               for _ in range(20)]
+    threads = [
+        threading.Thread(target=bus.emit, args=(StatusChanged(status="s"),)) for _ in range(20)
+    ]
     for t in threads:
         t.start()
     for t in threads:
@@ -179,8 +176,14 @@ def test_default_bus_singleton_and_reset():
 
 def test_speak_emits_speech_events():
     """VoiceInterface.speak publishes SpeechStarted/Stopped (F-14 wiring)."""
-    for _mod in ("pyautogui", "pyperclip", "speech_recognition", "pyttsx3",
-                 "fuzzywuzzy", "fuzzywuzzy.fuzz"):
+    for _mod in (
+        "pyautogui",
+        "pyperclip",
+        "speech_recognition",
+        "pyttsx3",
+        "fuzzywuzzy",
+        "fuzzywuzzy.fuzz",
+    ):
         sys.modules.setdefault(_mod, MagicMock(name=_mod))
     from jarvis.voice.interface import VoiceInterface
 
@@ -218,6 +221,7 @@ def test_agent_dispatch_emits_tool_events():
     agent.rate_limited = False
     agent.tainted = False
     from jarvis.core.safety import RateLimiter, CircuitBreaker
+
     agent._rate_limiter = RateLimiter(max_calls=1000)
     agent._breaker = CircuitBreaker()
     agent._audit = lambda *a, **k: None
@@ -237,6 +241,7 @@ def test_agent_dispatch_emits_tool_events():
 def test_main_py_has_no_speak_monkeypatch():
     """F-14 done-when: no `self.voice.speak = ...` in main.py."""
     import pathlib
+
     src = pathlib.Path("main.py").read_text(encoding="utf-8")
     assert "self.voice.speak =" not in src
     assert "_orig_speak" not in src

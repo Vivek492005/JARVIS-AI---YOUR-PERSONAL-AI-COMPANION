@@ -13,7 +13,6 @@ from jarvis.voice.vad import (  # noqa: E402
     Endpointer,
     EndpointConfig,
     EnergyVAD,
-    _rms_db,
 )
 
 
@@ -131,6 +130,7 @@ def test_blip_ignored():
 
 def test_webrtc_backend_helpful_error(monkeypatch):
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -140,6 +140,7 @@ def test_webrtc_backend_helpful_error(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     from jarvis.voice.vad import WebRTCVADBackend
+
     try:
         WebRTCVADBackend()
         raise AssertionError("should raise")

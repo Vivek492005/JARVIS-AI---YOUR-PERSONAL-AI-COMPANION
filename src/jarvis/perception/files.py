@@ -38,6 +38,7 @@ class ScopeError(PermissionError):
 # Scoped workspace
 # ---------------------------------------------------------------------------
 
+
 def workspace_root() -> Path:
     override = os.environ.get("JARVIS_WORKSPACE")
     if override:
@@ -49,10 +50,14 @@ def approved_roots() -> List[Path]:
     roots = [workspace_root()]
     try:
         from jarvis.core.config import get_settings
+
         extra = getattr(get_settings().files, "approved_dirs", None) or []
         roots.extend(Path(e).expanduser().resolve() for e in extra)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(
+            "approved-dirs resolve best-effort failed: %s",
+            e,
+        )
     return roots
 
 
@@ -114,9 +119,12 @@ _FIND_TIME_CAP_S = 5.0
 _FIND_MAX_RESULTS = 100
 
 
-def find_files(name: Optional[str] = None, ext: Optional[str] = None,
-               newer_than_days: Optional[float] = None,
-               root: Optional[str] = None) -> List[str]:
+def find_files(
+    name: Optional[str] = None,
+    ext: Optional[str] = None,
+    newer_than_days: Optional[float] = None,
+    root: Optional[str] = None,
+) -> List[str]:
     """Search the workspace (5 s cap, 100 results max)."""
     base = resolve_scoped(root) if root else workspace_root()
     if not base.is_dir():
@@ -146,8 +154,21 @@ def find_files(name: Optional[str] = None, ext: Optional[str] = None,
 
 _READ_MAX_CHARS = 20000
 
-_TEXT_EXTS = {".txt", ".md", ".json", ".csv", ".log", ".py", ".toml",
-              ".yaml", ".yml", ".ini", ".cfg", ".xml", ".html"}
+_TEXT_EXTS = {
+    ".txt",
+    ".md",
+    ".json",
+    ".csv",
+    ".log",
+    ".py",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".ini",
+    ".cfg",
+    ".xml",
+    ".html",
+}
 
 
 def read_file(path: str, max_chars: int = _READ_MAX_CHARS) -> str:
@@ -221,13 +242,16 @@ def summarize_file(path: str) -> str:
     suffix = p.suffix.lower() or "(no extension)"
     peek = read_file(path, max_chars=2000)
     lines = peek.count("\n") + 1
-    return (f"{p.name}: {size} bytes, type {suffix}, ~{lines} lines previewed.\n"
-            f"--- preview ---\n{peek[:1200]}")
+    return (
+        f"{p.name}: {size} bytes, type {suffix}, ~{lines} lines previewed.\n"
+        f"--- preview ---\n{peek[:1200]}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # move / copy / delete (trash only)
 # ---------------------------------------------------------------------------
+
 
 def move_file(src: str, dst: str) -> str:
     s, d = resolve_scoped(src), resolve_scoped(dst)
@@ -259,7 +283,7 @@ def delete_file(path: str) -> str:
     try:
         import send2trash
     except ImportError:
-        raise RuntimeError("send2trash not installed (pip install send2trash)")
+        raise RuntimeError("send2trash not installed (pip install send2trash)") from None
     send2trash.send2trash(str(p))
     return f"moved to Recycle Bin: {p.name}"
 
@@ -305,9 +329,11 @@ def organize_folder(path: str, dry_run: bool = True) -> str:
     total = sum(len(v) for v in plan.values())
     lines = [f"Plan: {total} files -> {len(plan)} folders in {folder}"]
     for cat in sorted(plan):
-        lines.append(f"  {cat}/: {len(plan[cat])} files "
-                     f"({', '.join(plan[cat][:5])}"
-                     f"{'...' if len(plan[cat]) > 5 else ''})")
+        lines.append(
+            f"  {cat}/: {len(plan[cat])} files "
+            f"({', '.join(plan[cat][:5])}"
+            f"{'...' if len(plan[cat]) > 5 else ''})"
+        )
     if dry_run:
         lines.append("Dry run only — pass dry_run=false to execute.")
         return "\n".join(lines)
@@ -320,7 +346,6 @@ def organize_folder(path: str, dry_run: bool = True) -> str:
             if dst.exists():
                 continue  # never overwrite silently
             shutil.move(str(src), str(dst))
-            record_pending_undo("move_file",
-                                {"src": str(dst), "dst": str(src)})
+            record_pending_undo("move_file", {"src": str(dst), "dst": str(src)})
             moved += 1
     return f"organized {moved}/{total} files into {len(plan)} folders"

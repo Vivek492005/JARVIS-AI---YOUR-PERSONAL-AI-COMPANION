@@ -5,10 +5,16 @@ from unittest import mock
 
 import pytest
 
-from jarvis.brain.providers import (Completion, DeepSeek,
-                                    HuggingFaceRouter, LocalHeuristicProvider,
-                                    Ollama, OpenAICompatibleProvider,
-                                    ProviderChain, ToolCall)
+from jarvis.brain.providers import (
+    Completion,
+    DeepSeek,
+    HuggingFaceRouter,
+    LocalHeuristicProvider,
+    Ollama,
+    OpenAICompatibleProvider,
+    ProviderChain,
+    ToolCall,
+)
 from jarvis.core.errors import ProviderError, QuotaExhaustedError
 
 
@@ -54,8 +60,7 @@ def test_chain_uses_first_healthy_provider():
 
 def test_chain_retries_then_falls_back_with_honest_notice():
     notices = []
-    p1 = FakeLLM("p1", [ProviderError("boom"), ProviderError("boom"),
-                        ProviderError("boom")])
+    p1 = FakeLLM("p1", [ProviderError("boom"), ProviderError("boom"), ProviderError("boom")])
     p2 = FakeLLM("p2", [Completion(text="from-p2")])
     chain = _chain([p1, p2], on_degraded=notices.append)
     res = chain.complete([{"role": "user", "content": "hi"}])
@@ -69,8 +74,7 @@ def test_chain_quota_error_skips_retry():
     notices = []
     p1 = FakeLLM("p1", [QuotaExhaustedError("429")])
     p2 = FakeLLM("p2", [Completion(text="from-p2")])
-    res = _chain([p1, p2], on_degraded=notices.append).complete(
-        [{"role": "user", "content": "hi"}])
+    res = _chain([p1, p2], on_degraded=notices.append).complete([{"role": "user", "content": "hi"}])
     assert p1.attempts == 1  # no retry on quota walls
     assert res.provider_name == "p2"
     assert any("quota exhausted" in n for n in notices)
@@ -80,8 +84,9 @@ def test_chain_backoff_is_exponential():
     sleeps = []
     p1 = FakeLLM("p1", [ProviderError("x")] * 3)
     p2 = FakeLLM("p2", [Completion(text="ok")])
-    _chain([p1, p2], sleep=sleeps.append,
-           rng=random.Random(0)).complete([{"role": "user", "content": "hi"}])
+    _chain([p1, p2], sleep=sleeps.append, rng=random.Random(0)).complete(
+        [{"role": "user", "content": "hi"}]
+    )
     assert len(sleeps) == 2
     # base 0.5 * 2^attempt + jitter[0, 0.25]
     assert 0.5 <= sleeps[0] <= 0.75
@@ -107,9 +112,9 @@ def test_all_cloud_down_falls_to_local_heuristic_degraded():
     notices = []
     p1 = FakeLLM("p1", [ProviderError("down")] * 3)
     local = LocalHeuristicProvider(handler=lambda text: f"heuristic:{text}")
-    res = _chain([p1], local_provider=local,
-                 on_degraded=notices.append).complete(
-        [{"role": "user", "content": "hello"}])
+    res = _chain([p1], local_provider=local, on_degraded=notices.append).complete(
+        [{"role": "user", "content": "hello"}]
+    )
     assert res.provider_name == "local-heuristic"
     assert res.degraded is True
     assert res.completion.text == "heuristic:hello"
@@ -123,18 +128,21 @@ def test_no_providers_no_local_raises():
 
 def test_local_heuristic_uses_latest_user_message():
     local = LocalHeuristicProvider(handler=lambda t: f"got:{t}")
-    comp = local.complete([
-        {"role": "system", "content": "sys"},
-        {"role": "user", "content": "first"},
-        {"role": "assistant", "content": "reply"},
-        {"role": "user", "content": "second"},
-    ])
+    comp = local.complete(
+        [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "reply"},
+            {"role": "user", "content": "second"},
+        ]
+    )
     assert comp.text == "got:second"
     assert comp.tool_calls == []
     assert local.health() is True
 
 
 # -- OpenAI-compatible adapter --------------------------------------------
+
 
 def _mock_openai_client(response=None, exc=None):
     client = mock.MagicMock()
@@ -160,13 +168,12 @@ def test_adapter_normalizes_tool_calls():
     tc.function.name = "open_application"
     tc.function.arguments = '{"app_name": "notepad"}'
     client = _mock_openai_client(_chat_response("ok", [tc]))
-    p = OpenAICompatibleProvider("test", "k", "http://x/v1", "m",
-                                 client=client)
-    comp = p.complete([{"role": "user", "content": "open notepad"}],
-                      tools=[{"type": "function"}])
+    p = OpenAICompatibleProvider("test", "k", "http://x/v1", "m", client=client)
+    comp = p.complete([{"role": "user", "content": "open notepad"}], tools=[{"type": "function"}])
     assert comp.text == "ok"
-    assert comp.tool_calls == [ToolCall(id="call_1", name="open_application",
-                                        args={"app_name": "notepad"})]
+    assert comp.tool_calls == [
+        ToolCall(id="call_1", name="open_application", args={"app_name": "notepad"})
+    ]
     assert comp.provider == "test"
     _, kwargs = client.chat.completions.create.call_args
     assert kwargs["model"] == "m"
@@ -175,19 +182,17 @@ def test_adapter_normalizes_tool_calls():
 
 def test_adapter_translates_429_to_quota_error():
     from openai import RateLimitError
-    exc = RateLimitError("rate limited",
-                         response=mock.MagicMock(status_code=429), body=None)
+
+    exc = RateLimitError("rate limited", response=mock.MagicMock(status_code=429), body=None)
     client = _mock_openai_client(exc=exc)
-    p = OpenAICompatibleProvider("test", "k", "http://x/v1", "m",
-                                 client=client)
+    p = OpenAICompatibleProvider("test", "k", "http://x/v1", "m", client=client)
     with pytest.raises(QuotaExhaustedError):
         p.complete([{"role": "user", "content": "hi"}])
 
 
 def test_adapter_wraps_generic_errors():
     client = _mock_openai_client(exc=ConnectionError("dns"))
-    p = OpenAICompatibleProvider("test", "k", "http://x/v1", "m",
-                                 client=client)
+    p = OpenAICompatibleProvider("test", "k", "http://x/v1", "m", client=client)
     with pytest.raises(ProviderError):
         p.complete([{"role": "user", "content": "hi"}])
 
@@ -206,13 +211,16 @@ def test_named_adapters_bind_env(monkeypatch):
 
 # -- agent wiring ----------------------------------------------------------
 
+
 def test_agent_builds_chain_respecting_egress(monkeypatch):
     from jarvis.brain.agent import AIAgent
+
     monkeypatch.setenv("HUGGINGFACE_API_KEY", "k1")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "k2")
     monkeypatch.setenv("PRIVACY__ALLOW_DEEPSEEK", "false")
     monkeypatch.setattr(AIAgent, "_ollama_wanted", staticmethod(lambda: False))
     from jarvis.core.config import reset_settings_cache
+
     reset_settings_cache()
     try:
         with mock.patch("openai.OpenAI", create=True):
@@ -223,7 +231,7 @@ def test_agent_builds_chain_respecting_egress(monkeypatch):
             a.ds_base_url = "http://ds"
             a.hf_model = "m1"
             a.ds_model = "m2"
-            a.client = None          # __init__ sets these before _init_clients
+            a.client = None  # __init__ sets these before _init_clients
             a.backup_client = None
             a._local_fallback_process = lambda text: "local"
             a._notify_status = lambda m: None
@@ -237,6 +245,7 @@ def test_agent_builds_chain_respecting_egress(monkeypatch):
 def test_agent_process_uses_chain_tool_loop():
     """A tool call round-trip through the chain dispatches the tool."""
     from jarvis.brain.agent import AIAgent
+
     a = AIAgent.__new__(AIAgent)
     a.temperature = 0.3
     a.conversation_history = []
@@ -248,14 +257,13 @@ def test_agent_process_uses_chain_tool_loop():
     tc = ToolCall(id="c1", name="get_time", args={})
     a.chain = mock.MagicMock()
     a.chain.complete.side_effect = [
-        mock.MagicMock(completion=Completion(text="", tool_calls=[tc],
-                                             provider="fake")),
-        mock.MagicMock(completion=Completion(text="done", tool_calls=[],
-                                             provider="fake")),
+        mock.MagicMock(completion=Completion(text="", tool_calls=[tc], provider="fake")),
+        mock.MagicMock(completion=Completion(text="done", tool_calls=[], provider="fake")),
     ]
     # _chain_complete unwraps .completion from chain.complete(...).
-    a._chain_complete = lambda messages, tools=None: \
+    a._chain_complete = lambda messages, tools=None: (
         a.chain.complete(messages, tools=tools).completion
+    )
     reply = AIAgent._call_llm_flow(a, "what time is it")
     assert reply == "done"
     assert a.chain.complete.call_count == 2

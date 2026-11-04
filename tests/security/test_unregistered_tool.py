@@ -7,8 +7,7 @@ import sys
 from unittest import mock
 from unittest.mock import MagicMock
 
-for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip",
-             "fuzzywuzzy"):
+for _mod in ("speech_recognition", "pyttsx3", "pyautogui", "pyperclip", "fuzzywuzzy"):
     sys.modules.setdefault(_mod, MagicMock(name=_mod))
 sys.modules["fuzzywuzzy"].fuzz = MagicMock()
 
@@ -19,9 +18,19 @@ from access_os.ai_agent import AIAgent  # noqa: E402
 from access_os.policy import Decision, PolicyContext, decide_tool_call  # noqa: E402
 from access_os.tools.registry import resolve  # noqa: E402
 
-BOGUS = ["delete_everything", "rm", "exec", "system", "eval",
-         "keyboard_mouse_action ", " web_search", "WEB_SEARCH",
-         "", "None", "null"]
+BOGUS = [
+    "delete_everything",
+    "rm",
+    "exec",
+    "system",
+    "eval",
+    "keyboard_mouse_action ",
+    " web_search",
+    "WEB_SEARCH",
+    "",
+    "None",
+    "null",
+]
 
 
 @pytest.mark.parametrize("name", BOGUS)

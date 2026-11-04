@@ -13,11 +13,18 @@ import pytest
 
 from jarvis.marketplace import ed25519
 from jarvis.marketplace.package import (
-    MANIFEST_NAME, PackageError, build_package, canonical_bytes,
-    load_package, pack_zip, validate_manifest_schema,
+    MANIFEST_NAME,
+    PackageError,
+    build_package,
+    canonical_bytes,
+    load_package,
+    pack_zip,
+    validate_manifest_schema,
 )
 from jarvis.marketplace.signing import (
-    CuratorStore, sign_package, verify_package,
+    CuratorStore,
+    sign_package,
+    verify_package,
 )
 
 SKILL_MD = """\
@@ -55,9 +62,9 @@ def skill_dir(tmp_path):
 
 @pytest.fixture()
 def signed_pkg_dir(tmp_path, skill_dir, author):
-    staging = build_package(skill_dir, author="tester",
-                            author_key_id=author["key_id"],
-                            min_jarvis="0.1.0")
+    staging = build_package(
+        skill_dir, author="tester", author_key_id=author["key_id"], min_jarvis="0.1.0"
+    )
     sign_package(staging, author["seed"])
     return staging
 
@@ -79,9 +86,9 @@ def test_pack_zip_roundtrip(tmp_path, signed_pkg_dir):
 
 
 def test_unsigned_package_refused(skill_dir, author):
-    staging = build_package(skill_dir, author="tester",
-                            author_key_id=author["key_id"],
-                            min_jarvis="0.1.0")
+    staging = build_package(
+        skill_dir, author="tester", author_key_id=author["key_id"], min_jarvis="0.1.0"
+    )
     res = verify_package(staging)
     assert not res.ok
     assert any("SIGNATURE" in e for e in res.errors)
@@ -124,8 +131,8 @@ def test_wrong_key_refused(signed_pkg_dir):
     sig = json.loads(sig_path.read_text(encoding="utf-8"))
     # Re-sign the manifest bytes with a different key but keep key_id.
     from jarvis.marketplace.package import canonical_bytes as cb
-    man = json.loads((signed_pkg_dir / MANIFEST_NAME).read_text(
-        encoding="utf-8"))
+
+    man = json.loads((signed_pkg_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
     sig["signature"] = ed25519.sign(other_seed, cb(man)).hex()
     sig_path.write_text(json.dumps(sig), encoding="utf-8")
     res = verify_package(signed_pkg_dir)
@@ -135,14 +142,13 @@ def test_wrong_key_refused(signed_pkg_dir):
 def test_skill_md_permissions_must_match_manifest(tmp_path, skill_dir, author):
     # Attack: manifest declares narrow permissions up front, but SKILL.md
     # (correctly hashed) requests broad ones at runtime.
-    staging = build_package(skill_dir, author="tester",
-                            author_key_id=author["key_id"],
-                            min_jarvis="0.1.0")
+    staging = build_package(
+        skill_dir, author="tester", author_key_id=author["key_id"], min_jarvis="0.1.0"
+    )
     man_path = staging / "MANIFEST.json"
     man = json.loads(man_path.read_text(encoding="utf-8"))
     man["permissions"] = []  # lie up front
-    man_path.write_text(json.dumps(man, indent=2, sort_keys=True) + "\n",
-                        encoding="utf-8")
+    man_path.write_text(json.dumps(man, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     sign_package(staging, author["seed"])
     res = verify_package(staging)
     assert not res.ok
@@ -151,18 +157,32 @@ def test_skill_md_permissions_must_match_manifest(tmp_path, skill_dir, author):
 
 def test_schema_rejects_unknown_fields():
     with pytest.raises(PackageError, match="unknown manifest fields"):
-        validate_manifest_schema({
-            "format": "jarvis-skill-package/1", "name": "x", "version": "1.0.0",
-            "author": "a", "author_key_id": "0" * 16, "min_jarvis": "0.1.0",
-            "permissions": [], "files": {"SKILL.md": "0" * 64},
-            "evil": "field"})
+        validate_manifest_schema(
+            {
+                "format": "jarvis-skill-package/1",
+                "name": "x",
+                "version": "1.0.0",
+                "author": "a",
+                "author_key_id": "0" * 16,
+                "min_jarvis": "0.1.0",
+                "permissions": [],
+                "files": {"SKILL.md": "0" * 64},
+                "evil": "field",
+            }
+        )
 
 
 def test_schema_rejects_bad_name_and_version():
-    base = {"format": "jarvis-skill-package/1", "name": "ok-name",
-            "version": "1.0.0", "author": "a", "author_key_id": "0" * 16,
-            "min_jarvis": "0.1.0", "permissions": [],
-            "files": {"SKILL.md": "0" * 64}}
+    base = {
+        "format": "jarvis-skill-package/1",
+        "name": "ok-name",
+        "version": "1.0.0",
+        "author": "a",
+        "author_key_id": "0" * 16,
+        "min_jarvis": "0.1.0",
+        "permissions": [],
+        "files": {"SKILL.md": "0" * 64},
+    }
     for bad in ("../evil", "UPPER", "has space", ""):
         with pytest.raises(PackageError):
             validate_manifest_schema({**base, "name": bad})
@@ -185,8 +205,7 @@ def test_canonical_bytes_deterministic():
     assert canonical_bytes(obj) == b'{"a":[3,2],"b":1}'
 
 
-def test_curator_tier_when_key_trusted(tmp_path, signed_pkg_dir, author,
-                                       monkeypatch):
+def test_curator_tier_when_key_trusted(tmp_path, signed_pkg_dir, author, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     store = CuratorStore()
     store.add(author["pub"].hex(), name="tester")
@@ -207,9 +226,9 @@ def test_curator_store_rejects_bad_key(tmp_path, monkeypatch):
 
 def test_sign_refuses_key_id_mismatch(skill_dir, author):
     other_seed, _ = ed25519.keypair()
-    staging = build_package(skill_dir, author="tester",
-                            author_key_id=author["key_id"],
-                            min_jarvis="0.1.0")
+    staging = build_package(
+        skill_dir, author="tester", author_key_id=author["key_id"], min_jarvis="0.1.0"
+    )
     with pytest.raises(PackageError, match="does not match"):
         sign_package(staging, other_seed)
 
@@ -220,9 +239,9 @@ def test_double_sign_refused(signed_pkg_dir, author):
 
 
 def test_pack_refuses_unsigned(tmp_path, skill_dir, author):
-    staging = build_package(skill_dir, author="tester",
-                            author_key_id=author["key_id"],
-                            min_jarvis="0.1.0")
+    staging = build_package(
+        skill_dir, author="tester", author_key_id=author["key_id"], min_jarvis="0.1.0"
+    )
     with pytest.raises(PackageError, match="unsigned"):
         pack_zip(staging, tmp_path / "x.jskill")
 

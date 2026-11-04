@@ -5,13 +5,12 @@ from unittest.mock import MagicMock
 
 sys.modules.setdefault("pyautogui", MagicMock(name="pyautogui"))
 
-from jarvis.brain.disambiguate import (
+from jarvis.brain.disambiguate import (  # noqa: E402
     format_options,
     is_undo_request,
     parse_selection,
 )
-from jarvis.brain.loop import (
-    Action,
+from jarvis.brain.loop import (  # noqa: E402
     AgentLoop,
     LoopContext,
     LLMPlanner,
@@ -20,16 +19,16 @@ from jarvis.brain.loop import (
     _parse_action,
     needs_handoff,
 )
-from jarvis.brain.model_router import (
+from jarvis.brain.model_router import (  # noqa: E402
     CostGuard,
     ModelRouter,
     SemanticCache,
     Tier,
     Usage,
 )
-from jarvis.brain.providers.base import Completion, ToolCall
-from tests.fakes.fake_llm import FakeLLM
-from tests.fakes.fake_os import FakeOS
+from jarvis.brain.providers.base import Completion  # noqa: E402
+from tests.fakes.fake_llm import FakeLLM  # noqa: E402
+from tests.fakes.fake_os import FakeOS  # noqa: E402
 
 
 def _planner(script):
@@ -50,8 +49,12 @@ class TestActionParsing:
         assert _parse_action('{"type": "nonsense"}') is None
 
     def test_repair_loop(self):
-        p = _planner([Completion(text='not json at all'),
-                      Completion(text='{"type": "finish", "reply": "recovered"}')])
+        p = _planner(
+            [
+                Completion(text="not json at all"),
+                Completion(text='{"type": "finish", "reply": "recovered"}'),
+            ]
+        )
         a = p._ask([{"role": "user", "content": "go"}])
         assert a.reply == "recovered"
 
@@ -60,13 +63,16 @@ class TestAgentLoop:
     def test_happy_path_with_verification(self):
         script = [
             Completion(text='{"type": "finish", "reply": "PLAN: 1) open notepad"}'),
-            Completion(text='{"type": "tool_call", "tool": "open_application", '
-                            '"args": {"app_name": "notepad"}}'),
+            Completion(
+                text='{"type": "tool_call", "tool": "open_application", '
+                '"args": {"app_name": "notepad"}}'
+            ),
             Completion(text='{"type": "finish", "reply": "Ho gaya: Notepad khol diya"}'),
         ]
         # open_application is REVERSIBLE -> CONFIRM at L1; accept it.
-        loop = AgentLoop(_planner(script), max_steps=6, wall_time_s=30,
-                         confirm_callback=lambda t, a: True)
+        loop = AgentLoop(
+            _planner(script), max_steps=6, wall_time_s=30, confirm_callback=lambda t, a: True
+        )
         with FakeOS():
             out = loop.run_task("notepad kholo", LoopContext())
         assert "Ho gaya" in out
@@ -82,8 +88,9 @@ class TestAgentLoop:
         assert "wapas aaya" in out
 
     def test_step_limit(self):
-        script = [Completion(text='{"type": "tool_call", "tool": "web_search", '
-                                   '"args": {"query": "x"}}')] * 20
+        script = [
+            Completion(text='{"type": "tool_call", "tool": "web_search", "args": {"query": "x"}}')
+        ] * 20
         loop = AgentLoop(_planner(script), max_steps=3, wall_time_s=30)
         with FakeOS():
             out = loop.run_task("khojo", LoopContext())
@@ -91,6 +98,7 @@ class TestAgentLoop:
 
     def test_kill_switch(self):
         from jarvis.core.safety import KillSwitch
+
         ks = KillSwitch()
         ks.trigger("test")
         script = [Completion(text='{"type": "finish", "reply": "PLAN: 1) x"}')]
@@ -100,12 +108,15 @@ class TestAgentLoop:
     def test_confirm_decline_continues(self):
         script = [
             Completion(text='{"type": "finish", "reply": "PLAN: 1) x"}'),
-            Completion(text='{"type": "tool_call", "tool": "system_control", '
-                            '"args": {"action": "empty_recycle_bin"}}'),
+            Completion(
+                text='{"type": "tool_call", "tool": "system_control", '
+                '"args": {"action": "empty_recycle_bin"}}'
+            ),
             Completion(text='{"type": "finish", "reply": "theek hai, cancel"}'),
         ]
-        loop = AgentLoop(_planner(script), max_steps=6, wall_time_s=30,
-                         confirm_callback=lambda t, a: False)
+        loop = AgentLoop(
+            _planner(script), max_steps=6, wall_time_s=30, confirm_callback=lambda t, a: False
+        )
         with FakeOS():
             out = loop.run_task("recycle bin khaali karo", LoopContext())
         assert "cancel" in out
@@ -113,8 +124,9 @@ class TestAgentLoop:
     def test_handoff_on_login(self):
         script = [
             Completion(text='{"type": "finish", "reply": "PLAN: 1) x"}'),
-            Completion(text='{"type": "tool_call", "tool": "web_search", '
-                            '"args": {"query": "bank"}}'),
+            Completion(
+                text='{"type": "tool_call", "tool": "web_search", "args": {"query": "bank"}}'
+            ),
         ]
         loop = AgentLoop(_planner(script), max_steps=6, wall_time_s=30)
         with FakeOS(results={"web_search": "please log in to continue"}):
@@ -125,8 +137,7 @@ class TestAgentLoop:
 class TestVerifier:
     def test_open_application_failure_detected(self):
         v = Verifier()
-        ok, ev = v.verify("open_application", {"app_name": "x"},
-                          "Could not launch x")
+        ok, ev = v.verify("open_application", {"app_name": "x"}, "Could not launch x")
         assert not ok
 
     def test_unknown_tool_heuristic(self):
@@ -171,8 +182,17 @@ class TestModelRouter:
         assert r.tier == Tier.T3_LOCAL
 
     def test_config_models_not_hardcoded(self):
-        s = type("S", (), {"brain": type("B", (), {
-            "t1_model": "my-fast", "t2_model": "my-strong", "t3_model": "my-local"})()})()
+        s = type(
+            "S",
+            (),
+            {
+                "brain": type(
+                    "B",
+                    (),
+                    {"t1_model": "my-fast", "t2_model": "my-strong", "t3_model": "my-local"},
+                )()
+            },
+        )()
         r = ModelRouter(s)
         assert r.route("hi").model == "my-fast"
         assert r.route("banao detailed plan abhi").model == "my-strong"
@@ -180,8 +200,11 @@ class TestModelRouter:
 
 class TestCostGuard:
     def _settings(self, tok, inr):
-        return type("S", (), {"brain": type("B", (), {
-            "daily_token_budget": tok, "daily_cost_inr_budget": inr})()})()
+        return type(
+            "S",
+            (),
+            {"brain": type("B", (), {"daily_token_budget": tok, "daily_cost_inr_budget": inr})()},
+        )()
 
     def test_breach_downgrades(self):
         notes = []
