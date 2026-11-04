@@ -13,6 +13,14 @@ All notable changes to JARVIS are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Phase 9 moonshot: self-improving skills (human-reviewed).** Hermes-style
+  learning loop: privacy-safe signal store (redacted args, sensitive
+  content withheld, no raw utterances), poisoning guard (untrusted/MCP
+  content never learnable), offline proposer (`reflex_rule` /
+  `prompt_snippet` / `skill_variant`), control-center proposals inbox with
+  approve/reject/edit/revert, eval-gated apply (fail-closed, safety +
+  injection always at 100%), versioned reversible changes, `jarvis learn`
+  CLI. Never auto-applies — every change is an explicit human decision.
 - **Phase 9 moonshot: signed skill marketplace.** `.jskill` packages
   (strict MANIFEST.json + hash-pinned files), pure-Python Ed25519
   sign/verify (stdlib only, libsodium-pinned vectors), trust tiers
