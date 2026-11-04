@@ -418,6 +418,75 @@ def _cmd_skill(args) -> int:
     return 2
 
 
+def _cmd_learn(args) -> int:
+    """Self-improving skills loop (Phase 9 moonshot). Never auto-applies:
+    approve/reject/revert are explicit human decisions, audit-logged."""
+    from jarvis.learning.service import LearningService
+    svc = LearningService.default()
+    cmd, arg = args.learn_cmd, args.learn_arg
+    extra = getattr(args, "learn_extra", []) or []
+
+    if cmd == "status":
+        s = svc.status()
+        print(f"learning loop: {'ENABLED' if s['enabled'] else 'DISABLED'}")
+        print(f"  runs: {s['total_runs']} ({s['learnable_runs']} learnable)")
+        print(f"  corrections: {s['total_corrections']}")
+        print(f"  pending proposals: {s['pending_proposals']}")
+        return 0
+    if cmd in ("enable", "disable"):
+        s = svc.set_enabled(cmd == "enable")
+        print("learning loop", "ENABLED" if s["enabled"] else "DISABLED")
+        return 0
+    if cmd == "analyze":
+        out = svc.analyze()
+        total = sum(len(v) for v in out.values())
+        print(f"{total} new proposal(s):")
+        for t, ids in out.items():
+            for pid in ids:
+                print(f"  [{t}] {pid}")
+        return 0
+    if cmd == "ingest-audit":
+        out = svc.ingest_audit()
+        print(f"ingested {out['ingested']} audit entr(y/ies)")
+        return 0
+    if cmd == "proposals":
+        for p in svc.reviewer.list(status=arg or ""):
+            print(f"{p['id']} [{p['type']}] ({p['status']}) "
+                  f"conf={p['confidence']}: {p['title']}")
+        return 0
+    if cmd == "approve":
+        if not arg:
+            print("usage: jarvis learn approve <proposal-id>", file=sys.stderr)
+            return 2
+        print(f"approving {arg} — eval gate running (may take minutes)…")
+        out = svc.approve(arg, reviewer="cli")
+        print(out.message)
+        return 0 if out.ok else 1
+    if cmd == "reject":
+        if not arg:
+            print("usage: jarvis learn reject <proposal-id> [reason]",
+                  file=sys.stderr)
+            return 2
+        out = svc.reviewer.reject(arg, reason=" ".join(extra),
+                                  reviewer="cli")
+        print(out.message)
+        return 0 if out.ok else 1
+    if cmd == "revert":
+        if not arg:
+            print("usage: jarvis learn revert <applied-id>", file=sys.stderr)
+            return 2
+        try:
+            aid = int(arg)
+        except ValueError:
+            print("applied-id must be a number", file=sys.stderr)
+            return 2
+        out = svc.reviewer.revert(aid, reviewer="cli")
+        print(out.message)
+        return 0 if out.ok else 1
+    print(f"unknown learn command: {cmd}", file=sys.stderr)
+    return 2
+
+
 def _cmd_memory(args) -> int:
     from jarvis.brain.memory.commands import MemoryCommands, parse
     from jarvis.brain.memory.store import MemoryStore
@@ -498,6 +567,15 @@ def build_parser() -> argparse.ArgumentParser:
                      help="list | forget <text> | export | wipe | remember <text>")
     mem.add_argument("memory_arg", nargs="?", default=None)
     mem.set_defaults(func=_cmd_memory)
+
+    ln = sub.add_parser("learn", help="self-improving skills loop (Phase 9)")
+    ln.add_argument("learn_cmd", nargs="?", default="status",
+                    help="status | analyze | ingest-audit | proposals [status] | "
+                         "approve <id> | reject <id> [reason] | revert <applied-id> | "
+                         "enable | disable")
+    ln.add_argument("learn_arg", nargs="?", default=None)
+    ln.add_argument("learn_extra", nargs="*", default=[])
+    ln.set_defaults(func=_cmd_learn)
     return p
 
 
