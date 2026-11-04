@@ -6,7 +6,7 @@ body.buddy-page { background: transparent; overflow: hidden; }
 
 /* ---------- the buddy ---------- */
 #buddy {
-  position: fixed; right: 22px; bottom: 22px; width: 84px; height: 84px;
+  position: fixed; right: 22px; bottom: 22px; width: 104px; height: 104px;
   cursor: grab; z-index: 50; outline: none;
   filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
   animation: bob 3.2s ease-in-out infinite;
@@ -57,7 +57,7 @@ body.buddy-page { background: transparent; overflow: hidden; }
 
 /* ---------- chat card ---------- */
 #chat-card {
-  position: fixed; right: 18px; bottom: 120px; z-index: 40;
+  position: fixed; right: 18px; bottom: 140px; z-index: 40;
   width: 380px; height: 520px;
   max-width: calc(100vw - 24px); max-height: calc(100dvh - 130px);
   display: flex; flex-direction: column; overflow: hidden;
