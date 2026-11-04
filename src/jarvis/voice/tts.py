@@ -277,6 +277,50 @@ class Pyttsx3Engine(_BaseTTS):
         return b""
 
 
+class ChatterboxEngine(_BaseTTS):
+    """Resemble AI Chatterbox TTS (MIT license). Local neural voice.
+
+    License-clean: MIT, no API key, no quota, fully offline after the
+    first run. Requires ``pip install chatterbox-tts`` (+ torch);
+    first use downloads ~2.5 GB of weights from HuggingFace
+    (ResembleAI/chatterbox). CPU synthesis is slow (~1 min per short
+    sentence on 2 cores) -- best as an offline fallback, not for
+    low-latency chat replies.
+    """
+
+    def __init__(self, device: str = "cpu") -> None:
+        self._device = device
+        self._model = None
+
+    @property
+    def name(self) -> str:
+        return "chatterbox"
+
+    @property
+    def offline_capable(self) -> bool:
+        return True
+
+    def _ensure_model(self):
+        if self._model is None:
+            try:
+                from chatterbox.tts import ChatterboxTTS
+            except ImportError as e:
+                raise RuntimeError(
+                    "chatterbox-tts is not installed "
+                    "(`pip install chatterbox-tts`).") from e
+            self._model = ChatterboxTTS.from_pretrained(device=self._device)
+        return self._model
+
+    def synth(self, text: str, voice: Optional[str] = None) -> bytes:
+        import io
+        import soundfile as sf
+        model = self._ensure_model()
+        wav = model.generate(text).squeeze(0).cpu().numpy()
+        buf = io.BytesIO()
+        sf.write(buf, wav, model.sr, format="WAV")
+        return buf.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # Phrase cache
 # ---------------------------------------------------------------------------
@@ -390,6 +434,7 @@ _TTS_ENGINES: Dict[str, type] = {
     "edge": EdgeTTSEngine,
     "rumik": RumikTTSEngine,
     "pyttsx3": Pyttsx3Engine,
+    "chatterbox": ChatterboxEngine,
 }
 
 

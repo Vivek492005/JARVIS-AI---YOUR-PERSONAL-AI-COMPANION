@@ -2009,6 +2009,31 @@ class VoiceInterface:
             logger.warning(f"Rumik TTS synthesis failed ({e}). Falling back to default voice.")
             return False
 
+    def _speak_chatterbox(self, text: str) -> bool:
+        """Synthesize and play speech using local Chatterbox TTS (MIT)."""
+        try:
+            from jarvis.voice.tts import ChatterboxEngine
+            import winsound
+
+            data = ChatterboxEngine().synth(text)
+            if not data:
+                return False
+            temp_file = os.path.join(
+                tempfile.gettempdir(),
+                f"JARVIS_chatterbox_{os.getpid()}_{int(time.time() * 1000)}.wav",
+            )
+            with open(temp_file, "wb") as f:
+                f.write(data)
+            winsound.PlaySound(temp_file, winsound.SND_FILENAME)
+            try:
+                os.remove(temp_file)
+            except Exception as e:
+                logger.debug("temp file cleanup best-effort failed: %s", e)
+            return True
+        except Exception as e:
+            logger.warning(f"Chatterbox TTS synthesis failed ({e}). Falling back.")
+            return False
+
     def _speak_neural(self, text: str) -> bool:
         """Synthesize and play speech with human-sounding Neural voice."""
         if self._privacy_tts_only_local():
@@ -2076,9 +2101,14 @@ class VoiceInterface:
                     # Primary order: Neural first (free, no API key, no quota),
                     # Rumik second. tts_engine="rumik" keeps the legacy order.
                     tts_engine = self.config.get("tts_engine", "neural")
-                    chain = ["neural", "rumik"] if tts_engine == "neural" else ["rumik", "neural"]
+                    if tts_engine == "chatterbox":
+                        chain = ["chatterbox", "neural", "rumik"]
+                    else:
+                        chain = ["neural", "rumik"] if tts_engine == "neural" else ["rumik", "neural"]
                     if not local_only:
                         for engine in chain:
+                            if engine == "chatterbox" and self._speak_chatterbox(text):
+                                return
                             if engine == "neural" and self._speak_neural(text):
                                 return
                             if engine == "rumik" and self._speak_rumik(text):
