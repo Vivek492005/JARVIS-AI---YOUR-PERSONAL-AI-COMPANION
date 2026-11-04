@@ -2103,8 +2103,10 @@ class VoiceInterface:
                     tts_engine = self.config.get("tts_engine", "neural")
                     if tts_engine == "chatterbox":
                         chain = ["chatterbox", "neural", "rumik"]
+                    elif tts_engine == "neural":
+                        chain = ["neural", "rumik"]
                     else:
-                        chain = ["neural", "rumik"] if tts_engine == "neural" else ["rumik", "neural"]
+                        chain = ["rumik", "neural"]
                     if not local_only:
                         for engine in chain:
                             if engine == "chatterbox" and self._speak_chatterbox(text):

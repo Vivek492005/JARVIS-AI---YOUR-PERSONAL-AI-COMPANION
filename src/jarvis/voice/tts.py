@@ -306,14 +306,15 @@ class ChatterboxEngine(_BaseTTS):
                 from chatterbox.tts import ChatterboxTTS
             except ImportError as e:
                 raise RuntimeError(
-                    "chatterbox-tts is not installed "
-                    "(`pip install chatterbox-tts`).") from e
+                    "chatterbox-tts is not installed (`pip install chatterbox-tts`)."
+                ) from e
             self._model = ChatterboxTTS.from_pretrained(device=self._device)
         return self._model
 
     def synth(self, text: str, voice: Optional[str] = None) -> bytes:
         import io
         import soundfile as sf
+
         model = self._ensure_model()
         wav = model.generate(text).squeeze(0).cpu().numpy()
         buf = io.BytesIO()
