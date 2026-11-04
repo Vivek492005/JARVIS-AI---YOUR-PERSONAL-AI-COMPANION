@@ -89,6 +89,7 @@ def create_app(service: JarvisService, token: str):
         "sw.js": "text/javascript",
         "icon-192.png": "image/png",
         "icon-512.png": "image/png",
+        "companion-avatar.webp": "image/webp",
     }
 
     def _hud_file(name: str) -> "FileResponse":
