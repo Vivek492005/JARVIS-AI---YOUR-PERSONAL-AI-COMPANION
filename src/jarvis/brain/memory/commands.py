@@ -1,4 +1,4 @@
-"""User control commands for memory (Task 4.4.6).
+"""User control commands for memory (Task 4.4.6, rewired Phase C).
 
 Recognized intents (checked before the LLM path):
   "yaad rakhna ..." / "remember ..."  -> propose a fact (needs confirm unless explicit)
@@ -6,6 +6,11 @@ Recognized intents (checked before the LLM path):
   "tumhe kya yaad hai?" / "what do you remember?" -> list facts
   "memory export"                     -> dump facts+episodes as text
   "memory delete all"                 -> confirm, then wipe
+
+Phase C: commands now run against a
+:py:class:`~jarvis.brain.memory.provider.MemoryProvider` (HybridProvider
+in the agent) instead of a raw MemoryStore. For backward compatibility the
+constructor still accepts a plain MemoryStore and wraps it.
 """
 
 from __future__ import annotations
@@ -13,7 +18,10 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Union
 
+from jarvis.brain.memory.provider import MemoryProvider
+from jarvis.brain.memory.sqlite_provider import SQLiteProvider
 from jarvis.brain.memory.store import MemoryStore
 from jarvis.brain.memory.write_policy import WriteRequest, validate_write
 
@@ -61,34 +69,47 @@ def _split_key_value(payload: str) -> tuple:
 
 
 class MemoryCommands:
-    """Executes memory control commands against a store."""
+    """Executes memory control commands against a provider.
 
-    def __init__(self, store: MemoryStore) -> None:
-        self.store = store
+    Accepts a MemoryProvider (preferred) or a legacy MemoryStore, which is
+    wrapped in a SQLiteProvider automatically.
+    """
+
+    def __init__(self, backend: Union[MemoryProvider, MemoryStore]) -> None:
+        if isinstance(backend, MemoryStore):
+            # Legacy callers pass a store; wrap it around the same DB file.
+            backend = SQLiteProvider(backend.path)
+        self.provider: MemoryProvider = backend
 
     def handle(self, cmd: MemoryCommand) -> str:
         if cmd.kind == "remember":
             return self._remember(cmd.payload)
         if cmd.kind == "forget":
-            n = self.store.delete_facts_like(cmd.payload)
+            try:
+                n = self.provider.forget(cmd.payload)
+            except Exception as e:
+                logger.exception("forget failed")
+                return f"Bhoolne mein dikkat aayi: {e}"
             return (
                 f"Bhool gaya. {n} yaadein delete ki." if n else "Us baare mein kuch yaad nahi tha."
             )
         if cmd.kind == "list":
-            facts = self.store.all_facts()
+            try:
+                prof = self.provider.profile()
+            except Exception as e:
+                logger.exception("profile failed")
+                return f"Yaadein nikaalne mein dikkat aayi: {e}"
+            facts = prof.facts
             if not facts:
                 return "Mujhe abhi kuch khaas yaad nahi hai."
-            return "Mujhe ye yaad hai:\n" + "\n".join(
-                f"{i + 1}. {f.key}: {f.value}" for i, f in enumerate(facts[:20])
-            )
+            shown = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(facts[:20]))
+            return f"Mujhe ye yaad hai:\n{shown}"
         if cmd.kind == "export":
-            facts = self.store.all_facts()
-            eps = self.store.recent_episodes(50)
-            out = ["# MEMORY EXPORT", "## Facts"]
-            out += [f"- [{f.source}] {f.key}: {f.value}" for f in facts]
-            out.append("## Recent episodes")
-            out += [f"- ({e['ts']}) {e['role']}: {e['text'][:120]}" for e in eps]
-            return "\n".join(out)
+            try:
+                return self.provider.export()
+            except Exception as e:
+                logger.exception("export failed")
+                return f"Export mein dikkat aayi: {e}"
         if cmd.kind == "wipe":
             # The caller must confirm first; this method only wipes when the
             # confirmed flag flows through the policy gate. We return the
@@ -105,9 +126,17 @@ class MemoryCommands:
         err = validate_write(req)
         if err:
             return f"Yaad nahi rakh paya: {err}"
-        fid = self.store.add_fact(key, value, source="user")
-        return f"Yaad rakh liya: {key} = {value} (#{fid})"
+        try:
+            mid = self.provider.add(f"{key}: {value}", {"source": "user", "kind": "explicit"})
+        except Exception as e:
+            logger.exception("remember failed")
+            return f"Yaad nahi rakh paya: {e}"
+        return f"Yaad rakh liya: {key} = {value} (#{mid})"
 
     def confirm_wipe(self) -> str:
-        self.store.clear_all()
+        try:
+            self.provider.wipe()
+        except Exception as e:
+            logger.exception("wipe failed")
+            return f"Wipe mein dikkat aayi: {e}"
         return "Saari yaadein delete kar di."

@@ -39,8 +39,11 @@ def parse_lesson(text: str) -> Optional[Lesson]:
 class Reflector:
     """Records lessons and builds weekly MEMORY.md proposals."""
 
-    def __init__(self, store: MemoryStore) -> None:
+    def __init__(self, store: MemoryStore, provider=None) -> None:
         self.store = store
+        # Optional MemoryProvider (e.g. HybridProvider) for semantic
+        # lesson storage. Best-effort; never breaks recording.
+        self.provider = provider
 
     def record_failure(self, tool: str, evidence: str, lesson_text: str = "") -> Optional[int]:
         """Store a failure episode + optional lesson. Returns lesson ep id."""
@@ -55,6 +58,16 @@ class Reflector:
             outcome="lesson",
         )
         logger.info("recorded lesson for %s", tool)
+        # Whole-brain (Phase B): mirror the lesson into semantic memory
+        # so "what did we learn about X?" is searchable by meaning.
+        if self.provider is not None:
+            try:
+                self.provider.add(
+                    f"Lesson learned: {lesson.what_failed} -> {lesson.what_to_do}",
+                    {"source": "confirmed", "kind": "lesson", "tool": tool},
+                )
+            except Exception:
+                logger.exception("semantic lesson save failed")
         return eid
 
     def weekly_proposals(self, limit: int = 50) -> List[str]:

@@ -559,10 +559,10 @@ def _cmd_learn(args) -> int:
 
 def _cmd_memory(args) -> int:
     from jarvis.brain.memory.commands import MemoryCommands, parse
-    from jarvis.brain.memory.store import MemoryStore
+    from jarvis.brain.memory.hybrid import HybridProvider
 
-    store = MemoryStore()
-    mc = MemoryCommands(store)
+    provider = HybridProvider()
+    mc = MemoryCommands(provider)
     cmd, arg = args.memory_cmd, args.memory_arg or ""
     if cmd == "list":
         print(mc.handle(parse("tumhe kya yaad hai?")))
@@ -572,6 +572,14 @@ def _cmd_memory(args) -> int:
         print(mc.handle(parse(f"yaad rakhna {arg}")))
     elif cmd == "export":
         print(mc.handle(parse("memory export")))
+    elif cmd == "status":
+        sem_ok = provider.semantic_available()
+        print(f"semantic backend : {'up' if sem_ok else 'down'} "
+              f"({provider.semantic.base_url})")
+        print(f"local backend    : {'up' if provider.sqlite.health() else 'down'}")
+        print(f"last backend used: {provider.backend_used()}")
+        print(f"semantic enabled : {provider.semantic_enabled} "
+              f"(JARVIS_SEMANTIC_MEMORY env)")
     elif cmd == "wipe":
         out = mc.handle(parse("memory delete all"))
         if out.startswith("CONFIRM_WIPE:"):
@@ -584,9 +592,12 @@ def _cmd_memory(args) -> int:
         else:
             print(out)
     else:
-        print("usage: jarvis memory [list|forget|export|wipe|remember]", file=sys.stderr)
+        print(
+            "usage: jarvis memory [list|forget|export|wipe|remember|status]",
+            file=sys.stderr,
+        )
         return 2
-    store.close()
+    provider.close()
     return 0
 
 
