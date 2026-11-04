@@ -25,7 +25,7 @@ def test_tray_menu_wires_callbacks():
     assert tray.available is True
     tray.run()
     labels = [label for label, _ in tray.backend.menu]
-    assert labels == ["Show HUD", "Summon (wake)", "Quit"]
+    assert labels == ["Open chat", "Summon (wake)", "Quit"]
     for _, action in tray.backend.menu:
         action()
     assert fired == ["show", "summon", "quit"]

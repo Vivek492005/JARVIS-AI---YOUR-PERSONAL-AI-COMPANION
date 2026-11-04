@@ -76,9 +76,15 @@ def create_app(service: JarvisService, token: str):
     _HUD_STATIC = Path(__file__).resolve().parent.parent / "hud" / "static"
     _HUD_FILES = {
         "index.html": "text/html",
+        "chat.html": "text/html",
+        "buddy.html": "text/html",
         "control.html": "text/html",
         "styles.css": "text/css",
+        "chat.css": "text/css",
+        "buddy.css": "text/css",
         "app.js": "text/javascript",
+        "chat.js": "text/javascript",
+        "buddy.js": "text/javascript",
         "manifest.json": "application/manifest+json",
         "sw.js": "text/javascript",
         "icon-192.png": "image/png",
@@ -135,6 +141,18 @@ def create_app(service: JarvisService, token: str):
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from None
         return {"v": 1, "accepted": True}
+
+    @app.post("/interrupt", dependencies=[Depends(verify)])
+    async def interrupt():
+        # Chat UI stop button: cancel the running lane item (the agent's
+        # current work) and flush queued TASK items. Same mechanism as the
+        # kill switch path; safe to call when idle (no-op).
+        try:
+            service.interrupt(reason="chat-stop")
+        except AttributeError as e:
+            raise HTTPException(status_code=501,
+                                detail="interrupt not supported") from e
+        return {"v": 1, "interrupted": True}
 
     @app.websocket("/events")
     async def events(ws: WebSocket, token_q: Optional[str] = Query(default=None, alias="token")):

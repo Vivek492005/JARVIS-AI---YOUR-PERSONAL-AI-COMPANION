@@ -18,6 +18,47 @@ import sys
 logger = logging.getLogger("jarvis.cli")
 
 
+def _start_summon_ui(port: int, token: str) -> None:
+    """Best-effort tray icon + global hotkey that open the buddy.
+
+    The buddy (buddy.html) is the default summon surface: a small floating
+    companion; clicking it expands the compact chat card. Ctrl+Alt+J (or the
+    tray "Open chat" item) opens ``/hud/buddy.html?token=...`` in the default
+    browser. Everything is availability-guarded; any failure only logs a
+    warning and never breaks ``serve``. Windows-only in practice
+    (pystray/keyboard).
+    """
+    try:
+        import webbrowser
+        from jarvis.hud.tray import TrayController, HotkeySummon
+
+        url = f"http://127.0.0.1:{port}/hud/buddy.html?token={token}"
+
+        def _open_chat() -> None:
+            try:
+                webbrowser.open(url)
+            except Exception:
+                logger.warning("summon: could not open browser", exc_info=True)
+
+        tray = TrayController(on_show=_open_chat, on_summon=_open_chat)
+        if tray.available:
+            import threading
+            threading.Thread(target=tray.run, daemon=True,
+                             name="jarvis-tray").start()
+            logger.info("tray icon running (Open chat / Summon / Quit)")
+        else:
+            logger.info("tray unavailable (pystray/Pillow not installed)")
+
+        hotkey = HotkeySummon(on_summon=_open_chat)
+        if hotkey.available:
+            hotkey.start()
+            logger.info("summon hotkey registered: %s", hotkey.hotkey)
+        else:
+            logger.info("hotkey unavailable ('keyboard' package not installed)")
+    except Exception:
+        logger.warning("summon UI failed to start", exc_info=True)
+
+
 def _cmd_serve(args) -> int:
     from jarvis.server.service import JarvisService
     from jarvis.server.token import get_or_create_token
@@ -37,6 +78,7 @@ def _cmd_serve(args) -> int:
             app = create_app(service, token)
             print(f"jarvisd HTTP on http://127.0.0.1:{args.port} "
                   f"(token stored per-install; see server.token)")
+            _start_summon_ui(args.port, token)
             uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="info")
         else:
             print("jarvisd running (in-process, no HTTP). "

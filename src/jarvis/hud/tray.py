@@ -107,7 +107,7 @@ class TrayController:
             logger.warning("tray: pystray/Pillow not installed — tray disabled")
             return
         self.backend.run("JARVIS", [
-            ("Show HUD", lambda: self.on_show()),
+            ("Open chat", lambda: self.on_show()),
             ("Summon (wake)", lambda: self.on_summon()),
             ("Quit", lambda: (self.on_quit(), self.backend.stop())),
         ])

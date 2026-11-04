@@ -20,6 +20,11 @@ body {
 #hud { max-width: 720px; margin: 0 auto; padding: 12px; }
 header { display: flex; justify-content: space-between; align-items: center; }
 #mode-toggle button[aria-selected="true"] { outline: 2px solid var(--state-color); }
+#link-chat {
+  color: var(--dim); text-decoration: none; padding: 8px 14px;
+  border: 1px solid var(--dim); border-radius: 6px; font-size: 14px;
+}
+#link-chat:hover { color: var(--ink); border-color: var(--state-color); }
 #conn { color: var(--dim); font-size: 13px; }
 
 body[data-state="idle"] { --state-color: var(--idle); }

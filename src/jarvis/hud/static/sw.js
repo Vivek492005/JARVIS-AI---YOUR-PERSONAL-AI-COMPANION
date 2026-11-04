@@ -1,10 +1,16 @@
 /* JARVIS HUD service worker (Task 7.9). App-shell caching only —
 // live state always comes from the /events WebSocket, never from cache. */
-var CACHE = "jarvis-hud-v1";
+var CACHE = "jarvis-hud-v3";
 var SHELL = [
   "/hud/index.html",
+  "/hud/chat.html",
+  "/hud/buddy.html",
   "/hud/styles.css",
+  "/hud/chat.css",
+  "/hud/buddy.css",
   "/hud/app.js",
+  "/hud/chat.js",
+  "/hud/buddy.js",
   "/hud/manifest.json"
 ];
 

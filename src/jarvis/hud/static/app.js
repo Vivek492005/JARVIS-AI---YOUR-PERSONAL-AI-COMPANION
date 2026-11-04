@@ -277,4 +277,6 @@
 
   connect();
   drawOrb();
+  var chatLink = document.getElementById("link-chat");
+  if (chatLink) chatLink.href = "chat.html?token=" + encodeURIComponent(token);
 })();

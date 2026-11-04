@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07090d">
+<title>JARVIS</title>
+<link rel="stylesheet" href="chat.css">
+<link rel="stylesheet" href="buddy.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body class="buddy-page">
+<div id="stage">
+  <!-- The buddy: a small floating companion. Click to open the chat card. -->
+  <div id="buddy" data-state="idle" role="button" tabindex="0" aria-label="Open JARVIS chat">
+    <div class="buddy-body" aria-hidden="true">
+      <div class="buddy-eyes">
+        <span class="eye"><span class="pupil"></span></span>
+        <span class="eye"><span class="pupil"></span></span>
+      </div>
+      <div class="buddy-mouth"></div>
+      <div class="buddy-notif" hidden></div>
+    </div>
+  </div>
+
+  <!-- Compact chat card (~380x520), expands from the buddy. -->
+  <section id="chat-card" hidden aria-label="JARVIS chat">
+    <header id="card-head">
+      <span class="brand-mini"><span class="brand-orb"></span>JARVIS</span>
+      <span id="card-title">New chat</span>
+      <button id="btn-new" title="New chat" aria-label="New chat">+</button>
+      <button id="btn-pop" title="Pop out as compact window" aria-label="Pop out as compact window">⧉</button>
+      <button id="btn-close" title="Close" aria-label="Close chat">×</button>
+    </header>
+    <div id="thread" aria-live="polite" aria-label="Conversation"></div>
+    <div id="composer-wrap">
+      <div id="working" hidden aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="working-label">Working…</span>
+        <button id="working-toggle" aria-expanded="false">details</button>
+        <ol id="working-tools" hidden></ol>
+      </div>
+      <div id="composer">
+        <button id="btn-mic" title="Voice input" aria-label="Voice input">🎙</button>
+        <textarea id="input" rows="1" placeholder="Message JARVIS…" aria-label="Message"></textarea>
+        <button id="btn-send" title="Send (Enter)" aria-label="Send">➤</button>
+        <button id="btn-stop" title="Stop" aria-label="Stop" hidden>■</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="chat.js"></script>
+<script src="buddy.js"></script>
+</body>
+</html>

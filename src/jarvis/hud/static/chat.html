@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07090d">
+<title>JARVIS Chat</title>
+<link rel="stylesheet" href="chat.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body>
+<div id="chat-app">
+  <aside id="sidebar" aria-label="Conversations">
+    <div class="side-head">
+      <div class="brand"><span class="brand-orb" aria-hidden="true"></span>JARVIS</div>
+      <button id="btn-new" title="New chat">+ New chat</button>
+    </div>
+    <ol id="conv-list"></ol>
+    <div class="side-foot">
+      <label class="toggle"><input type="checkbox" id="opt-speak"> Speak replies</label>
+      <label class="toggle"><input type="checkbox" id="opt-contrast"> High contrast</label>
+      <a id="link-hud" href="index.html">HUD view</a>
+      <span id="side-conn" aria-live="polite">connecting…</span>
+    </div>
+  </aside>
+  <button id="btn-side" aria-label="Toggle sidebar">☰</button>
+
+  <main id="main">
+    <div id="thread" aria-live="polite" aria-label="Conversation"></div>
+
+    <div id="composer-wrap">
+      <div id="working" hidden aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="working-label">Working…</span>
+        <button id="working-toggle" aria-expanded="false">details</button>
+        <ol id="working-tools" hidden></ol>
+      </div>
+      <div id="composer">
+        <button id="btn-mic" title="Voice input" aria-label="Voice input">🎙</button>
+        <textarea id="input" rows="1" placeholder="Message JARVIS…" aria-label="Message"></textarea>
+        <button id="btn-send" title="Send (Enter)">➤</button>
+        <button id="btn-stop" title="Stop" hidden>■</button>
+      </div>
+      <div id="hint">Enter to send · Shift+Enter for newline · "haan"/"nahi" to confirm</div>
+    </div>
+  </main>
+</div>
+<script src="chat.js"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+/* JARVIS buddy: small floating companion + expandable chat card.
+   Pure CSS character — no images, no CDN. Shares chat.css for bubbles. */
+body.buddy-page { background: transparent; overflow: hidden; }
+#stage { position: fixed; inset: 0; pointer-events: none; }
+#stage > * { pointer-events: auto; }
+
+/* ---------- the buddy ---------- */
+#buddy {
+  position: fixed; right: 22px; bottom: 22px; width: 76px; height: 76px;
+  cursor: grab; z-index: 50; outline: none;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
+  animation: bob 3.2s ease-in-out infinite;
+  touch-action: none;
+}
+@keyframes bob { 50% { transform: translateY(-5px); } }
+#buddy:hover .buddy-body { animation: wiggle 0.45s ease; }
+@keyframes wiggle { 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } }
+#buddy:active { cursor: grabbing; }
+#buddy:focus-visible .buddy-body { box-shadow: 0 0 0 3px rgba(95, 242, 200, 0.6), 0 0 26px rgba(95, 242, 200, 0.35); }
+
+.buddy-body {
+  width: 100%; height: 100%; border-radius: 50%; position: relative;
+  background: radial-gradient(circle at 32% 28%, #1d3a4a 0%, #0e2231 55%, #081420 100%);
+  border: 2px solid rgba(95, 242, 200, 0.55);
+  box-shadow: 0 0 22px rgba(95, 242, 200, 0.28), inset 0 0 18px rgba(95, 242, 200, 0.12);
+}
+.buddy-eyes { position: absolute; top: 30%; left: 0; right: 0; display: flex; justify-content: center; gap: 13px; }
+.eye {
+  width: 15px; height: 19px; border-radius: 50%; background: #eaf6ff;
+  display: flex; align-items: center; justify-content: center;
+  animation: blink 4.4s infinite; transform-origin: center;
+  box-shadow: 0 0 6px rgba(234, 246, 255, 0.5);
+}
+@keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5%, 97.5% { transform: scaleY(0.08); } }
+.pupil { width: 7px; height: 10px; border-radius: 50%; background: #0a1420; }
+.buddy-mouth {
+  position: absolute; bottom: 24%; left: 50%; transform: translateX(-50%);
+  width: 17px; height: 7px; border-radius: 0 0 12px 12px; background: #0a1420;
+  border: 1.5px solid rgba(234, 246, 255, 0.75); border-top: none;
+  transform-origin: center top;
+}
+.buddy-notif {
+  position: absolute; top: 2px; right: 6px; width: 15px; height: 15px;
+  border-radius: 50%; background: #ff9f43; border: 2px solid #081420;
+  box-shadow: 0 0 10px rgba(255, 159, 67, 0.9);
+  animation: notif-pulse 1s ease-in-out infinite;
+}
+@keyframes notif-pulse { 50% { transform: scale(1.25); } }
+
+/* buddy states (driven by live events via window.JarvisBuddy) */
+#buddy[data-state="listening"] .buddy-body {
+  border-color: #5ff2c8;
+  animation: listen-pulse 1.1s ease-in-out infinite;
+}
+@keyframes listen-pulse {
+  50% { box-shadow: 0 0 34px rgba(95, 242, 200, 0.65), inset 0 0 18px rgba(95, 242, 200, 0.25); }
+}
+#buddy[data-state="thinking"] { animation: think-bounce 0.9s ease-in-out infinite; }
+@keyframes think-bounce { 30% { transform: translateY(-11px); } 55% { transform: translateY(0); } 75% { transform: translateY(-4px); } }
+#buddy[data-state="speaking"] .buddy-mouth { animation: talk 0.45s ease-in-out infinite; }
+@keyframes talk { 50% { transform: translateX(-50%) scaleY(2.4); border-radius: 8px; } }
+#buddy[data-state="attention"] { animation: excited 0.7s ease-in-out 3; }
+@keyframes excited {
+  20% { transform: translateY(-9px) rotate(-5deg); }
+  45% { transform: translateY(0) rotate(4deg); }
+  70% { transform: translateY(-5px); }
+}
+
+/* ---------- chat card ---------- */
+#chat-card {
+  position: fixed; right: 18px; bottom: 112px; z-index: 40;
+  width: 380px; height: 520px;
+  max-width: calc(100vw - 24px); max-height: calc(100dvh - 130px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(13, 18, 26, 0.97);
+  border: 1px solid rgba(139, 152, 169, 0.28); border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  transform-origin: bottom right;
+  transform: scale(0.55) translateY(26px); opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.16s ease;
+}
+#chat-card.open { transform: none; opacity: 1; }
+#chat-card[hidden] { display: none; }
+
+#card-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  border-bottom: 1px solid rgba(139, 152, 169, 0.14); flex: 0 0 auto;
+}
+.brand-mini { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12.5px; letter-spacing: 2px; }
+.brand-mini .brand-orb {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--accent, #5ff2c8);
+  box-shadow: 0 0 10px rgba(95, 242, 200, 0.4); animation: orb-pulse 3s ease-in-out infinite;
+}
+@keyframes orb-pulse { 50% { box-shadow: 0 0 16px rgba(95, 242, 200, 0.6); } }
+#card-title {
+  flex: 1; font-size: 13px; color: var(--dim, #8b98a9);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#card-head button {
+  background: none; border: none; color: var(--dim, #8b98a9); cursor: pointer;
+  font-size: 17px; padding: 3px 7px; border-radius: 7px; line-height: 1;
+}
+#card-head button:hover { color: var(--ink, #e6edf6); background: rgba(139, 152, 169, 0.12); }
+
+/* compact tweaks on top of chat.css */
+#chat-card #thread { padding: 14px 12px 8px; }
+#chat-card #composer-wrap { padding: 4px 10px 10px; }
+#chat-card #hint { display: none; }
+#chat-card .bubble { max-width: 88%; font-size: 14px; }
+#chat-card .empty { margin-top: 9vh; }
+#chat-card .empty .big { font-size: 30px; }
+#chat-card .confirm { max-width: 92%; }
+
+@media (prefers-reduced-motion: reduce) {
+  #buddy, #buddy .eye, #buddy .buddy-body, #buddy .buddy-mouth, #buddy .buddy-notif,
+  #buddy:hover .buddy-body, .brand-mini .brand-orb { animation: none !important; }
+  #chat-card { transition: none; }
+}
