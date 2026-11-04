@@ -6,7 +6,7 @@ body.buddy-page { background: transparent; overflow: hidden; }
 
 /* ---------- the buddy ---------- */
 #buddy {
-  position: fixed; right: 22px; bottom: 22px; width: 104px; height: 104px;
+  position: fixed; right: 22px; bottom: 22px; width: 128px; height: 128px;
   cursor: grab; z-index: 50; outline: none;
   filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
   animation: bob 3.2s ease-in-out infinite;
@@ -57,7 +57,7 @@ body.buddy-page { background: transparent; overflow: hidden; }
 
 /* ---------- chat card ---------- */
 #chat-card {
-  position: fixed; right: 18px; bottom: 140px; z-index: 40;
+  position: fixed; right: 18px; bottom: 168px; z-index: 40;
   width: 380px; height: 520px;
   max-width: calc(100vw - 24px); max-height: calc(100dvh - 130px);
   display: flex; flex-direction: column; overflow: hidden;
@@ -104,4 +104,51 @@ body.buddy-page { background: transparent; overflow: hidden; }
   #buddy, #buddy .eye, #buddy .buddy-body, #buddy .buddy-mouth, #buddy .buddy-notif,
   #buddy:hover .buddy-body, .brand-mini .brand-orb { animation: none !important; }
   #chat-card { transition: none; }
+}
+
+/* ---------- liveliness: buddy feels alive ---------- */
+.buddy-body { transition: transform 0.25s ease; }
+.buddy-body.breathe { animation: breathe 3.4s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.03, 0.97); } }
+.buddy-body.act-hop { animation: act-hop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes act-hop { 35% { transform: translateY(-16px) scale(0.96, 1.06); } 70% { transform: translateY(0) scale(1.05, 0.93); } }
+.buddy-body.act-spin { animation: act-spin 0.7s ease; }
+@keyframes act-spin { to { transform: rotate(360deg); } }
+.buddy-body.act-tilt { animation: act-tilt 0.8s ease; }
+@keyframes act-tilt { 25% { transform: rotate(-12deg); } 60% { transform: rotate(10deg); } }
+.buddy-body.act-squash { animation: act-squash 0.6s ease; }
+@keyframes act-squash { 30% { transform: scale(1.12, 0.82); } 65% { transform: scale(0.92, 1.1); } }
+#buddy.sleeping .buddy-body { animation: sleepy 4s ease-in-out infinite; filter: saturate(0.6) brightness(0.85); }
+@keyframes sleepy { 50% { transform: scale(1.02, 0.98) translateY(2px); } }
+
+/* speech bubble */
+.buddy-say {
+  position: absolute; bottom: calc(100% + 10px); right: 6px;
+  max-width: 190px; padding: 8px 12px; font-size: 12.5px; line-height: 1.4;
+  background: rgba(16, 22, 32, 0.97); color: #e8eef5;
+  border: 1px solid rgba(95, 242, 200, 0.4); border-radius: 14px 14px 4px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: say-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none; white-space: normal; z-index: 60;
+}
+.buddy-say[hidden] { display: none; }
+@keyframes say-pop { from { opacity: 0; transform: translateY(8px) scale(0.9); } }
+
+/* context menu */
+.buddy-menu {
+  position: absolute; bottom: calc(100% + 10px); right: 0; min-width: 170px;
+  background: rgba(16, 22, 32, 0.98); border: 1px solid rgba(139, 152, 169, 0.3);
+  border-radius: 12px; padding: 6px; z-index: 70;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  animation: say-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.buddy-menu[hidden] { display: none; }
+.buddy-menu button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  color: #dbe4ee; font-size: 13px; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.buddy-menu button:hover { background: rgba(95, 242, 200, 0.14); }
+
+@media (prefers-reduced-motion: reduce) {
+  #buddy, .buddy-body, .buddy-body.breathe, #buddy.sleeping .buddy-body { animation: none !important; }
 }
