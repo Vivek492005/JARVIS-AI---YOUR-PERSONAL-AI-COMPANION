@@ -1,0 +1,23 @@
+# Force LF line endings on checkout (all platforms).
+#
+# WHY: CI runs `ruff format --check` on windows-latest, where git checks out
+# files with CRLF by default. Ruff counts the CR as part of the line, so
+# lines that are exactly <=100 cols with LF exceed the limit with CRLF and
+# `ruff format --check` fails on Windows while passing on Linux/macOS.
+# Enforcing LF everywhere makes the format check deterministic per platform.
+* text=auto eol=lf
+
+# Binary assets must never get line-ending conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.exe binary
+*.dll binary
+*.zip binary
+*.pdf binary
