@@ -251,7 +251,7 @@ def test_agent_process_uses_chain_tool_loop():
     a.conversation_history = []
     a.max_history = 10
     a.tool_definitions = []
-    a._get_system_prompt = lambda: "sys"
+    a._get_system_prompt = lambda memory_context="": "sys"
     a._dispatch_tool_call = lambda name, args: "tool-ok"
     a._sanitize_for_prompt = lambda n, al, r: r
     tc = ToolCall(id="c1", name="get_time", args={})

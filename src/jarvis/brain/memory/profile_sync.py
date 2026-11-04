@@ -36,9 +36,7 @@ class ProfileSync:
         try:
             self._cached = self.provider.profile()
             self._last_refresh = now
-            logger.info(
-                "profile refreshed: %d facts", len(self._cached.facts)
-            )
+            logger.info("profile refreshed: %d facts", len(self._cached.facts))
         except Exception:
             logger.exception("profile refresh failed; keeping cache")
             if self._cached is None:

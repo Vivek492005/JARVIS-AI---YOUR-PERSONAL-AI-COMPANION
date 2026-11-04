@@ -154,7 +154,7 @@ def test_golden_llm_tool_call_trace(bus, seen, tmp_path):
     agent.conversation_history = []
     agent.max_history = 10
     agent.tool_definitions = []
-    agent._get_system_prompt = lambda: "sys"
+    agent._get_system_prompt = lambda memory_context="": "sys"
     # Real _dispatch_tool_call (emits ToolRequested/Finished); stub only the
     # policy decision, the executor and the audit sink.
     agent._decide = lambda name, args, ctx=None: ("ALLOW", "test allow")

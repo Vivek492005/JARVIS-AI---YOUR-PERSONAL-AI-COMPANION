@@ -58,13 +58,9 @@ class SupermemoryProvider(MemoryProvider):
         namespace: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
-        self.base_url = (
-            base_url or os.getenv("JARVIS_SUPERMEMORY_URL", DEFAULT_URL)
-        ).rstrip("/")
+        self.base_url = (base_url or os.getenv("JARVIS_SUPERMEMORY_URL", DEFAULT_URL)).rstrip("/")
         self.api_key = api_key or os.getenv("JARVIS_SUPERMEMORY_API_KEY", "")
-        self.namespace = (
-            namespace or os.getenv("JARVIS_SUPERMEMORY_NAMESPACE", DEFAULT_NAMESPACE)
-        )
+        self.namespace = namespace or os.getenv("JARVIS_SUPERMEMORY_NAMESPACE", DEFAULT_NAMESPACE)
         self.timeout = timeout
 
     # -- low-level HTTP -------------------------------------------------
@@ -75,9 +71,7 @@ class SupermemoryProvider(MemoryProvider):
             h["Authorization"] = f"Bearer {self.api_key}"
         return h
 
-    def _call(
-        self, method: str, path: str, payload: Optional[dict] = None
-    ) -> dict:
+    def _call(self, method: str, path: str, payload: Optional[dict] = None) -> dict:
         url = f"{self.base_url}{path}"
         data = json.dumps(payload or {}).encode("utf-8")
         req = urllib.request.Request(  # noqa: S310
@@ -114,10 +108,7 @@ class SupermemoryProvider(MemoryProvider):
         res = self._call("POST", self._ns("/document"), payload)
         # v5 returns the document id under various keys; be liberal.
         doc_id = (
-            res.get("id")
-            or res.get("documentId")
-            or (res.get("document") or {}).get("id")
-            or ""
+            res.get("id") or res.get("documentId") or (res.get("document") or {}).get("id") or ""
         )
         logger.debug("supermemory add -> %s", doc_id)
         return str(doc_id)
@@ -126,9 +117,7 @@ class SupermemoryProvider(MemoryProvider):
         query = (query or "").strip()
         if not query:
             return []
-        res = self._call(
-            "POST", self._ns("/search"), {"query": query, "limit": limit}
-        )
+        res = self._call("POST", self._ns("/search"), {"query": query, "limit": limit})
         out: List[Memory] = []
         for item in res.get("results", []) or []:
             mem = item.get("memory") or item
@@ -141,10 +130,7 @@ class SupermemoryProvider(MemoryProvider):
                     text=text,
                     score=float(item.get("score") or mem.get("score") or 0.0),
                     source="semantic",
-                    metadata={
-                        k: str(v)
-                        for k, v in (mem.get("metadata") or {}).items()
-                    },
+                    metadata={k: str(v) for k, v in (mem.get("metadata") or {}).items()},
                 )
             )
         return out[:limit]

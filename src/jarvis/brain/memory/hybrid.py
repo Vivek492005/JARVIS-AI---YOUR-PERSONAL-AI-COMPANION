@@ -55,9 +55,7 @@ class HybridProvider(MemoryProvider):
                 self._last_backend = "supermemory"
                 return result
             except Exception as e:
-                logger.warning(
-                    "supermemory %s failed (%s); falling back to sqlite", op, e
-                )
+                logger.warning("supermemory %s failed (%s); falling back to sqlite", op, e)
         result = getattr(self.sqlite, op)(*args, **kwargs)
         self._last_backend = "sqlite"
         return result

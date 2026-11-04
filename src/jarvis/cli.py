@@ -574,12 +574,10 @@ def _cmd_memory(args) -> int:
         print(mc.handle(parse("memory export")))
     elif cmd == "status":
         sem_ok = provider.semantic_available()
-        print(f"semantic backend : {'up' if sem_ok else 'down'} "
-              f"({provider.semantic.base_url})")
+        print(f"semantic backend : {'up' if sem_ok else 'down'} ({provider.semantic.base_url})")
         print(f"local backend    : {'up' if provider.sqlite.health() else 'down'}")
         print(f"last backend used: {provider.backend_used()}")
-        print(f"semantic enabled : {provider.semantic_enabled} "
-              f"(JARVIS_SEMANTIC_MEMORY env)")
+        print(f"semantic enabled : {provider.semantic_enabled} (JARVIS_SEMANTIC_MEMORY env)")
     elif cmd == "wipe":
         out = mc.handle(parse("memory delete all"))
         if out.startswith("CONFIRM_WIPE:"):
