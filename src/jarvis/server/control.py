@@ -105,6 +105,32 @@ class PushSubscription(BaseModel):
     keys: Dict[str, str] = {}
 
 
+class ProposalReject(BaseModel):
+    reason: str = ""
+
+
+class ProposalEdit(BaseModel):
+    title: Optional[str] = None
+    body: Optional[Dict[str, Any]] = None
+
+
+def _learning_service(service):
+    """Lazily attach a LearningService to the jarvisd service object.
+
+    Tests may pre-attach a fake ``service.learning``; production gets the
+    default (``~/.jarvis/learning.db``).
+    """
+    svc = getattr(service, "learning", None)
+    if svc is None:
+        from jarvis.learning.service import LearningService
+        svc = LearningService.default()
+        try:
+            service.learning = svc
+        except Exception:  # noqa: S110 - caching is best-effort only
+            pass
+    return svc
+
+
 def _push_store_path() -> Path:
     from jarvis.core.config import get_settings
     try:
@@ -324,6 +350,93 @@ def build_control_router(service, verify) -> APIRouter:
                 if s.get("endpoint") != endpoint]
         _save_subscriptions(subs)
         return {"ok": True, "subscriptions": len(subs)}
+
+    # --- learning loop: proposals inbox (Phase 9 moonshot) ------------------
+    # Every state-changing endpoint here is an explicit human decision,
+    # audit-logged by the reviewer. Approval runs the eval gate first
+    # (fail-closed) and may take a few minutes — the UI polls.
+
+    @r.get("/learning/status")
+    def learning_status():
+        return _learning_service(service).status()
+
+    @r.post("/learning/enable")
+    def learning_enable():
+        return _learning_service(service).set_enabled(True)
+
+    @r.post("/learning/disable")
+    def learning_disable():
+        return _learning_service(service).set_enabled(False)
+
+    @r.post("/learning/analyze")
+    def learning_analyze(min_evidence: int = 3):
+        svc = _learning_service(service)
+        return {"new_proposals": svc.analyze(
+            min_evidence=max(2, min(min_evidence, 50)))}
+
+    @r.post("/learning/ingest-audit")
+    def learning_ingest_audit(limit: int = 2000):
+        svc = _learning_service(service)
+        return svc.ingest_audit(limit=max(1, min(limit, 10000)))
+
+    @r.get("/learning/proposals")
+    def learning_proposals(status: str = ""):
+        svc = _learning_service(service)
+        return svc.reviewer.list(status=status)
+
+    @r.get("/learning/proposals/{pid}")
+    def learning_proposal(pid: str):
+        svc = _learning_service(service)
+        p = svc.reviewer.get(pid)
+        if p is None:
+            raise HTTPException(404, f"unknown proposal {pid}")
+        return p
+
+    @r.post("/learning/proposals/{pid}/approve")
+    def learning_approve(pid: str):
+        svc = _learning_service(service)
+        out = svc.approve(pid, reviewer="control-center")
+        if not out.ok:
+            raise HTTPException(409, out.message)
+        return {"ok": True, "proposal": out.proposal_id,
+                "applied_id": out.applied_id, "message": out.message}
+
+    @r.post("/learning/proposals/{pid}/reject")
+    def learning_reject(pid: str, body: ProposalReject):
+        svc = _learning_service(service)
+        out = svc.reviewer.reject(pid, reason=body.reason,
+                                  reviewer="control-center")
+        if not out.ok:
+            raise HTTPException(409, out.message)
+        return {"ok": True, "message": out.message}
+
+    @r.put("/learning/proposals/{pid}")
+    def learning_edit(pid: str, body: ProposalEdit):
+        svc = _learning_service(service)
+        out = svc.reviewer.edit(pid, title=body.title, body=body.body,
+                                reviewer="control-center")
+        if not out.ok:
+            raise HTTPException(409, out.message)
+        return {"ok": True, "message": out.message}
+
+    @r.get("/learning/applied")
+    def learning_applied():
+        svc = _learning_service(service)
+        return svc.reviewer.store.list_applied()
+
+    @r.post("/learning/applied/{aid}/revert")
+    def learning_revert(aid: int):
+        svc = _learning_service(service)
+        out = svc.reviewer.revert(aid, reviewer="control-center")
+        if not out.ok:
+            raise HTTPException(409, out.message)
+        return {"ok": True, "message": out.message}
+
+    @r.get("/learning/runs")
+    def learning_runs(limit: int = 50):
+        svc = _learning_service(service)
+        return svc.reviewer.store.recent_runs(
+            limit=max(1, min(limit, 500)), learnable_only=False)
 
     return r
 

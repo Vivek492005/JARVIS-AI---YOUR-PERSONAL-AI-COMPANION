@@ -62,6 +62,21 @@
   </div>
 
   <div class="card">
+    <h2>Learning loop <span class="muted">(Phase 9 — human-reviewed, never auto-applies)</span></h2>
+    <div class="row" style="margin-bottom:.5rem">
+      <button id="learn-refresh">Refresh</button>
+      <button id="learn-analyze">Analyze now</button>
+      <button id="learn-toggle">Enable/Disable</button>
+      <span class="muted" id="learn-status">—</span>
+    </div>
+    <div id="learn-msg" class="muted"></div>
+    <h3 style="font-size:.9rem;margin:.8rem 0 .4rem">Proposals inbox</h3>
+    <div id="learn-proposals" class="muted">—</div>
+    <h3 style="font-size:.9rem;margin:.8rem 0 .4rem">Applied changes</h3>
+    <div id="learn-applied" class="muted">—</div>
+  </div>
+
+  <div class="card">
     <h2>Providers &amp; costs</h2>
     <div class="row" style="margin-bottom:.5rem">
       <button id="prov-load">Refresh</button>
@@ -161,7 +176,74 @@ $('prov-load').onclick = async () => {
   $('costs-out').textContent = 'Daily cost: ' + JSON.stringify(c, null, 1);
 };
 
-loadSettings(); loadAudit(); loadFacts(); loadSkills();
+async function loadLearning() {
+  const s = await (await fetch('/api/learning/status', { headers: H })).json();
+  $('learn-status').textContent =
+    `loop ${s.enabled ? 'ENABLED' : 'DISABLED'} · pending ${s.pending_proposals} · runs ${s.total_runs} (${s.learnable_runs} learnable) · corrections ${s.total_corrections}`;
+  const props = await (await fetch('/api/learning/proposals?status=pending', { headers: H })).json();
+  $('learn-proposals').innerHTML = props.map(p =>
+    `<div class="row" style="align-items:flex-start;margin-bottom:.4rem">
+       <span><b>${p.id}</b> <span class="muted">[${p.type}]</span> ${p.title}
+       <span class="muted">(conf ${p.confidence})</span><br>
+       <span class="muted">evidence: ${JSON.stringify(JSON.parse(p.evidence || '{}'))}</span></span>
+       <button data-appr="${p.id}">Approve</button>
+       <button class="danger" data-rej="${p.id}">Reject</button>
+       <button data-det="${p.id}">Detail</button>
+     </div>
+     <div class="muted" id="det-${p.id}" style="display:none;white-space:pre-wrap;margin-bottom:.6rem"></div>`
+  ).join('') || 'no pending proposals';
+  document.querySelectorAll('[data-appr]').forEach(b => b.onclick = async () => {
+    $('learn-msg').textContent = 'approving ' + b.dataset.appr + ' (eval gate running, may take minutes)…';
+    const r = await fetch(`/api/learning/proposals/${b.dataset.appr}/approve`, { method: 'POST', headers: H });
+    const j = await r.json();
+    $('learn-msg').textContent = r.ok ? j.message : ('FAILED: ' + (j.detail || JSON.stringify(j)));
+    loadLearning();
+  });
+  document.querySelectorAll('[data-rej]').forEach(b => b.onclick = async () => {
+    const reason = prompt('Rejection reason (optional):', '') || '';
+    const r = await fetch(`/api/learning/proposals/${b.dataset.rej}/reject`, { method: 'POST', headers: H,
+      body: JSON.stringify({ reason }) });
+    const j = await r.json();
+    $('learn-msg').textContent = r.ok ? j.message : ('FAILED: ' + JSON.stringify(j));
+    loadLearning();
+  });
+  document.querySelectorAll('[data-det]').forEach(b => b.onclick = async () => {
+    const el = $('det-' + b.dataset.det);
+    if (el.style.display === 'none') {
+      const p = await (await fetch(`/api/learning/proposals/${b.dataset.det}`, { headers: H })).json();
+      el.textContent = 'body:\n' + p.body + (p.eval_report ? '\n\neval_report:\n' + p.eval_report : '');
+      el.style.display = 'block';
+    } else { el.style.display = 'none'; }
+  });
+  const applied = await (await fetch('/api/learning/applied', { headers: H })).json();
+  $('learn-applied').innerHTML = applied.map(a =>
+    `<div class="row"><span><b>#${a.id}</b> ${a.proposal_id} · ${a.change_type} → ${a.path}
+     <span class="muted">${a.reverted_ts ? 'REVERTED' : 'active'}</span></span>
+     ${a.reverted_ts ? '' : `<button class="danger" data-rev="${a.id}">Revert</button>`}</div>`
+  ).join('') || 'none';
+  document.querySelectorAll('[data-rev]').forEach(b => b.onclick = async () => {
+    if (!confirm('Revert applied change #' + b.dataset.rev + '?')) return;
+    const r = await fetch(`/api/learning/applied/${b.dataset.rev}/revert`, { method: 'POST', headers: H });
+    const j = await r.json();
+    $('learn-msg').textContent = r.ok ? j.message : ('FAILED: ' + JSON.stringify(j));
+    loadLearning();
+  });
+}
+$('learn-refresh').onclick = loadLearning;
+$('learn-analyze').onclick = async () => {
+  $('learn-msg').textContent = 'analyzing…';
+  const j = await (await fetch('/api/learning/analyze', { method: 'POST', headers: H })).json();
+  const n = Object.values(j.new_proposals || {}).flat().length;
+  $('learn-msg').textContent = n + ' new proposal(s)';
+  loadLearning();
+};
+$('learn-toggle').onclick = async () => {
+  const s = await (await fetch('/api/learning/status', { headers: H })).json();
+  await fetch('/api/learning/' + (s.enabled ? 'disable' : 'enable'), { method: 'POST', headers: H });
+  loadLearning();
+};
+
+loadSettings(); loadAudit(); loadFacts(); loadSkills(); loadLearning();
 </script>
 </body>
 </html>
