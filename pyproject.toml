@@ -37,7 +37,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-vision = ["opencv-python>=4.7.0", "mediapipe>=0.10.0,<1.0"]
+vision = ["opencv-python>=5.0.0.93", "mediapipe>=0.10.0,<1.0"]
 voice-local = ["faster-whisper", "openwakeword", "silero-vad"]
 audio = ["sounddevice>=0.4.6", "webrtcvad>=2.0.10", "PyAudio>=0.2.14; sys_platform == 'win32'"]
 wakeword = ["openwakeword>=0.6.0"]
