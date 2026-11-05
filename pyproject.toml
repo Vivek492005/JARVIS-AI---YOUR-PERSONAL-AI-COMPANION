@@ -69,7 +69,7 @@ jarvis = "jarvis.cli:main"
 jarvis-legacy = "jarvis.legacy.access_os_main:main"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
