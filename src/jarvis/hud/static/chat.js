@@ -450,9 +450,23 @@
         inputEl.value = (finalText + interim).trim(); autogrow();
       };
       recog.onend = function () { recog = null; micBtn.classList.remove("rec"); };
-      recog.onerror = function () { recog = null; micBtn.classList.remove("rec"); };
+      /* Mic errors used to fail silently (button just stopped glowing), so a
+         denied mic permission or missing browser support looked like
+         "JARVIS doesn't hear me". Now the user sees the reason in chat. */
+      recog.onerror = function (ev) {
+        recog = null; micBtn.classList.remove("rec");
+        var reason = (ev && ev.error) || "unknown";
+        var hint = reason === "not-allowed"
+          ? "Browser mic permission deny ho gayi — site settings me mic allow karo, phir dobara try karo."
+          : reason === "no-speech"
+          ? "Mic ne kuch suna nahi — mic device check karo aur thoda paas bolke try karo."
+          : reason === "audio-capture"
+          ? "Mic device nahi mila — Windows Settings > Sound me input device set karo."
+          : "Mic error (" + reason + ") — Chrome/Edge use karo, mic permission allow karo.";
+        addMsg("system", "Mic: " + hint, { ephemeral: true });
+      };
       try { recog.start(); micBtn.classList.add("rec"); }
-      catch (e) { recog = null; micBtn.classList.remove("rec"); }
+      catch (e) { recog = null; micBtn.classList.remove("rec"); addMsg("system", "Mic start nahi hua: " + e.message, { ephemeral: true }); }
     });
   }
 

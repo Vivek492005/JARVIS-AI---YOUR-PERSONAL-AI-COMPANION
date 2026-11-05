@@ -35,6 +35,20 @@ def gesture_available() -> Tuple[bool, str]:
             missing.append(mod)
     if missing:
         return False, f"optional deps missing: {', '.join(missing)}"
+    # Importing mediapipe is NOT enough: mediapipe >= 0.10.21 wheels for
+    # Python 3.12+ ship tasks-only (no mp.solutions), and 1.x removed it
+    # entirely. The legacy controller needs mp.solutions.hands/face_mesh,
+    # so verify it actually exists — otherwise the skill must degrade to
+    # "unavailable" instead of crashing mid-confirmation with AttributeError.
+    try:
+        import mediapipe as _mp
+
+        if not hasattr(_mp, "solutions"):
+            return False, (
+                "mediapipe installed but mp.solutions missing in this build (use Python 3.11)"
+            )
+    except ImportError:
+        return False, "optional deps missing: mediapipe"
     return True, ""
 
 

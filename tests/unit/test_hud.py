@@ -173,10 +173,15 @@ def test_hud_routes_require_auth(monkeypatch):
 def test_hud_serves_index_and_assets(monkeypatch):
     c = _make_client(monkeypatch)
     h = {"Authorization": "Bearer test-token"}
+    # /hud is the buddy (default companion surface since 2026-11-05); the
+    # legacy orb HUD remains at /hud/index.html.
     r = c.get("/hud", headers=h)
     assert r.status_code == 200
-    assert "JARVIS HUD" in r.text
+    assert "buddy-avatar" in r.text
     assert r.headers["content-type"].startswith("text/html")
+    r = c.get("/hud/index.html", headers=h)
+    assert r.status_code == 200
+    assert "JARVIS HUD" in r.text
     for name, ctype in [
         ("styles.css", "text/css"),
         ("app.js", "text/javascript"),

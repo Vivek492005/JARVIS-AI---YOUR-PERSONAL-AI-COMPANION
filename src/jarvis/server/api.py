@@ -113,7 +113,12 @@ def create_app(service: JarvisService, token: str):
 
     @app.get("/hud", dependencies=[Depends(verify)], include_in_schema=False)
     async def hud_index():
-        return _hud_file("index.html")
+        # The buddy is the default companion surface (2026-11-05): /hud serves
+        # buddy.html so users never land on the legacy orb by accident. The
+        # orb HUD is still available at /hud/index.html, and the PWA manifest
+        # still starts at /hud/index.html explicitly. Relative asset refs in
+        # buddy.html (buddy.css/js, companion-avatar.webp) resolve under /hud/.
+        return _hud_file("buddy.html")
 
     # NOTE: /hud/snapshot must be registered BEFORE /hud/{name},
     # otherwise the path param swallows it.

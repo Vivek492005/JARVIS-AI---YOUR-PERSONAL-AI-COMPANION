@@ -94,7 +94,12 @@ class VoiceCommandProcessor:
             # ==========================================
             {
                 "id": "open_youtube",
-                "patterns": [r"^(open|go to|launch) youtube$", r"^youtube$"],
+                "patterns": [
+                    r"^(open|go to|launch) youtube$",
+                    r"^youtube$",
+                    r"^youtube khol$",
+                    r"^youtube kholo$",
+                ],
                 "action": lambda m: self._open_url("https://www.youtube.com", "Opening YouTube"),
                 "type": CommandType.WEB,
             },
@@ -272,6 +277,8 @@ class VoiceCommandProcessor:
                     r"^play (.+) youtube$",
                     r"^search youtube for (.+)$",
                     r"^youtube search (.+)$",
+                    r"^youtube par (.+) chala de$",
+                    r"^youtube pe (.+) chala de$",
                 ],
                 "action": self._action_play_youtube,
                 "type": CommandType.MEDIA,
@@ -440,7 +447,8 @@ class VoiceCommandProcessor:
             {
                 "id": "volume_up",
                 "patterns": [
-                    r"^(volume up|increase volume|louder|raise volume)$",
+                    r"^(volume up|increase volume|louder|raise volume|awaz badha|awaz badhao|"
+                    r"volume badha)$",
                     r"^turn up the volume$",
                 ],
                 "action": lambda m: self._change_volume(up=True, steps=5),
@@ -449,7 +457,8 @@ class VoiceCommandProcessor:
             {
                 "id": "volume_down",
                 "patterns": [
-                    r"^(volume down|decrease volume|lower volume|softer)$",
+                    r"^(volume down|decrease volume|lower volume|softer|awaz kam kar|"
+                    r"awaz kam karo|volume kam kar)$",
                     r"^turn down the volume$",
                 ],
                 "action": lambda m: self._change_volume(up=False, steps=5),
@@ -473,7 +482,10 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "volume_mute",
-                "patterns": [r"^(mute|unmute|mute sound|mute volume|toggle mute)$"],
+                "patterns": [
+                    r"^(mute|unmute|mute sound|mute volume|toggle mute|mute kar de|"
+                    r"awaz band kar|mute karo)$"
+                ],
                 "action": lambda m: self._press_key("volumemute", "Mute toggled"),
                 "type": CommandType.SYSTEM,
             },
@@ -482,13 +494,23 @@ class VoiceCommandProcessor:
             # ==========================================
             {
                 "id": "open_notepad",
-                "patterns": [r"^(open|launch) notepad$", r"^notepad$"],
+                "patterns": [
+                    r"^(open|launch) notepad$",
+                    r"^notepad$",
+                    r"^notepad khol$",
+                    r"^notepad kholo$",
+                ],
                 "action": lambda m: self._launch_app("notepad", "Opening Notepad"),
                 "type": CommandType.APPLICATION,
             },
             {
                 "id": "open_calculator",
-                "patterns": [r"^(open|launch) calculator$", r"^calculator$"],
+                "patterns": [
+                    r"^(open|launch) calculator$",
+                    r"^calculator$",
+                    r"^calculator khol$",
+                    r"^calculator kholo$",
+                ],
                 "action": lambda m: self._launch_app("calc", "Opening Calculator"),
                 "type": CommandType.APPLICATION,
             },
@@ -500,7 +522,11 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "open_explorer",
-                "patterns": [r"^(open|launch) (explorer|file explorer|files|this pc|my computer)$"],
+                "patterns": [
+                    r"^(open|launch) (explorer|file explorer|files|this pc|my computer)$",
+                    r"^file explorer khol$",
+                    r"^explorer khol$",
+                ],
                 "action": lambda m: self._launch_app("explorer", "Opening File Explorer"),
                 "type": CommandType.APPLICATION,
             },
@@ -538,7 +564,11 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "open_chrome",
-                "patterns": [r"^(open|launch) (chrome|google chrome)$"],
+                "patterns": [
+                    r"^(open|launch) (chrome|google chrome)$",
+                    r"^chrome khol$",
+                    r"^chrome kholo$",
+                ],
                 "action": lambda m: self._launch_app("start chrome", "Opening Google Chrome"),
                 "type": CommandType.APPLICATION,
             },
@@ -550,7 +580,11 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "open_vscode",
-                "patterns": [r"^(open|launch) (vs code|vscode|code)$"],
+                "patterns": [
+                    r"^(open|launch) (vs code|vscode|code)$",
+                    r"^vs code khol$",
+                    r"^vscode khol$",
+                ],
                 "action": lambda m: self._launch_app("code", "Opening Visual Studio Code"),
                 "type": CommandType.APPLICATION,
             },
@@ -620,13 +654,19 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "lock_computer",
-                "patterns": [r"^(lock computer|lock pc|lock screen|lock windows)$"],
+                "patterns": [
+                    r"^(lock computer|lock pc|lock screen|lock windows|pc lock kar de|"
+                    r"computer lock kar|pc lock karo)$"
+                ],
                 "action": lambda m: self._action_lock_pc(),
                 "type": CommandType.SYSTEM,
             },
             {
                 "id": "take_screenshot",
-                "patterns": [r"^(take a screenshot|capture screen|screenshot|take screenshot)$"],
+                "patterns": [
+                    r"^(take a screenshot|capture screen|screenshot|take screenshot|"
+                    r"screenshot le|screenshot lo)$"
+                ],
                 "action": lambda m: self._action_take_screenshot(),
                 "type": CommandType.SYSTEM,
             },
@@ -874,7 +914,7 @@ class VoiceCommandProcessor:
                 "id": "tell_time",
                 "patterns": [
                     r"^(what time is it|what is the time|current time|tell me the time|time "
-                    r"please)$"
+                    r"please|time kya hai|kitne baje hain|samay kya hai)$"
                 ],
                 "action": lambda m: self._action_get_time(),
                 "type": CommandType.UTILITY,
@@ -883,14 +923,17 @@ class VoiceCommandProcessor:
                 "id": "tell_date",
                 "patterns": [
                     r"^(what is the date|today's date|what date is it|tell me the date|what's the "
-                    r"date)$"
+                    r"date|aaj ki date kya hai|aaj kya date hai|aaj kaunsi tarikh hai)$"
                 ],
                 "action": lambda m: self._action_get_date(),
                 "type": CommandType.UTILITY,
             },
             {
                 "id": "tell_day",
-                "patterns": [r"^(what day is today|what day is it|day of the week)$"],
+                "patterns": [
+                    r"^(what day is today|what day is it|day of the week|"
+                    r"aaj kaunsa din hai)$"
+                ],
                 "action": lambda m: self._action_get_day(),
                 "type": CommandType.UTILITY,
             },
@@ -927,37 +970,52 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "tell_joke",
-                "patterns": [r"^(tell me a joke|tell a joke|joke|make me laugh)$"],
+                "patterns": [
+                    r"^(tell me a joke|tell a joke|joke|make me laugh|ek joke suna|"
+                    r"joke suna|mujhe hasao)$"
+                ],
                 "action": lambda m: self._action_tell_joke(),
                 "type": CommandType.UTILITY,
             },
             {
                 "id": "flip_coin",
-                "patterns": [r"^(flip a coin|toss a coin|coin flip)$"],
+                "patterns": [
+                    r"^(flip a coin|toss a coin|coin flip|coin flip kar|sikka uchalo|"
+                    r"coin toss kar)$"
+                ],
                 "action": lambda m: self._action_flip_coin(),
                 "type": CommandType.UTILITY,
             },
             {
                 "id": "roll_dice",
-                "patterns": [r"^(roll a dice|roll dice|roll a die)$"],
+                "patterns": [r"^(roll a dice|roll dice|roll a die|dice roll kar)$"],
                 "action": lambda m: self._action_roll_dice(),
                 "type": CommandType.UTILITY,
             },
             {
                 "id": "take_note",
-                "patterns": [r"^take a note (.+)$", r"^write note (.+)$", r"^note down (.+)$"],
+                "patterns": [
+                    r"^take a note (.+)$",
+                    r"^write note (.+)$",
+                    r"^note down (.+)$",
+                    r"^ek note likh de: (.+)$",
+                    r"^note likh (.+)$",
+                ],
                 "action": self._action_take_note,
                 "type": CommandType.UTILITY,
             },
             {
                 "id": "read_notes",
-                "patterns": [r"^(read my notes|read notes|show notes|show my notes)$"],
+                "patterns": [
+                    r"^(read my notes|read notes|show notes|show my notes|"
+                    r"mere notes dikha|notes dikha)$"
+                ],
                 "action": lambda m: self._action_read_notes(),
                 "type": CommandType.UTILITY,
             },
             {
                 "id": "clear_notes",
-                "patterns": [r"^(clear notes|delete notes|empty notes)$"],
+                "patterns": [r"^(clear notes|delete notes|empty notes|notes delete kar de)$"],
                 "action": lambda m: self._action_clear_notes(),
                 "type": CommandType.UTILITY,
             },
@@ -979,7 +1037,10 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "battery_status",
-                "patterns": [r"^(battery level|battery status|check battery|how much battery)$"],
+                "patterns": [
+                    r"^(battery level|battery status|check battery|how much battery|"
+                    r"battery kitni hai)$"
+                ],
                 "action": lambda m: self._action_check_battery(),
                 "type": CommandType.SYSTEM,
             },
@@ -1192,7 +1253,10 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "tell_quote",
-                "patterns": [r"^(tell me a quote|inspire me|motivate me|quote of the day)$"],
+                "patterns": [
+                    r"^(tell me a quote|inspire me|motivate me|quote of the day|"
+                    r"mujhe motivate kar|motivation do|ek quote suna)$"
+                ],
                 "action": lambda m: random.choice(  # noqa: S311 — non-crypto UI randomness (canned replies/jokes/dice)
                     [
                         "'The secret of getting ahead is getting started.' — Mark Twain",
@@ -1206,7 +1270,10 @@ class VoiceCommandProcessor:
             },
             {
                 "id": "tell_fact",
-                "patterns": [r"^(tell me a fact|interesting fact|fun fact|random fact)$"],
+                "patterns": [
+                    r"^(tell me a fact|interesting fact|fun fact|random fact|"
+                    r"ek fact bata|interesting fact bata|fact bata)$"
+                ],
                 "action": lambda m: random.choice(  # noqa: S311 — non-crypto UI randomness (canned replies/jokes/dice)
                     [
                         "Did you know? Honey never spoils — archaeologists have found edible "
@@ -1913,7 +1980,14 @@ class VoiceInterface:
         try:
             self.microphone = sr.Microphone()
         except Exception as e:
-            logger.warning(f"Could not initialize microphone: {e}")
+            # Loud, actionable warning: a missing PyAudio used to make this a
+            # silent no-op (microphone=None, voice never hears anything).
+            logger.warning(
+                "Could not initialize microphone: %s. "
+                "Install the mic backend (Windows: pip install PyAudio) "
+                "and check Windows Settings > Sound > Input.",
+                e,
+            )
 
     def _load_config(self) -> Dict[str, Any]:
         # Task 0.3: single source of truth is access_os.config.Settings.

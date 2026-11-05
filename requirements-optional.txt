@@ -25,5 +25,8 @@
 # pygetwindow>=0.0.9      # never imported
 # pywin32>=306            # no win32* imports anywhere; ctypes is used instead
 # python-dateutil>=2.8.2  # never imported
-# pyaudio>=0.2.13         # only named inside a test's print() string, never imported;
-#                         # not needed for Google STT via SpeechRecognition
+# pyaudio>=0.2.13         # RESTORED 2026-11-05: speech_recognition's
+#                         # Microphone() REQUIRES PyAudio at runtime; the
+#                         # 2026-10-30 removal broke all mic input. It now
+#                         # lives in requirements.txt (win32) + the audio
+#                         # extra in pyproject.toml.

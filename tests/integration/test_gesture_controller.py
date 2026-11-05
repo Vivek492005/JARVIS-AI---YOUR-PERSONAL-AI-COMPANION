@@ -18,6 +18,23 @@ class TestGestureController(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        # The controller binds `mp`/`cv2` at import time. The sys.modules
+        # setdefault above loses when another module imported the real
+        # packages first during collection (tests/hardware/test_gestures.py
+        # does `pytest.importorskip("mediapipe")` at module level, and
+        # hardware/ sorts before integration/). On Python 3.12 the real
+        # mediapipe wheel has no `mp.solutions`, so __init__ crashes; and
+        # the real cv2's imshow aborts headless (no display). Patching the
+        # module globals here makes the tests independent of collection
+        # order; patches auto-undo per test.
+        self._mp_patcher = patch("jarvis.legacy.gestures.controller.mp", MagicMock(name="mp"))
+        self._mp_patcher.start()
+        self.addCleanup(self._mp_patcher.stop)
+        mock_cv2 = MagicMock(name="cv2")
+        mock_cv2.waitKey.return_value = ord("q")
+        self._cv2_patcher = patch("jarvis.legacy.gestures.controller.cv2", mock_cv2)
+        self._cv2_patcher.start()
+        self.addCleanup(self._cv2_patcher.stop)
         self.gc = GestureController(enable_hand_tracking=True, enable_face_mesh=False)
         self.gc.hands = MagicMock()
         self.gc.face_mesh = None
