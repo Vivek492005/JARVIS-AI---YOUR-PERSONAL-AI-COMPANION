@@ -38,7 +38,7 @@ pyperclip>=1.8.0
 # mediapipe is PINNED <1.0: v1.x removed mp.solutions (hands/face_mesh/
 # drawing_utils) which the legacy gesture controller uses. A fresh install
 # pulls 1.2.2 and every gesture test fails with AttributeError.
-opencv-python>=4.7.0
+opencv-python>=5.0.0.93
 mediapipe>=0.10.0,<1.0
 numpy>=1.24.0
 
