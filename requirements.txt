@@ -31,7 +31,7 @@ fuzzywuzzy>=0.18.0
 
 # OS control & system info
 pyautogui>=0.9.54
-psutil>=5.9.0
+psutil>=7.2.2
 pyperclip>=1.8.0
 
 # Gestures / camera
